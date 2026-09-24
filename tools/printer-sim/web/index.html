@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Simulador de impresoras</title>
+<style>
+:root{
+  --bg:#F2F2F7;--card:#fff;--fill:rgba(118,118,128,.12);--label:#1C1C1E;--label2:rgba(60,60,67,.62);--label3:rgba(60,60,67,.3);--sep:rgba(60,60,67,.16);
+  --blue:#007AFF;--green:#34C759;--orange:#FF9500;--red:#FF3B30;--yellow:#FFCC00;--gray:#8E8E93;
+  --paper:#FFFEF9;--ink:#1d1d1f;--shadow:0 1px 2px rgba(0,0,0,.04),0 8px 28px rgba(0,0,0,.07);--thumb:#fff;
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --mono:"SF Mono",ui-monospace,Menlo,Consolas,"DejaVu Sans Mono",monospace;
+}
+@media (prefers-color-scheme:dark){:root{
+  color-scheme:dark;--bg:#000;--card:#1C1C1E;--fill:rgba(120,120,128,.24);--label:#F5F5F7;--label2:rgba(235,235,245,.62);--label3:rgba(235,235,245,.3);--sep:rgba(84,84,88,.55);
+  --blue:#0A84FF;--green:#30D158;--orange:#FF9F0A;--red:#FF453A;--yellow:#FFD60A;--gray:#98989D;--paper:#F4F1E8;--shadow:none;--thumb:#636366;
+}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--label);font:16px/1.45 var(--font);-webkit-font-smoothing:antialiased}
+.wrap{max-width:1240px;margin:0 auto;padding:24px 20px 60px}
+h1{font-size:34px;letter-spacing:-.02em;margin:4px 0 2px;font-weight:800}
+.sub{color:var(--label2);margin:0 0 20px}
+.layout{display:grid;grid-template-columns:minmax(0,420px) minmax(0,1fr);gap:24px;align-items:start}
+.h2{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--label2);margin:0 4px 8px;font-weight:600;display:flex;justify-content:space-between;align-items:center}
+.printers{display:flex;flex-direction:column;gap:14px}
+.pcard{background:var(--card);border-radius:20px;padding:16px;box-shadow:var(--shadow)}
+.ptop{display:flex;gap:12px;align-items:center}
+.icon{width:46px;height:46px;border-radius:12px;display:grid;place-items:center;color:#fff;flex:none;background:linear-gradient(160deg,var(--c2),var(--c1));box-shadow:inset 0 1px 0 rgba(255,255,255,.3)}
+.icon svg{width:26px;height:26px}
+.pname{font-weight:700;font-size:17px}
+.paddr{font-family:var(--mono);font-size:13px;color:var(--label2)}
+.pill{margin-left:auto;display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 10px;border-radius:13px;font-size:13px;font-weight:600;white-space:nowrap}
+.pill i{width:8px;height:8px;border-radius:50%;background:currentColor}
+.ok{background:color-mix(in srgb,var(--green) 16%,transparent);color:color-mix(in srgb,var(--green) 80%,var(--label))}
+.warn{background:color-mix(in srgb,var(--orange) 18%,transparent);color:color-mix(in srgb,var(--orange) 80%,var(--label))}
+.bad{background:color-mix(in srgb,var(--red) 15%,transparent);color:color-mix(in srgb,var(--red) 85%,var(--label))}
+.off{background:var(--fill);color:var(--label2)}
+.seg{display:grid;grid-template-columns:repeat(5,1fr);background:var(--fill);border-radius:9px;padding:2px;margin-top:14px}
+.seg button{border:0;background:none;font:inherit;font-size:12px;font-weight:500;color:var(--label);height:30px;border-radius:7px;cursor:pointer;padding:0 2px}
+.seg button[aria-pressed=true]{background:var(--thumb);box-shadow:0 2px 6px rgba(0,0,0,.14);font-weight:600}
+.prow{display:flex;gap:8px;align-items:center;margin-top:12px;flex-wrap:wrap}
+.btn{border:0;font:inherit;font-size:14px;font-weight:600;height:34px;padding:0 14px;border-radius:17px;cursor:pointer;background:var(--fill);color:var(--blue);display:inline-flex;align-items:center;gap:6px}
+.btn.primary{background:var(--blue);color:#fff}
+.btn:active{transform:scale(.97)}
+label.lat{font-size:13px;color:var(--label2);display:flex;align-items:center;gap:6px;margin-left:auto}
+select{font:inherit;font-size:13px;border:0;background:var(--fill);color:var(--label);border-radius:8px;height:30px;padding:0 8px}
+.hint{font-size:13px;color:var(--label2);margin:12px 4px 0}
+.hint code{font-family:var(--mono);font-size:12px;background:var(--fill);padding:1px 5px;border-radius:5px}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.chip{border:0;font:inherit;font-size:14px;font-weight:500;height:32px;padding:0 13px;border-radius:16px;background:var(--card);box-shadow:inset 0 0 0 .5px var(--sep);color:var(--label);cursor:pointer}
+.chip[aria-pressed=true]{background:var(--blue);color:#fff;box-shadow:none}
+.feed{display:flex;flex-wrap:wrap;gap:22px;align-items:flex-start}
+.tk{position:relative;animation:drop .45s cubic-bezier(.2,.9,.3,1.2)}
+@keyframes drop{from{transform:translateY(-14px);opacity:0}to{transform:none;opacity:1}}
+.tkmeta{display:flex;gap:8px;align-items:center;font-size:12px;color:var(--label2);margin:0 2px 6px}
+.tkmeta b{color:var(--label)}
+.paper{background:var(--paper);color:var(--ink);font-family:var(--mono);font-size:12px;line-height:1.3;padding:14px 12px 18px;box-shadow:0 1px 3px rgba(0,0,0,.12),0 10px 24px -12px rgba(0,0,0,.3);position:relative;--zig:8px;
+  -webkit-mask:linear-gradient(#000,#000) 0 0/100% calc(100% - var(--zig)) no-repeat,conic-gradient(from -45deg at bottom,#0000,#000 1deg 89deg,#0000 90deg) 50% 100%/calc(var(--zig)*2) var(--zig) repeat-x;
+          mask:linear-gradient(#000,#000) 0 0/100% calc(100% - var(--zig)) no-repeat,conic-gradient(from -45deg at bottom,#0000,#000 1deg 89deg,#0000 90deg) 50% 100%/calc(var(--zig)*2) var(--zig) repeat-x}
+.ln{display:flex;white-space:pre;min-height:1.3em}
+.ln.c{justify-content:center}.ln.r{justify-content:flex-end}
+.run{display:inline-block;white-space:pre}
+.run.b{font-weight:800}.run.u{text-decoration:underline}.run.i{background:var(--ink);color:var(--paper)}
+.run .sc{display:inline-block;transform-origin:0 100%}
+.bar{height:46px;display:flex;gap:1px;margin:6px 0 2px}
+.bar i{display:block;background:var(--ink)}
+.codecap{font-size:10px;text-align:center}
+.qr{width:120px;height:120px;image-rendering:pixelated;display:block;margin:6px auto}
+.cut{border-top:1.5px dashed #999;margin:10px -12px 0;position:relative}
+.cut span{position:absolute;right:6px;top:-9px;background:var(--paper);font-size:11px;color:#777;padding:0 4px}
+.drawer{margin:8px auto 0;width:max-content;font-family:var(--font);font-size:11px;font-weight:700;color:#fff;background:#34C759;border-radius:10px;padding:2px 10px}
+.held{position:absolute;inset:26px 0 0;display:grid;place-items:center;background:color-mix(in srgb,var(--bg) 55%,transparent);backdrop-filter:blur(2px);border-radius:4px}
+.held span{background:var(--red);color:#fff;font-weight:700;font-size:13px;padding:6px 12px;border-radius:14px;box-shadow:0 6px 16px rgba(0,0,0,.2)}
+.empty{background:var(--card);border-radius:20px;padding:40px 20px;text-align:center;color:var(--label2);box-shadow:var(--shadow);width:100%}
+.empty .icon{margin:0 auto 12px;--c1:#8E8E93;--c2:#C7C7CC}
+.live{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--green);text-transform:none;letter-spacing:0}
+.live i{width:8px;height:8px;border-radius:50%;background:currentColor;animation:pulse 1.6s infinite}
+.live.down{color:var(--red)}.live.down i{animation:none}
+@keyframes pulse{50%{opacity:.3}}
+@media (max-width:900px){.layout{grid-template-columns:1fr}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Impresoras simuladas</h1>
+  <p class="sub">Cada impresora escucha en su puerto TCP como una térmica real. Envía ESC/POS y el ticket aparece aquí al instante.</p>
+  <div class="layout">
+    <section>
+      <div class="h2">Impresoras <span class="live" id="live"><i></i>En vivo</span></div>
+      <div class="printers" id="printers"></div>
+      <p class="hint">Prueba desde una terminal: <code>printf 'Hola cocina\n\x1dVA\x03' | nc localhost 9100</code></p>
+    </section>
+    <section>
+      <div class="h2">Tickets recibidos <button class="btn" id="clear" type="button">Limpiar</button></div>
+      <div class="chips" id="chips"></div>
+      <div class="feed" id="feed"></div>
+    </section>
+  </div>
+</div>
+<script>
+const ICONS = {
+  flame:'<path d="M12 22c4 0 7-2.7 7-6.8 0-3.1-1.9-5.4-3.4-7.1-.4 1.6-1.4 2.8-2.6 3.2.3-3.3-1.3-6.3-4-8.3.2 3-1.6 5-3 6.8C4.8 11.4 5 13.4 5 15.2 5 19.3 8 22 12 22Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>',
+  wine:'<path d="M8 22h8M12 15v7M7 2h10l-.6 6.4A4.4 4.4 0 0 1 12 12.5a4.4 4.4 0 0 1-4.4-4.1Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
+  receipt:'<path d="M5 2v20l2.3-1.5L9.7 22 12 20.5 14.3 22l2.4-1.5L19 22V2l-2.3 1.5L14.3 2 12 3.5 9.7 2 7.3 3.5Z M9 8h6M9 12h6M9 16h3" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>',
+  printer:'<path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>',
+};
+const PALETTE = [['#FF375F','#FF9F0A','flame'],['#BF5AF2','#FF7AD9','wine'],['#0A84FF','#5AC8FA','receipt'],['#30B0C7','#64D2FF','printer'],['#30D158','#63E6A2','printer']];
+const ESTADOS = [['normal','Lista'],['poco_papel','Poco papel'],['sin_papel','Sin papel'],['tapa_abierta','Tapa'],['desconectada','Apagada']];
+const PILL = {normal:['ok','Lista'],poco_papel:['warn','Queda poco papel'],sin_papel:['bad','Sin papel'],tapa_abierta:['bad','Tapa abierta'],desconectada:['off','Apagada']};
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let printers = [], tickets = [], filtro = 'todas', vistos = new Set();
+
+async function api(path, opts) {
+  const r = await fetch(path, opts);
+  if (!r.ok) { const p = await r.json().catch(() => ({})); throw new Error(p.detail || r.statusText); }
+  return r.status === 204 || r.status === 202 ? null : r.json();
+}
+function icon(i) { const [c1, c2, n] = PALETTE[i % PALETTE.length]; return `<span class="icon" style="--c1:${c1};--c2:${c2}"><svg viewBox="0 0 24 24">${ICONS[n]}</svg></span>`; }
+
+function drawPrinters() {
+  document.getElementById('printers').innerHTML = printers.map((p, i) => {
+    const [cls, txt] = PILL[p.estado];
+    return `<article class="pcard" data-id="${p.id}">
+      <div class="ptop">${icon(i)}<div><div class="pname">${esc(p.nombre)}</div><div class="paddr">TCP ${esc(p.addr)} · ${p.papel} mm</div></div>
+        <span class="pill ${cls}"><i></i>${txt}${p.retenidos ? ` · ${p.retenidos} retenido${p.retenidos > 1 ? 's' : ''}` : ''}</span></div>
+      <div class="seg" role="group" aria-label="Estado de ${esc(p.nombre)}">${ESTADOS.map(([v, l]) => `<button type="button" data-estado="${v}" aria-pressed="${p.estado === v}">${l}</button>`).join('')}</div>
+      <div class="prow">
+        <button class="btn primary" type="button" data-ejemplo="comanda">Enviar comanda</button>
+        <button class="btn" type="button" data-ejemplo="prueba">Imprimir prueba</button>
+        <label class="lat">Latencia <select data-lat>${[0,200,800,1500,3000].map(v => `<option value="${v}" ${p.latenciaMs === v ? 'selected' : ''}>${v} ms</option>`).join('')}</select></label>
+      </div></article>`;
+  }).join('');
+  document.getElementById('chips').innerHTML = [['todas', 'Todas'], ...printers.map(p => [p.id, p.nombre])]
+    .map(([v, l]) => `<button class="chip" type="button" data-f="${v}" aria-pressed="${filtro === v}">${esc(l)}</button>`).join('');
+}
+
+function runHTML(r) {
+  const w = r.w || 1, h = r.h || 1, cls = ['run', r.b && 'b', r.u && 'u', r.i && 'i'].filter(Boolean).join(' ');
+  if (w === 1 && h === 1) return `<span class="${cls}">${esc(r.t)}</span>`;
+  const len = [...r.t].length;
+  return `<span class="${cls}" style="width:${len * w}ch;height:${1.3 * h}em"><span class="sc" style="transform:translateY(${1.3 * (h - 1)}em) scale(${w},${h})">${esc(r.t)}</span></span>`;
+}
+function barsHTML(data) {
+  let bars = '', seed = 7;
+  for (const ch of '*' + data + '*') { seed = (seed * 31 + ch.charCodeAt(0)) % 997; for (let k = 0; k < 4; k++) { const v = (seed >> k) & 3; bars += `<i style="width:${1 + v}px;margin-right:${1 + ((v + k) & 1)}px"></i>`; } }
+  return `<div class="bar" style="justify-content:center">${bars}</div><div class="codecap">${esc(data)} · CODE128 (vista simulada)</div>`;
+}
+function ticketHTML(t) {
+  const alin = ['', 'c', 'r'];
+  const body = t.elementos.map(e => {
+    switch (e.tipo) {
+      case 'text': return `<div class="ln ${alin[e.alin]}">${(e.runs || []).map(runHTML).join('') || ' '}</div>`;
+      case 'barcode': return barsHTML(e.dato);
+      case 'qr': return e.qrPng ? `<img class="qr" alt="QR: ${esc(e.dato)}" src="${e.qrPng}">` : `<div class="codecap">[QR ${esc(e.dato)}]</div>`;
+      case 'cut': return `<div class="cut"><span>✂ corte</span></div>`;
+      case 'drawer': return `<div class="drawer">Cajón abierto</div>`;
+    }
+    return '';
+  }).join('');
+  const hora = new Date(t.recibido).toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  const motivo = { sin_papel: 'Retenido: sin papel', tapa_abierta: 'Retenido: tapa abierta' }[(printers.find(p => p.id === t.impresoraId) || {}).estado] || 'Retenido';
+  return `<div class="tk" data-new="${!vistos.has(t.id)}">
+    <div class="tkmeta"><b>${esc(t.impresora)}</b> · ${hora} · ${t.bytes} bytes · ${t.duracionMs} ms</div>
+    <div class="paper" style="width:calc(${t.papel === 58 ? 32 : 48}ch + 24px)">${body}</div>
+    ${t.impreso ? '' : `<div class="held"><span>${motivo}</span></div>`}
+  </div>`;
+}
+function drawFeed() {
+  const list = tickets.filter(t => filtro === 'todas' || t.impresoraId === filtro);
+  const feed = document.getElementById('feed');
+  feed.innerHTML = list.length ? list.map(ticketHTML).join('')
+    : `<div class="empty">${icon(3)}Todavía no llegan tickets. Toca «Enviar comanda» o manda ESC/POS al puerto de una impresora.</div>`;
+  feed.querySelectorAll('.tk[data-new=false]').forEach(el => el.style.animation = 'none');
+  list.forEach(t => vistos.add(t.id));
+}
+async function refresh() {
+  [printers, tickets] = await Promise.all([api('api/impresoras'), api('api/tickets')]);
+  drawPrinters(); drawFeed();
+}
+
+document.getElementById('printers').addEventListener('click', async e => {
+  const card = e.target.closest('.pcard'); if (!card) return;
+  const id = card.dataset.id;
+  try {
+    const est = e.target.closest('[data-estado]');
+    if (est) await api(`api/impresoras/${id}/estado`, { method: 'POST', body: JSON.stringify({ estado: est.dataset.estado }) });
+    const ej = e.target.closest('[data-ejemplo]');
+    if (ej) await api(`api/impresoras/${id}/ejemplo?tipo=${ej.dataset.ejemplo}`, { method: 'POST' });
+    await refresh();
+  } catch (err) { alertaInline(card, err.message); }
+});
+document.getElementById('printers').addEventListener('change', async e => {
+  if (!e.target.matches('[data-lat]')) return;
+  const id = e.target.closest('.pcard').dataset.id;
+  await api(`api/impresoras/${id}/estado`, { method: 'POST', body: JSON.stringify({ latenciaMs: +e.target.value }) });
+  refresh();
+});
+function alertaInline(card, msg) {
+  const p = document.createElement('p'); p.className = 'hint'; p.style.color = 'var(--red)'; p.textContent = msg;
+  card.appendChild(p); setTimeout(() => p.remove(), 5000);
+}
+document.getElementById('chips').addEventListener('click', e => { const c = e.target.closest('[data-f]'); if (c) { filtro = c.dataset.f; drawPrinters(); drawFeed(); } });
+document.getElementById('clear').addEventListener('click', async () => { await api('api/tickets', { method: 'DELETE' }); refresh(); });
+
+const live = document.getElementById('live');
+function connect() {
+  const es = new EventSource('api/eventos');
+  es.addEventListener('cambio', () => refresh());
+  es.onopen = () => { live.className = 'live'; live.lastChild.textContent = 'En vivo'; };
+  es.onerror = () => { live.className = 'live down'; live.lastChild.textContent = 'Sin conexión'; };
+}
+refresh().then(connect);
+</script>
+</body>
+</html>
