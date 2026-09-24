@@ -1,0 +1,314 @@
+[
+  {
+    "id": "F0",
+    "nombre": "Fundaciones y spikes de riesgo",
+    "corto": "Fundaciones",
+    "icono": "flask-conical",
+    "color": [
+      "#5E5CE6",
+      "#8E8CF7"
+    ],
+    "objetivo": "Dejar el terreno listo (monorepo, CI, entorno local, sistema de diseño) y eliminar las tres incógnitas técnicas mayores antes de construir encima: firma SRI, impresión ESC/POS y sincronización offline.",
+    "sem1": [
+      4,
+      6
+    ],
+    "sem3": [
+      3,
+      4
+    ],
+    "mvp": true,
+    "reqs": "Decisiones DP-01…16 · ADR-0001…0008 · Spikes SRI, impresión y sync",
+    "dod": [
+      "Los tres spikes tienen su resultado documentado en un ADR.",
+      "El CI está en verde en main.",
+      "`make dev` levanta todo el entorno local con un comando.",
+      "Sistema de diseño iOS publicado (tokens + componentes base) y wireframes validados con usuarios reales."
+    ]
+  },
+  {
+    "id": "F1",
+    "nombre": "Núcleo Cloud y Backoffice base",
+    "corto": "Núcleo Cloud",
+    "icono": "cloud",
+    "color": [
+      "#0A84FF",
+      "#5AC8FA"
+    ],
+    "objetivo": "API Go multi-tenant con RLS, autenticación web, catálogo, salón en cuadrícula y personal. El dueño configura su restaurante completo desde un backoffice con estética iPadOS.",
+    "sem1": [
+      5,
+      7
+    ],
+    "sem3": [
+      3,
+      4
+    ],
+    "mvp": true,
+    "reqs": "RF-01-01…04 · RF-03-01 (cuadrícula) · base de RF-03-06 · RNF-20",
+    "dod": [
+      "Un Admin crea su menú completo y su personal desde el backoffice.",
+      "La prueba de aislamiento entre tenants (QA-06) pasa para todas las tablas.",
+      "El despliegue a `dev` es automático al hacer merge en main."
+    ]
+  },
+  {
+    "id": "F2",
+    "nombre": "Nodo Local e impresión",
+    "corto": "Nodo Local",
+    "icono": "server",
+    "color": [
+      "#FF9F0A",
+      "#FFCC00"
+    ],
+    "objetivo": "El corazón offline: binario Go como servicio de Windows con SQLite WAL, sincronización con la nube, hub de tiempo real, descubrimiento de impresoras y ruteo de comandas por estación.",
+    "sem1": [
+      5,
+      7
+    ],
+    "sem3": [
+      3,
+      5
+    ],
+    "mvp": true,
+    "reqs": "RF-02-01…06, 08, 09 (parcial)",
+    "dod": [
+      "Desde el backoffice se configura «Bebidas → Bar, Platos → Cocina».",
+      "Un pedido simulado por la API del nodo imprime en 2 impresoras en paralelo con p95 ≤ 1,5 s.",
+      "Al desconectar una impresora el trabajo se conserva y se imprime al volver."
+    ]
+  },
+  {
+    "id": "F3",
+    "nombre": "App de meseros",
+    "corto": "App Meseros",
+    "icono": "smartphone",
+    "color": [
+      "#30D158",
+      "#63E6A2"
+    ],
+    "objetivo": "App Flutter con estilo Cupertino: emparejamiento por QR, login por PIN, mapa de mesas en vivo con bloqueo anti-colisión y toma de pedidos offline-first a una sola mano.",
+    "sem1": [
+      6,
+      8
+    ],
+    "sem3": [
+      4,
+      5
+    ],
+    "mvp": true,
+    "reqs": "RF-01-05, 06 · RF-03-02…10",
+    "dod": [
+      "8 dispositivos simultáneos contra un nodo sin internet: 0 platos duplicados y 0 colisiones de mesa.",
+      "Búsqueda p95 ≤ 50 ms en el móvil de referencia.",
+      "Test de concurrencia Go + prueba manual guiada en verde."
+    ]
+  },
+  {
+    "id": "F4",
+    "nombre": "Caja POS",
+    "corto": "Caja POS",
+    "icono": "monitor",
+    "color": [
+      "#BF5AF2",
+      "#DA8FFF"
+    ],
+    "objetivo": "Caja web servida por el Nodo Local: cobro Zero-Click con billetes dinámicos, pagos mixtos, división de cuentas, jornadas, turnos, cierre ciego y Cierre Z inmutable.",
+    "sem1": [
+      6,
+      8
+    ],
+    "sem3": [
+      4,
+      5
+    ],
+    "mvp": true,
+    "reqs": "RF-04-01…10 · RF-01-07 · RF-02-07 · RF-03-11 · RF-08-06 (registro)",
+    "dod": [
+      "Suite Cypress del flujo de cobro y división en verde.",
+      "Cuadre al centavo en 1 000 escenarios aleatorios de división (property-based).",
+      "El Cierre Z coincide con la suma de los pagos en todas las pruebas."
+    ]
+  },
+  {
+    "id": "F5",
+    "nombre": "Facturación electrónica SRI",
+    "corto": "Facturación SRI",
+    "icono": "receipt",
+    "color": [
+      "#FF375F",
+      "#FF7A93"
+    ],
+    "objetivo": "Comprobantes electrónicos reales: secuencial y clave de acceso en el nodo, XML + XAdES-BES + SOAP en la nube, RIDE, bóveda de 7 años, notas de crédito y onboarding fiscal guiado.",
+    "sem1": [
+      6,
+      9
+    ],
+    "sem3": [
+      4,
+      6
+    ],
+    "mvp": true,
+    "reqs": "RF-05-01…09 · RF-04-11 · RF-08-02 (básicos)",
+    "dod": [
+      "200 comprobantes (facturas + NC) autorizados en el ambiente de pruebas cubriendo todas las tarifas, consumidor final, propina, descuentos y pagos mixtos.",
+      "Caída del SRI simulada 2 h sin pérdida.",
+      "Revisión del contador firmada (checklist `05` §14)."
+    ]
+  },
+  {
+    "id": "F6",
+    "nombre": "Hardening y piloto",
+    "corto": "Piloto",
+    "icono": "shield-check",
+    "color": [
+      "#64D2FF",
+      "#0A84FF"
+    ],
+    "objetivo": "Blindar el sistema para producción (respaldos, auto-update, observabilidad, carga, seguridad, LOPDP) y operar un restaurante piloto real en paralelo 14 días.",
+    "sem1": [
+      4,
+      6
+    ],
+    "sem3": [
+      3,
+      4
+    ],
+    "mvp": true,
+    "reqs": "RF-02-10, 11 · RNF-10…15, 50…54",
+    "dod": [
+      "El piloto opera 2 fines de semana completos en producción.",
+      "0 pérdidas de datos y 0 comprobantes perdidos.",
+      "≥ 99 % de autorizaciones en menos de 1 h (fuera de caídas del SRI).",
+      "Feedback registrado y priorizado. 🚀 = MVP."
+    ]
+  },
+  {
+    "id": "F7",
+    "nombre": "Inventario y stock diario",
+    "corto": "Inventario",
+    "icono": "package",
+    "color": [
+      "#AC8E68",
+      "#D4B98C"
+    ],
+    "objetivo": "Inventario por recetas (BOM) con sub-recetas, conversión de unidades, kardex inmutable, toma física ciega y cupos diarios en tiempo real con reservas.",
+    "sem1": [
+      9,
+      12
+    ],
+    "sem3": [
+      6,
+      8
+    ],
+    "mvp": false,
+    "reqs": "RF-06-01…10",
+    "dod": [
+      "La descarga por receta es exacta al 4.º decimal en la suite E2E.",
+      "Carrera de cupos (2 disponibles, 3 solicitudes) → 2 éxitos en el 100 % de 1 000 ejecuciones.",
+      "El reporte diario de cupos cuadra."
+    ]
+  },
+  {
+    "id": "F8",
+    "nombre": "Reportes, analítica y auditoría",
+    "corto": "Reportes",
+    "icono": "trending-up",
+    "color": [
+      "#32ADE6",
+      "#7FD4F5"
+    ],
+    "objetivo": "El «cerebro» del dueño: dashboard en vivo con widgets iOS, reportes exportables, reparto de propinas, exportación contable y la matriz de fugas.",
+    "sem1": [
+      6,
+      9
+    ],
+    "sem3": [
+      4,
+      6
+    ],
+    "mvp": false,
+    "reqs": "RF-08-01…07",
+    "dod": [
+      "Dashboard en vivo con latencia ≤ 5 s.",
+      "El reparto de propinas cuadra al centavo.",
+      "Matriz de fugas validada por el dueño piloto."
+    ]
+  },
+  {
+    "id": "F9",
+    "nombre": "KDS y menú QR",
+    "corto": "KDS + QR",
+    "icono": "chef-hat",
+    "color": [
+      "#FF6B35",
+      "#FF9F0A"
+    ],
+    "objetivo": "Pantalla de cocina offline servida por el nodo, aviso de «plato listo» al mesero y un menú QR público que muestra lo agotado en tiempo real.",
+    "sem1": [
+      5,
+      7
+    ],
+    "sem3": [
+      3,
+      5
+    ],
+    "mvp": false,
+    "reqs": "RF-07-01…03 · RF-03-12",
+    "dod": [
+      "KDS operando en el piloto.",
+      "«Plato listo» llega al mesero en ≤ 1 s.",
+      "El menú QR refleja «Agotado» en ≤ 5 s con internet."
+    ]
+  },
+  {
+    "id": "F10",
+    "nombre": "SaaS comercial",
+    "corto": "SaaS",
+    "icono": "rocket",
+    "color": [
+      "#00C7BE",
+      "#66E0D9"
+    ],
+    "objetivo": "Vender sin intervención: planes y entitlements, registro self-service, cobro recurrente, factura del propio SaaS, consola de plataforma, pentest y documentos legales.",
+    "sem1": [
+      6,
+      11
+    ],
+    "sem3": [
+      4,
+      7
+    ],
+    "mvp": false,
+    "reqs": "RF-09-01…04 · RF-01-08 · RF-05-10 · RNF-34",
+    "dod": [
+      "Un restaurante nuevo se registra, paga, instala y factura sin intervención del equipo.",
+      "Pentest externo sin hallazgos críticos abiertos.",
+      "Términos, privacidad y acuerdo de tratamiento de datos publicados."
+    ]
+  },
+  {
+    "id": "F11",
+    "nombre": "Expansión (backlog priorizable)",
+    "corto": "Expansión",
+    "icono": "sparkles",
+    "color": [
+      "#FFD60A",
+      "#FF9F0A"
+    ],
+    "objetivo": "Funciones de crecimiento que solo se construyen tras decidirlas explícitamente: multi-sucursal, hot standby, ATS, notas de venta RIMPE, datafonos, delivery, WhatsApp, auto-pedido QR e IA.",
+    "sem1": [
+      0,
+      0
+    ],
+    "sem3": [
+      0,
+      0
+    ],
+    "mvp": false,
+    "reqs": "RF-01-03 (multi-local) · RF-05-11 · RF-06-11 · RF-07-04 · RF-08-05 · RF-09-04.2",
+    "dod": [
+      "Cada épica se prioriza con datos del piloto y de los primeros clientes antes de iniciarse."
+    ]
+  }
+]
