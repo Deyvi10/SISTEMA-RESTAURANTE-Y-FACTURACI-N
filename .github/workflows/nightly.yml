@@ -1,0 +1,23 @@
+name: Pruebas largas
+
+on:
+  schedule:
+    - cron: "0 7 * * *" # 02:00 en Ecuador
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  property:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: QA-04 · 10⁶ claves de acceso
+        run: go test -count=1 ./packages/go/sri -run Property -rapid.checks=1000000
+      - name: Dinero · 10⁵ repartos
+        run: go test -count=1 ./packages/go/money -run Property -rapid.checks=100000

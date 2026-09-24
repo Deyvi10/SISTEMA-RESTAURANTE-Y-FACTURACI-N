@@ -1,0 +1,73 @@
+# CI base (F0-04, docs/08 §3). Cada job corre solo si cambió su parte del monorepo.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  cambios:
+    runs-on: ubuntu-latest
+    outputs:
+      go: ${{ steps.f.outputs.go }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: f
+        with:
+          filters: |
+            go:
+              - 'go.mod'
+              - 'go.sum'
+              - 'packages/go/**'
+              - 'packages/testdata/**'
+              - 'tools/**'
+              - 'apps/cloud-api/**'
+              - 'apps/edge-node/**'
+              - 'contracts/**'
+              - '.golangci.yml'
+
+  go:
+    needs: cambios
+    if: needs.cambios.outputs.go == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Formato
+        run: test -z "$(gofmt -l packages tools apps)" || (gofmt -l packages tools apps; exit 1)
+      - name: Sin float en dominio
+        run: make check-float
+      - name: go vet
+        run: go vet ./...
+      - uses: golangci/golangci-lint-action@v8
+        with:
+          version: latest
+      - name: Pruebas con detector de carreras
+        run: go test -race -count=1 -coverprofile=coverage.out ./...
+      - name: Cobertura de dominios críticos
+        run: go tool cover -func=coverage.out | tail -1
+      - name: Vulnerabilidades (govulncheck)
+        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+      - name: Golden de tickets sin cambios
+        run: go test ./packages/go/escpos -update && git diff --exit-code packages/go/escpos/testdata
+
+  secretos:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
