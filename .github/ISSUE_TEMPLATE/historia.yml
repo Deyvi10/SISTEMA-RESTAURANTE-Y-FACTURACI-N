@@ -1,0 +1,19 @@
+name: Historia o tarea
+description: Un ticket del backlog (docs/12-backlog-tickets.md)
+labels: [historia]
+body:
+  - type: input
+    id: ticket
+    attributes: { label: Ticket, placeholder: "F3-07" }
+    validations: { required: true }
+  - type: textarea
+    id: que
+    attributes: { label: Qué se quiere }
+    validations: { required: true }
+  - type: textarea
+    id: ac
+    attributes: { label: Criterios de aceptación, value: "- [ ] " }
+    validations: { required: true }
+  - type: input
+    id: req
+    attributes: { label: Requisitos, placeholder: "RF-03-03, QA-01" }

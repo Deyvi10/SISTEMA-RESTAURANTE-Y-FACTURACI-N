@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# Revisión rápida antes de cada commit: formato Go, float en dominio y secretos.
+set -euo pipefail
+GO=$(command -v go || echo "$HOME/.local/go/bin/go")
+files=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.go$' || true)
+if [[ -n "$files" ]]; then
+  bad=$("$(dirname "$GO")/gofmt" -l $files || true)
+  if [[ -n "$bad" ]]; then echo "✗ Archivos sin formato (ejecuta make fmt):"; echo "$bad"; exit 1; fi
+fi
+make -s check-float >/dev/null || { make -s check-float; exit 1; }
+if git diff --cached --name-only | grep -qE '\.(p12|pfx|pem|key)$|(^|/)\.env$'; then
+  echo "✗ Estás por confirmar un certificado, llave o .env. Eso nunca va al repositorio."; exit 1
+fi
+if command -v gitleaks >/dev/null; then gitleaks protect --staged --no-banner; fi

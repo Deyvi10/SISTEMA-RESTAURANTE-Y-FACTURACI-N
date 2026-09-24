@@ -1,0 +1,29 @@
+version: "2"
+run:
+  timeout: 5m
+linters:
+  default: none
+  enable:
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - gosec
+    - bodyclose
+    - errorlint
+    - noctx
+    - contextcheck
+  settings:
+    gosec:
+      excludes:
+        - G104 # cubierto por errcheck
+  exclusions:
+    rules:
+      - path: _test\.go
+        linters: [gosec, noctx]
+      - path: tools/
+        linters: [gosec]
+formatters:
+  enable:
+    - gofumpt

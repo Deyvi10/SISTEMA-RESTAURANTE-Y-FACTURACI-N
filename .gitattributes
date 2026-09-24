@@ -1,0 +1,5 @@
+* text=auto eol=lf
+*.golden.txt -text diff
+*.png binary
+*.docx binary
+*.p12 binary
