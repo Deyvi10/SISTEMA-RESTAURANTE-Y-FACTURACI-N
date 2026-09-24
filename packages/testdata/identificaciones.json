@@ -1,0 +1,19 @@
+{
+  "fuente": "docs/05 §12",
+  "casos": [
+    {"id": "1710034065", "valida": true, "tipo": "05", "contribuyente": "PERSONA_NATURAL", "nota": "Cédula de ejemplo"},
+    {"id": "1710034066", "valida": false, "tipo": "05", "nota": "Verificador alterado"},
+    {"id": "2510034065", "valida": false, "tipo": "05", "nota": "Provincia 25 no existe"},
+    {"id": "1760034065", "valida": false, "tipo": "05", "nota": "Tercer dígito ≥ 6"},
+    {"id": "171003406", "valida": false, "tipo": "", "nota": "9 dígitos: no es cédula ni RUC ni pasaporte válido"},
+    {"id": "1710034065001", "valida": true, "tipo": "04", "contribuyente": "PERSONA_NATURAL", "nota": "RUC persona natural"},
+    {"id": "1710034065000", "valida": false, "tipo": "04", "nota": "Establecimiento 000"},
+    {"id": "1790011674001", "valida": true, "tipo": "04", "contribuyente": "SOCIEDAD_PRIVADA", "nota": "RUC sociedad privada"},
+    {"id": "1790011675001", "valida": true, "tipo": "04", "contribuyente": "SOCIEDAD_PRIVADA", "advertencia": true, "nota": "Módulo 11 inválido: advierte, no bloquea"},
+    {"id": "1760001550001", "valida": true, "tipo": "04", "contribuyente": "SECTOR_PUBLICO", "nota": "RUC sector público"},
+    {"id": "1780011674001", "valida": false, "tipo": "04", "nota": "Tercer dígito 8 no existe"},
+    {"id": "9999999999999", "valida": true, "tipo": "07", "nota": "Consumidor final"},
+    {"id": "AB1234567", "valida": true, "tipo": "06", "nota": "Pasaporte"},
+    {"id": "12-34", "valida": false, "tipo": "", "nota": "Caracteres no permitidos"}
+  ]
+}
