@@ -31,8 +31,10 @@ reset: ## Borra los datos locales y vuelve a levantar el entorno
 logs: ## Sigue los logs del entorno local
 	docker compose logs -f --tail=50
 
-test: ## Pruebas Go con detector de carreras
-	$(GO) test -race -count=1 $(GOPKGS)
+TEST_DATABASE_URL ?= postgres://restpos_owner:restpos_dev@localhost:$${PG_PORT:-5442}/restpos
+
+test: ## Pruebas Go con detector de carreras (las de Postgres corren si `make dev` está arriba)
+	TEST_DATABASE_URL="$(TEST_DATABASE_URL)" $(GO) test -race -count=1 $(GOPKGS)
 
 test-long: ## Pruebas property-based largas (QA-04: 10⁶ claves de acceso)
 	$(GO) test -count=1 ./packages/go/sri -run Property -rapid.checks=1000000

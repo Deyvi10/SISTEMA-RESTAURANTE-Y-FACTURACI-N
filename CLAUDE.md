@@ -27,6 +27,6 @@ La documentación vive en `documentacion-proyecto/`: toda referencia a `docs/…
 | F0-11 Dinero, IDs, reloj | ✅ Go. TS y Dart pendientes (usar `packages/testdata/`) |
 | F0-08 Spike SRI | 🟡 Clave de acceso lista. Falta XML + XSD + firma XAdES: requiere `.p12` de pruebas (DP-04) |
 | F0-09 Spike impresión | 🟡 Librería ESC/POS lista y probada con el simulador. Falta hardware real (DP-04) |
-| F0-10 Spike sync | ⏳ |
+| F0-10 Spike sync | ✅ 10 000 eventos con caos: 0 pérdidas, 0 duplicados (ADR-0012, `packages/go/edgesync`) |
 | F0-12 Sistema de diseño | ⏳ |
 | F0-01, F0-13, F0-14 | ⏳ Requieren decisiones, usuarios reales o descargar la ficha del SRI |
