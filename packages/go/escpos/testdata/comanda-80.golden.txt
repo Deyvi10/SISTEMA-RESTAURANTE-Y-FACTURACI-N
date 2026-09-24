@@ -1,0 +1,19 @@
+COCINA CALIENTE
+Mesa 4
+Comanda #27                                21:15
+Mesero: Carlos M.                     24/09/2026
+================================================
+-- ENTRADA --
+1 x Ceviche mixto
+    * Sin cebolla
+-- FUERTE --
+1 x Hamburguesa doble con queso cheddar y tocino
+    > Término medio
+    > Extra queso
+1 x Hamburguesa doble con queso cheddar y tocino
+    > Bien cocida
+    * Alérgico al maní
+================================================
+
+
+-------- corte --------
