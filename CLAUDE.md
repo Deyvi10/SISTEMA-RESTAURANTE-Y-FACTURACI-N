@@ -21,7 +21,7 @@ La documentación vive en `documentacion-proyecto/`: toda referencia a `docs/…
 | F0-02 Monorepo | ✅ |
 | F0-03 Tooling | ✅ Go (vet, golangci, gofumpt, ganchos). TS y Flutter se configuran al crear sus apps |
 | F0-04 CI | ✅ `.github/workflows/ci.yml` + nocturno |
-| F0-05 `make dev` | ✅ Postgres 17, VersityGW (S3 + Object Lock), Mailpit, toxiproxy, simuladores |
+| F0-05 `make dev` | ✅ Postgres 17, VersityGW (S3 + Object Lock), Azurite (Azure Blob, ADR-0013), Mailpit, toxiproxy, simuladores |
 | F0-06 Simulador de impresoras | ✅ `tools/printer-sim` |
 | F0-07 Stub del SRI | ✅ `tools/sri-stub` |
 | F0-11 Dinero, IDs, reloj | ✅ Go. TS y Dart pendientes (usar `packages/testdata/`) |
@@ -32,7 +32,7 @@ La documentación vive en `documentacion-proyecto/`: toda referencia a `docs/…
 | F0-01, F0-13, F0-14 | ⏳ Requieren decisiones, usuarios reales o descargar la ficha del SRI |
 | F1-01…F1-09, F1-13 | ✅ API Go (`apps/cloud-api`): RLS forzado + QA-06 en 16 tablas, QA-11, auth completa, catálogo, salón, personal, imágenes WebP + galería de 24 fotos CC0 |
 | F1-10…F1-12 | ✅ Backoffice React (`apps/backoffice-web`): login promocional, guía de 5 pasos, menú con fotos, salón, personal con PIN, ajustes |
-| F1-14 | 🟡 Imagen Docker lista (`deploy/docker/cloud-api.Dockerfile`, `-tags nodynamic`). Falta IaC y despliegue a `dev`: depende de DP-01 (nube) |
+| F1-14 | 🟡 Imagen Docker lista (`deploy/docker/cloud-api.Dockerfile`, `-tags nodynamic`). Falta IaC (Terraform en `deploy/azure/`, ADR-0013) y despliegue a `dev` |
 
 Notas para seguir:
 - El cliente TS del backoffice está escrito a mano (`src/api/types.ts`); generarlo desde OpenAPI queda pendiente (contrato en `contracts/openapi/`).

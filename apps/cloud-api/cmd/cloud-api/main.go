@@ -84,7 +84,12 @@ func build(ctx context.Context, migrate bool) (*App, error) {
 	if err != nil {
 		return nil, err
 	}
-	store, err := imagenes.NewS3(cfg.S3Endpoint, cfg.S3AccessKey, cfg.S3SecretKey, cfg.S3Bucket, cfg.S3UseSSL)
+	var store imagenes.Store
+	if cfg.StorageDriver == "azure" {
+		store, err = imagenes.NewAzureBlob(ctx, cfg.AzureStorageConn, cfg.S3Bucket)
+	} else {
+		store, err = imagenes.NewS3(cfg.S3Endpoint, cfg.S3AccessKey, cfg.S3SecretKey, cfg.S3Bucket, cfg.S3UseSSL)
+	}
 	if err != nil {
 		return nil, err
 	}

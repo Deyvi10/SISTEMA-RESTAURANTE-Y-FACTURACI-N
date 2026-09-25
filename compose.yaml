@@ -41,6 +41,13 @@ services:
     volumes: ["./deploy/local/s3-init.sh:/init.sh:ro"]
     restart: on-failure
 
+  # Emulador oficial de Azure Blob (ADR-0013). Solo el servicio Blob, sin persistir accesos.
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite:latest
+    command: ["azurite-blob", "--blobHost", "0.0.0.0", "--location", "/data", "--skipApiVersionCheck", "--loose"]
+    ports: ["127.0.0.1:${AZURITE_PORT:-10010}:10000"]
+    volumes: ["azuritedata:/data"]
+
   mailpit:
     image: axllent/mailpit:latest
     ports: ["127.0.0.1:8025:8025", "127.0.0.1:1025:1025"]
@@ -62,3 +69,4 @@ services:
 volumes:
   pgdata:
   s3data:
+  azuritedata:

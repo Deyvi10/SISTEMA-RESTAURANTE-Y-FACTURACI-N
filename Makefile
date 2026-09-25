@@ -32,9 +32,11 @@ logs: ## Sigue los logs del entorno local
 	docker compose logs -f --tail=50
 
 TEST_DATABASE_URL ?= postgres://restpos_owner:restpos_dev@localhost:$${PG_PORT:-5442}/restpos
+# Azurite con su clave pública de emulador (no es un secreto).
+TEST_AZURE_STORAGE ?= DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://127.0.0.1:$${AZURITE_PORT:-10010}/devstoreaccount1;
 
 test: ## Pruebas Go con detector de carreras (las de Postgres corren si `make dev` está arriba)
-	TEST_DATABASE_URL="$(TEST_DATABASE_URL)" $(GO) test -race -count=1 $(GOPKGS)
+	TEST_DATABASE_URL="$(TEST_DATABASE_URL)" TEST_AZURE_STORAGE="$(TEST_AZURE_STORAGE)" $(GO) test -race -count=1 $(GOPKGS)
 
 test-long: ## Pruebas property-based largas (QA-04: 10⁶ claves de acceso)
 	$(GO) test -count=1 ./packages/go/sri -run Property -rapid.checks=1000000
