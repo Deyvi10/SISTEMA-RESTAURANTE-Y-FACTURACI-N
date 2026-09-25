@@ -37,3 +37,12 @@ func Parse(s string) (ID, error) {
 	}
 	return id, nil
 }
+
+// MustParse es Parse para constantes del código: entra en pánico si no es un UUID v7.
+func MustParse(s string) ID {
+	id, err := Parse(s)
+	if err != nil {
+		panic(err)
+	}
+	return id
+}

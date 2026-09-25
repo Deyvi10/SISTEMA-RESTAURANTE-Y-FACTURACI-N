@@ -58,6 +58,8 @@ type App struct {
 	fotos       *fotos.Cache
 	// listarInstaladas lee las impresoras de Windows (las pruebas lo reemplazan).
 	listarInstaladas func() ([]spooler.Instalada, error)
+	limite           limitador
+	desafios         desafios
 	busqueda         Busqueda
 	buscar           func(context.Context) []descubrir.Encontrada // las pruebas lo reemplazan
 	ultimaCaida      atomic.Int64                                 // unix nano de la última búsqueda por caída
@@ -90,6 +92,8 @@ func New(ctx context.Context, cfg Config, log *slog.Logger) (*App, error) {
 	a := &App{Cfg: cfg, Store: st, Clock: clk, Log: log, Inicio: inicio, mux: http.NewServeMux(), replica: rep}
 	a.hub = hub.New(log, clk.Now)
 	a.heartbeatYa = make(chan struct{}, 1)
+	a.limite.fallos = map[string][]time.Time{}
+	a.desafios.m = map[string]desafio{}
 	a.buscarYa = make(chan struct{}, 1)
 	a.fotosYa = make(chan struct{}, 1)
 	a.fotos = &fotos.Cache{Dir: dirFotos(cfg.DataDir), NubeURL: cfg.NubeURL, Log: log, Pausa: 100 * time.Millisecond}
@@ -103,7 +107,8 @@ func New(ctx context.Context, cfg Config, log *slog.Logger) (*App, error) {
 	a.listarInstaladas = spooler.Listar
 	a.alAplicar = func(c CambiosAplicados) {
 		a.difundirCambios(c)
-		if c.Completo || c.Tablas["productos"] > 0 {
+		a.revocarDispositivos(context.Background(), c.Cambios)
+		if c.Completo || c.Tablas["productos"] > 0 || c.Tablas["usuarios"] > 0 {
 			a.pedirFotos()
 		}
 		a.sincronizarImpresoras(context.Background())
@@ -126,7 +131,8 @@ func (a *App) routes() {
 	a.mux.Handle("POST /v1/impresoras/buscar", soloLocal(http.HandlerFunc(a.handleBuscarAhora)))
 	a.mux.Handle("POST /v1/activacion", soloLocal(http.HandlerFunc(a.handleActivar)))
 	a.mux.HandleFunc("GET /v1/conectividad", a.handleConectividad)
-	a.mux.Handle("GET /v1/ws", a.hub.Handler(autenticarLAN))
+	a.mux.Handle("GET /v1/ws", a.hub.Handler(a.autenticarWS))
+	a.rutasApp()
 
 	// Operación: por ahora solo desde esta PC; los teléfonos entran con el emparejamiento (F3-02).
 	a.mux.Handle("POST /v1/comandas", soloLocal(jsonHandler(a.EnviarComanda, http.StatusCreated)))
@@ -179,6 +185,7 @@ func (a *App) Run(ctx context.Context) error {
 	a.syncMu.Unlock()
 	a.wg.Go(func() { a.watchdog(bg) })
 	a.motor.Iniciar(bg)
+	a.wg.Go(func() { a.barrerBloqueos(bg) })
 	a.sincronizarImpresoras(ctx)
 	if !a.sinMDNS {
 		if tcp, ok := ln.Addr().(*net.TCPAddr); ok {

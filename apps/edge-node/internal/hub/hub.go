@@ -95,6 +95,21 @@ func (h *Hub) DifundirA(e eventos.Evento, filtro func(*Cliente) bool) error {
 	return nil
 }
 
+// Desconectar cierra las conexiones que cumplan el filtro (p. ej. un dispositivo revocado).
+func (h *Hub) Desconectar(filtro func(*Cliente) bool) {
+	h.mu.RLock()
+	var cerrar []*Cliente
+	for c := range h.clientes {
+		if filtro(c) {
+			cerrar = append(cerrar, c)
+		}
+	}
+	h.mu.RUnlock()
+	for _, c := range cerrar {
+		c.cerrar(websocket.StatusPolicyViolation, "dispositivo revocado")
+	}
+}
+
 func (h *Hub) agregar(c *Cliente) {
 	h.mu.Lock()
 	h.clientes[c] = struct{}{}

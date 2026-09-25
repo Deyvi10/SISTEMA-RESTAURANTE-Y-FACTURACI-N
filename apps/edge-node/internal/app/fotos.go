@@ -33,7 +33,8 @@ func (a *App) fotosLoop(ctx context.Context) {
 
 // SincronizarFotos baja las fotos de los productos activos y borra las que sobran.
 func (a *App) SincronizarFotos(ctx context.Context) {
-	rows, err := a.Store.Read().QueryContext(ctx, `SELECT DISTINCT imagen_key FROM productos WHERE deleted_at IS NULL AND activo = 1 AND imagen_key IS NOT NULL`)
+	rows, err := a.Store.Read().QueryContext(ctx, `SELECT imagen_key FROM productos WHERE deleted_at IS NULL AND activo = 1 AND imagen_key IS NOT NULL
+		UNION SELECT avatar_key FROM usuarios WHERE activo = 1 AND avatar_key IS NOT NULL`)
 	if err != nil {
 		a.Log.Error("fotos: réplica ilegible", "err", err)
 		return

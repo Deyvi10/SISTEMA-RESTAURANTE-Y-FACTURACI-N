@@ -76,6 +76,11 @@ func (a *App) iniciarSync(id *Identidad) {
 	a.wg.Go(func() { a.busquedaLoop(ctx) })
 	a.fotos.NubeURL = id.NubeURL
 	a.wg.Go(func() { a.fotosLoop(ctx) })
+	a.wg.Go(func() {
+		if err := a.traerPepper(ctx); err != nil && ctx.Err() == nil {
+			a.Log.Warn("aún no se pudo traer la clave de PIN; se reintentará al primer login", "err", err)
+		}
+	})
 	a.Log.Info("sincronización iniciada", "nodo", id.NodoID)
 }
 

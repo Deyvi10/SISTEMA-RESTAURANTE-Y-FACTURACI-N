@@ -93,18 +93,9 @@ func (in *ComandaIn) validar() error {
 	}
 	for i := range in.Lineas {
 		l := &in.Lineas[i]
-		q, err := decimal.NewFromString(strings.TrimSpace(l.Cantidad))
-		if err != nil || !q.IsPositive() || q.GreaterThan(decimal.NewFromInt(999)) || q.Exponent() < -3 {
-			return invalido(fmt.Sprintf("Plato %d: la cantidad debe ser un número mayor a 0, con hasta 3 decimales.", i+1))
-		}
-		l.Cantidad = q.String()
-		l.Nota = strings.TrimSpace(l.Nota)
-		l.Tiempo = strings.ToUpper(strings.TrimSpace(l.Tiempo))
-		if len([]rune(l.Nota)) > 140 {
-			return invalido(fmt.Sprintf("Plato %d: la nota admite hasta 140 caracteres.", i+1))
-		}
-		if !tiemposValidos[l.Tiempo] {
-			return invalido(fmt.Sprintf("Plato %d: el tiempo debe ser BEBIDA, ENTRADA, FUERTE o POSTRE.", i+1))
+		var err error
+		if l.Cantidad, l.Nota, l.Tiempo, err = validarLinea(i, l.Cantidad, l.Nota, l.Tiempo); err != nil {
+			return err
 		}
 		if len(l.Modificadores) > 15 {
 			return invalido(fmt.Sprintf("Plato %d: demasiados modificadores.", i+1))
@@ -118,6 +109,22 @@ func (in *ComandaIn) validar() error {
 		}
 	}
 	return nil
+}
+
+// validarLinea normaliza cantidad (decimal exacto, hasta 3 decimales), nota y tiempo.
+func validarLinea(i int, cantidad, nota, tiempo string) (string, string, string, error) {
+	q, err := decimal.NewFromString(strings.TrimSpace(cantidad))
+	if err != nil || !q.IsPositive() || q.GreaterThan(decimal.NewFromInt(999)) || q.Exponent() < -3 {
+		return "", "", "", invalido(fmt.Sprintf("Plato %d: la cantidad debe ser un número mayor a 0, con hasta 3 decimales.", i+1))
+	}
+	nota, tiempo = strings.TrimSpace(nota), strings.ToUpper(strings.TrimSpace(tiempo))
+	if len([]rune(nota)) > 140 {
+		return "", "", "", invalido(fmt.Sprintf("Plato %d: la nota admite hasta 140 caracteres.", i+1))
+	}
+	if !tiemposValidos[tiempo] {
+		return "", "", "", invalido(fmt.Sprintf("Plato %d: el tiempo debe ser BEBIDA, ENTRADA, FUERTE o POSTRE.", i+1))
+	}
+	return q.String(), nota, tiempo, nil
 }
 
 // ---------- Estaciones e impresoras desde la réplica ----------
