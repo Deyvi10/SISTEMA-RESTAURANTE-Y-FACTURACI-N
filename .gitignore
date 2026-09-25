@@ -32,3 +32,6 @@ build/
 !.vscode/extensions.json
 .DS_Store
 Thumbs.db
+
+# Paquetes Dart: el lockfile solo se versiona en apps
+packages/dart/**/pubspec.lock
