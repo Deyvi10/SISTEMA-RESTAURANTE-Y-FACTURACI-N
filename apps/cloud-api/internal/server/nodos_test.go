@@ -9,11 +9,13 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/impresoras"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/nodos"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/salon"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/edgesync"
@@ -95,6 +97,7 @@ func (c *cliente) nodoOperativo() *nodoSim {
 	n.activar(c.codigoNodo().Codigo, 200)
 	n.req("POST", "/v1/nodos/heartbeat", edgesync.Heartbeat{Version: "0.1.0", HoraNodo: time.Now()}, true, 200, nil)
 	n.req("POST", "/v1/sync/push", edgesync.PushRequest{NodeID: n.id, Events: []edgesync.Event{n.evento("prueba.creada")}}, true, 200, nil)
+	c.impresoraConPrueba(n, "10.0.0.9")
 	return n
 }
 
@@ -305,4 +308,128 @@ func TestPullAislado(t *testing.T) {
 			t.Fatal("el nodo de B recibió datos de A")
 		}
 	}
+}
+
+func (c *cliente) estaciones() []salon.Estacion {
+	c.e.t.Helper()
+	var es []salon.Estacion
+	c.do("GET", "/v1/estaciones", nil, 200, &es)
+	return es
+}
+
+// impresoraConPrueba registra una impresora, la asigna a una estación y pide una prueba al
+// nodo (deja filas en impresoras, estacion_impresoras y comandos_nodo; lo usa QA-06).
+func (c *cliente) impresoraConPrueba(n *nodoSim, host string) (impresoras.Impresora, impresoras.Comando) {
+	c.e.t.Helper()
+	var locales []salon.Local
+	c.do("GET", "/v1/locales", nil, 200, &locales)
+	var imp impresoras.Impresora
+	c.do("POST", "/v1/impresoras", map[string]any{"localId": locales[0].ID, "nombre": "Cocina " + host, "host": host}, 201, &imp)
+	var prod salon.Estacion
+	for _, e := range c.estaciones() {
+		if e.Tipo == "PRODUCCION" {
+			prod = e
+		}
+	}
+	c.do("PUT", "/v1/estaciones/"+prod.ID.String()+"/impresoras", map[string]any{"impresoras": []ids.ID{imp.ID}}, 204, nil)
+	var cmd impresoras.Comando
+	c.do("POST", "/v1/impresoras/"+imp.ID.String()+"/prueba", map[string]any{}, 200, &cmd)
+	return imp, cmd
+}
+
+func TestImpresorasRuteoYPrueba(t *testing.T) {
+	e := newEnv(t)
+	dueno, _ := e.restaurante("1790011674001", "a@a.ec")
+	var locales []salon.Local
+	dueno.do("GET", "/v1/locales", nil, 200, &locales)
+	local := locales[0].ID
+
+	// Validaciones claras al agregar a mano.
+	dueno.do("POST", "/v1/impresoras", map[string]any{"localId": local, "nombre": "Bar", "host": "no es una ip!"}, 422, nil)
+	dueno.do("POST", "/v1/impresoras", map[string]any{"localId": local, "nombre": "Bar", "host": "192.168.1.60", "anchoPapel": 70}, 422, nil)
+	var bar impresoras.Impresora
+	dueno.do("POST", "/v1/impresoras", map[string]any{"localId": local, "nombre": "Bar", "host": "192.168.1.60"}, 201, &bar)
+	if bar.AnchoPapel != 80 || *bar.Puerto != 9100 || bar.Estado != "DESCONOCIDO" {
+		t.Fatalf("valores por defecto: %+v", bar)
+	}
+	dueno.do("POST", "/v1/impresoras", map[string]any{"localId": local, "nombre": "Otra", "host": "192.168.1.60"}, 409, nil)
+
+	// Sin nodo en línea, la prueba explica qué hacer.
+	dueno.do("POST", "/v1/impresoras/"+bar.ID.String()+"/prueba", map[string]any{}, 409, nil)
+
+	n := e.nuevoNodo()
+	n.activar(dueno.codigoNodo().Codigo, 200)
+	n.req("POST", "/v1/nodos/heartbeat", edgesync.Heartbeat{HoraNodo: time.Now(), Impresoras: []edgesync.ImpresoraSalud{{ID: bar.ID, Estado: "SIN_PAPEL", Cola: 3}}}, true, 200, nil)
+	var lista []impresoras.Impresora
+	dueno.do("GET", "/v1/impresoras", nil, 200, &lista)
+	if lista[0].Estado != "SIN_PAPEL" || lista[0].Cola != 3 || !lista[0].NodoEnRed {
+		t.Fatalf("estado vivo: %+v", lista[0])
+	}
+
+	// Ruteo: categoría → estación de producción; nunca a caja.
+	var cats []map[string]any
+	dueno.do("GET", "/v1/categorias", nil, 200, &cats)
+	var prod, caja salon.Estacion
+	for _, e := range dueno.estaciones() {
+		if e.Tipo == "CAJA" {
+			caja = e
+		} else {
+			prod = e
+		}
+	}
+	cat := cats[0]["id"].(string)
+	dueno.do("PUT", "/v1/categorias/"+cat+"/estacion", map[string]any{"estacionId": prod.ID}, 204, nil)
+	if caja.ID != ids.Nil {
+		dueno.do("PUT", "/v1/categorias/"+cat+"/estacion", map[string]any{"estacionId": caja.ID}, 422, nil)
+	}
+	dueno.do("PUT", "/v1/categorias/"+cat+"/estacion", map[string]any{"estacionId": nil}, 204, nil)
+	dueno.do("PUT", "/v1/categorias/"+ids.New().String()+"/estacion", map[string]any{"estacionId": nil}, 404, nil)
+
+	// Prueba de impresión: la orden llega al nodo por el feed y el nodo informa el resultado.
+	base := n.pull(0, 0).Hasta
+	imp, cmd := dueno.impresoraConPrueba(n, "192.168.1.61")
+	inc := n.pull(base, 0)
+	tb := tablas(inc)
+	if tb["impresoras:U"] < 1 || tb["estacion_impresoras:U"] != 1 || tb["comandos_nodo:U"] != 1 {
+		t.Fatalf("el nodo no recibió impresora, asignación y orden: %v", tb)
+	}
+	ev, _ := edgesync.NewEvent(nodos.EventoComandoEjecutado, 1, cmd.ID, nodos.ComandoEjecutado{ComandoID: cmd.ID, OK: true, Resultado: "Impreso en Cocina"}, time.Now())
+	ev.NodeSeq = 1
+	n.req("POST", "/v1/sync/push", edgesync.PushRequest{NodeID: n.id, Events: []edgesync.Event{ev}}, true, 200, nil)
+	var got impresoras.Comando
+	dueno.do("GET", "/v1/comandos-nodo/"+cmd.ID.String(), nil, 200, &got)
+	if got.EjecutadoAt == nil || got.Resultado == nil || *got.Resultado != "OK: Impreso en Cocina" {
+		t.Fatalf("resultado del comando: %+v", got)
+	}
+
+	// Detección automática: nueva impresora y, luego, la misma MAC con otra IP (DHCP).
+	host, port, mac := "192.168.1.77", 9100, "00:11:62:aa:bb:cc"
+	nueva := ids.New()
+	det := func(seq int64, h string) {
+		ev, _ := edgesync.NewEvent(nodos.EventoImpresoraDetectada, 1, nueva, nodos.ImpresoraDetectada{ID: nueva, Conexion: "TCP", Host: &h, Puerto: &port, MAC: &mac, Modelo: "TM-T20III"}, time.Now())
+		ev.NodeSeq = seq
+		n.req("POST", "/v1/sync/push", edgesync.PushRequest{NodeID: n.id, Events: []edgesync.Event{ev}}, true, 200, nil)
+	}
+	det(2, host)
+	det(3, "192.168.1.88")
+	dueno.do("GET", "/v1/impresoras", nil, 200, &lista)
+	var detectadas []impresoras.Impresora
+	for _, x := range lista {
+		if x.Origen == "DETECTADA" {
+			detectadas = append(detectadas, x)
+		}
+	}
+	if len(detectadas) != 1 || *detectadas[0].Host != "192.168.1.88" || detectadas[0].Modelo != "TM-T20III" || !strings.HasPrefix(detectadas[0].Nombre, "Impresora ") {
+		t.Fatalf("detectadas: %+v", detectadas)
+	}
+	// El dueño la renombra; una nueva detección no pisa el nombre.
+	dueno.do("PUT", "/v1/impresoras/"+detectadas[0].ID.String(), map[string]any{"nombre": "Barra", "host": "192.168.1.88", "anchoPapel": 58}, 200, nil)
+	det(4, "192.168.1.88")
+	dueno.do("GET", "/v1/impresoras", nil, 200, &lista)
+	for _, x := range lista {
+		if x.ID == detectadas[0].ID && (x.Nombre != "Barra" || x.AnchoPapel != 58) {
+			t.Fatalf("la detección pisó lo que decidió el dueño: %+v", x)
+		}
+	}
+	dueno.do("DELETE", "/v1/impresoras/"+imp.ID.String(), nil, 204, nil)
 }

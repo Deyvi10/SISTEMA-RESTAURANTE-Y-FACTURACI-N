@@ -109,10 +109,13 @@ func consultasVolcado(tabla string) (string, bool) {
 	switch tabla {
 	case "locales":
 		return `SELECT to_jsonb(t) FROM locales t WHERE t.id = $1 AND t.deleted_at IS NULL`, true
-	case "estaciones", "zonas", "mesas":
+	case "estaciones", "zonas", "mesas", "impresoras":
 		return fmt.Sprintf(`SELECT to_jsonb(t) FROM %s t WHERE t.local_id = $1 AND t.deleted_at IS NULL`, tabla), true
-	case "usuario_locales":
-		return `SELECT to_jsonb(t) FROM usuario_locales t WHERE t.local_id = $1`, true
+	case "usuario_locales", "estacion_impresoras":
+		return fmt.Sprintf(`SELECT to_jsonb(t) FROM %s t WHERE t.local_id = $1`, tabla), true
+	case "comandos_nodo":
+		// Solo órdenes recientes y pendientes: un volcado nunca repite una prueba vieja.
+		return `SELECT to_jsonb(t) FROM comandos_nodo t WHERE t.local_id = $1 AND t.ejecutado_at IS NULL AND t.created_at > now() - interval '10 minutes'`, true
 	case "categorias", "productos", "grupos_modificadores":
 		return fmt.Sprintf(`SELECT to_jsonb(t) FROM %s t WHERE t.deleted_at IS NULL`, tabla), false
 	case "usuarios":

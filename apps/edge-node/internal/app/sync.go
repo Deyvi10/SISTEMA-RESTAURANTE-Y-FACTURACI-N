@@ -69,13 +69,7 @@ func (a *App) iniciarSync(id *Identidad) {
 
 	cli := &nube.Client{BaseURL: id.NubeURL, NodoID: id.NodoID, Llave: id.Llave, Now: a.Clock.Now, HTTP: a.httpNube}
 	a.nube = cli
-	ob, err := edgesync.NewOutbox(ctx, a.Store.Writer())
-	if err != nil {
-		a.Log.Error("sync: outbox", "err", err)
-		return
-	}
-	a.outbox = ob
-	a.pusher = &edgesync.Pusher{Outbox: ob, NodeID: id.NodoID, URL: cli.URL("/v1/sync/push"), Client: cli.Firmado(30 * time.Second), Clock: a.Clock, Log: a.Log}
+	a.pusher = &edgesync.Pusher{Outbox: a.outbox, NodeID: id.NodoID, URL: cli.URL("/v1/sync/push"), Client: cli.Firmado(30 * time.Second), Clock: a.Clock, Log: a.Log}
 	a.wg.Go(func() { a.pusher.Run(ctx) })
 	a.wg.Go(func() { a.heartbeatLoop(ctx) })
 	a.wg.Go(func() { a.pullLoop(ctx) })
@@ -101,7 +95,23 @@ func (a *App) heartbeatLoop(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-t.C:
+		case <-a.heartbeatYa:
+			// Un cambio importante (p. ej. impresora sin papel): se informa ya, sin
+			// esperar el minuto, pero como mucho uno cada 2 s.
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(2 * time.Second):
+			}
 		}
+	}
+}
+
+// pedirHeartbeat adelanta el próximo heartbeat (no bloquea).
+func (a *App) pedirHeartbeat() {
+	select {
+	case a.heartbeatYa <- struct{}{}:
+	default:
 	}
 }
 
@@ -139,7 +149,7 @@ func (a *App) revocado(ctx context.Context) {
 }
 
 func (a *App) telemetria(ctx context.Context) edgesync.Heartbeat {
-	hb := edgesync.Heartbeat{Version: Version, HoraNodo: a.Clock.Now(), ArranqueAt: a.Inicio.UTC(), DiscoLibreMB: sistema.DiscoLibreMB(a.Cfg.DataDir), Impresoras: []edgesync.ImpresoraSalud{}}
+	hb := edgesync.Heartbeat{Version: Version, HoraNodo: a.Clock.Now(), ArranqueAt: a.Inicio.UTC(), DiscoLibreMB: sistema.DiscoLibreMB(a.Cfg.DataDir), Impresoras: a.saludImpresoras(ctx)}
 	for _, f := range []string{a.Cfg.DBPath(), a.Cfg.DBPath() + "-wal"} {
 		if fi, err := os.Stat(f); err == nil {
 			hb.BaseMB += fi.Size() >> 20

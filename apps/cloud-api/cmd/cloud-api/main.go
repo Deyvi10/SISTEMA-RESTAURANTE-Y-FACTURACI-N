@@ -22,6 +22,7 @@ import (
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/auth"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/catalogo"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/imagenes"
+	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/impresoras"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/nodos"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/personal"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/platform/apperr"
@@ -157,7 +158,7 @@ func serve(ctx context.Context) error {
 		DB: app.DB, Signer: app.Signer, Now: app.Clock.Now, BackofficeURL: cfg.BackofficeURL,
 		Auth:  &auth.Handlers{Svc: &auth.Service{DB: app.DB, Signer: app.Signer, Mail: app.Mail, Clock: app.Clock, BackofficeURL: cfg.BackofficeURL}, CookieSecure: cfg.CookieSecure},
 		Salon: app.Salon, Catalogo: app.Catalogo, Personal: app.Personal, Imagenes: app.Imagenes,
-		Nodos: nodos.New(app.DB, app.Clock),
+		Nodos: nodos.New(app.DB, app.Clock), Impresoras: &impresoras.Service{DB: app.DB, Clock: app.Clock},
 	}
 	go deps.Nodos.Avisos.Escuchar(ctx, app.DB.Pool, slog.Default())
 	srv := &http.Server{

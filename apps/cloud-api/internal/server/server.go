@@ -10,6 +10,7 @@ import (
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/auth"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/catalogo"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/imagenes"
+	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/impresoras"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/nodos"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/personal"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/platform/db"
@@ -44,6 +45,7 @@ type Deps struct {
 	Personal      *personal.Service
 	Imagenes      *imagenes.Service
 	Nodos         *nodos.Service
+	Impresoras    *impresoras.Service
 	BackofficeURL string
 }
 
@@ -128,12 +130,24 @@ func Routes(d Deps) []Route {
 			d.Imagenes.HandleSubir(w, r)
 		}},
 
+		{"GET", "/v1/impresoras", sal, list(d.Impresoras.Listar)},
+		{"POST", "/v1/impresoras", sal, create(d.Impresoras.Crear)},
+		{"PUT", "/v1/impresoras/{id}", sal, update(d.Impresoras.Actualizar)},
+		{"DELETE", "/v1/impresoras/{id}", sal, remove(d.Impresoras.Eliminar)},
+		{"POST", "/v1/impresoras/{id}/prueba", sal, update(func(ctx context.Context, p auth.Principal, id idT, _ struct{}) (impresoras.Comando, error) {
+			return d.Impresoras.ImprimirPrueba(ctx, p, id)
+		})},
+		{"GET", "/v1/comandos-nodo/{id}", sal, get(d.Impresoras.Comando)},
+		{"PUT", "/v1/estaciones/{id}/impresoras", sal, updateNoContent(d.Impresoras.AsignarAEstacion)},
+		{"PUT", "/v1/categorias/{id}/estacion", menu, updateNoContent(d.Impresoras.RutearCategoria)},
+		{"PUT", "/v1/productos/{id}/estacion", menu, updateNoContent(d.Impresoras.RutearProducto)},
+
 		{"GET", "/v1/nodos", sal, list(d.Nodos.Listar)},
 		{"POST", "/v1/nodos/codigos", sal, create(d.Nodos.GenerarCodigo)},
 		{"POST", "/v1/nodos/{id}/revocar", sal, remove(d.Nodos.Revocar)},
 		{"POST", "/v1/nodos/activar", publico, activarNodo(d.Nodos)},
 		{"POST", "/v1/nodos/heartbeat", nodo, heartbeat(d.Nodos)},
-		{"POST", "/v1/sync/push", nodo, syncPush(d.DB)},
+		{"POST", "/v1/sync/push", nodo, syncPush(d.DB, d.Nodos)},
 		{"GET", "/v1/sync/pull", nodo, syncPull(d.Nodos)},
 
 		{"GET", "/v1/usuarios", per, list(pe.Listar)},

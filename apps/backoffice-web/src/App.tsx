@@ -4,6 +4,7 @@ import { Spinner } from "./components/ui";
 import { Shell } from "./layout/Shell";
 import { CambiarClave, Login, Olvide, Restablecer } from "./pages/Acceso";
 import { Inicio, Proximamente } from "./pages/Inicio";
+import { Impresoras } from "./pages/Impresoras";
 import { Menu } from "./pages/Menu";
 import { Nodo } from "./pages/Nodo";
 import { Ajustes, Personal } from "./pages/Personal";
@@ -38,9 +39,7 @@ export function App() {
         <Route path="personal" element={<Personal />} />
         <Route path="ajustes" element={<Ajustes />} />
         <Route path="nodo" element={<Nodo />} />
-        <Route path="impresoras" element={<Proximamente titulo="Impresoras sin complicaciones" icono="printer" tint="gray"
-          texto="Tu Nodo Local encontrará solas las impresoras de cocina, bar y caja. Tú solo arrastras cada categoría a su estación."
-          beneficios={["Detección automática por red y USB", "Comandas en cocina en menos de 1,5 segundos", "Si se acaba el papel, no se pierde ningún pedido"]} />} />
+        <Route path="impresoras" element={<Impresoras />} />
         <Route path="facturacion" element={<Proximamente titulo="Facturación electrónica SRI" icono="receipt" tint="pink"
           texto="Sube tu firma electrónica una vez y factura sin hacer esperar al cajero, incluso cuando el SRI está lento o caído."
           beneficios={["Comprobante impreso al instante con clave de acceso", "Autorización automática en segundo plano", "Tus XML guardados 7 años sin posibilidad de borrarse"]} />} />

@@ -13,12 +13,14 @@ import (
 	"time"
 
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/edge-node/internal/hub"
+	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/edge-node/internal/impresion"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/edge-node/internal/nube"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/edge-node/internal/replica"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/edge-node/internal/store"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/edge-node/internal/web"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/clock"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/edgesync"
+	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/ids"
 )
 
 // App es el nodo en ejecución.
@@ -33,19 +35,21 @@ type App struct {
 
 	// Procesos de fondo: bg vive mientras corre Run; la sincronización tiene su propio
 	// contexto para poder detenerla si la nube revoca al nodo.
-	bg         context.Context
-	wg         sync.WaitGroup
-	syncMu     sync.Mutex
-	syncCancel context.CancelFunc
-	salud      Salud
-	httpNube   *http.Client // nil = cliente por defecto (las pruebas lo reemplazan)
-	nube       *nube.Client
-	outbox     *edgesync.Outbox
-	pusher     *edgesync.Pusher
-	replica    *replica.Replica
-	alAplicar  func(CambiosAplicados) // por defecto difunde por el hub (F2-06)
-	hub        *hub.Hub
-	sinMDNS    bool // pruebas: no anunciar en la red
+	bg          context.Context
+	wg          sync.WaitGroup
+	syncMu      sync.Mutex
+	syncCancel  context.CancelFunc
+	salud       Salud
+	httpNube    *http.Client // nil = cliente por defecto (las pruebas lo reemplazan)
+	nube        *nube.Client
+	outbox      *edgesync.Outbox
+	pusher      *edgesync.Pusher
+	replica     *replica.Replica
+	alAplicar   func(CambiosAplicados) // por defecto difunde por el hub (F2-06)
+	hub         *hub.Hub
+	motor       *impresion.Motor
+	heartbeatYa chan struct{}
+	sinMDNS     bool // pruebas: no anunciar en la red
 }
 
 // New abre la base (migrando) y prepara las rutas. No escucha todavía.
@@ -73,7 +77,17 @@ func New(ctx context.Context, cfg Config, log *slog.Logger) (*App, error) {
 	clk := clock.Real{}
 	a := &App{Cfg: cfg, Store: st, Clock: clk, Log: log, Inicio: inicio, mux: http.NewServeMux(), replica: rep}
 	a.hub = hub.New(log, clk.Now)
-	a.alAplicar = a.difundirCambios
+	a.heartbeatYa = make(chan struct{}, 1)
+	if a.outbox, err = edgesync.NewOutbox(ctx, st.Writer()); err != nil {
+		_ = st.Close()
+		return nil, err
+	}
+	a.motor = a.nuevoMotor(impresion.TCP{})
+	a.alAplicar = func(c CambiosAplicados) {
+		a.difundirCambios(c)
+		a.sincronizarImpresoras(context.Background())
+		a.ejecutarComandos(context.Background())
+	}
 	a.routes()
 	return a, nil
 }
@@ -85,9 +99,37 @@ func (a *App) routes() {
 	a.mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServerFS(web.Static())))
 	a.mux.HandleFunc("GET /{$}", a.inicio)
 	a.mux.HandleFunc("GET /activar", pagina("activar.html"))
-	a.mux.HandleFunc("POST /v1/activacion", a.handleActivar)
+	a.mux.Handle("POST /v1/activacion", soloLocal(http.HandlerFunc(a.handleActivar)))
 	a.mux.HandleFunc("GET /v1/conectividad", a.handleConectividad)
 	a.mux.Handle("GET /v1/ws", a.hub.Handler(autenticarLAN))
+
+	// Operación: por ahora solo desde esta PC; los teléfonos entran con el emparejamiento (F3-02).
+	a.mux.Handle("POST /v1/comandas", soloLocal(jsonHandler(a.EnviarComanda, http.StatusCreated)))
+	a.mux.Handle("POST /v1/comandas/{id}/anular", soloLocal(conID(a.AnularLineas)))
+	a.mux.Handle("POST /v1/comandas/{id}/reimprimir", soloLocal(conID(a.Reimprimir)))
+	a.mux.Handle("POST /v1/estaciones/{id}/redirigir", soloLocal(conID(func(ctx context.Context, id ids.ID, in RedirigirIn) (map[string]int, error) {
+		n, err := a.Redirigir(ctx, id, in)
+		return map[string]int{"trabajosMovidos": n}, err
+	})))
+	a.mux.Handle("DELETE /v1/estaciones/{id}/redirigir", soloLocal(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		id, err := ids.Parse(r.PathValue("id"))
+		if err == nil {
+			err = a.QuitarRedireccion(r.Context(), id, nil)
+		}
+		if err != nil {
+			responderError(w, a.Log, err)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	})))
+	a.mux.HandleFunc("GET /v1/impresoras", func(w http.ResponseWriter, r *http.Request) {
+		v, err := a.vistaImpresion(r.Context())
+		if err != nil {
+			responderError(w, a.Log, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, v)
+	})
 }
 
 // Hub expone el canal de tiempo real (para otros módulos del nodo).
@@ -111,6 +153,8 @@ func (a *App) Run(ctx context.Context) error {
 	a.bg = bg
 	a.syncMu.Unlock()
 	a.wg.Go(func() { a.watchdog(bg) })
+	a.motor.Iniciar(bg)
+	a.sincronizarImpresoras(ctx)
 	if !a.sinMDNS {
 		if tcp, ok := ln.Addr().(*net.TCPAddr); ok {
 			a.wg.Go(func() { a.anunciarMDNS(bg, tcp.Port) })
@@ -137,6 +181,7 @@ func (a *App) Run(ctx context.Context) error {
 	_ = srv.Shutdown(sctx)
 	cancel()
 	a.wg.Wait()
+	a.motor.Esperar()
 	if cerr := a.Store.Close(); cerr != nil {
 		err = errors.Join(err, cerr)
 	}

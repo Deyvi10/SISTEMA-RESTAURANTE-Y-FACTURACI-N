@@ -20,6 +20,7 @@ import (
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/auth"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/catalogo"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/imagenes"
+	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/impresoras"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/nodos"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/personal"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/platform/mail"
@@ -48,12 +49,13 @@ func newEnv(t *testing.T) *env {
 	img := &imagenes.Service{Store: &imagenes.Memory{}}
 	deps := server.Deps{
 		DB: tdb.App, Signer: signer, Now: clk.Now, BackofficeURL: "http://bo.test",
-		Auth:     &auth.Handlers{Svc: &auth.Service{DB: tdb.App, Signer: signer, Mail: m, Clock: clk, BackofficeURL: "http://bo.test"}},
-		Salon:    &salon.Service{DB: tdb.App},
-		Catalogo: &catalogo.Service{DB: tdb.App, ImagenURL: img.URL, Clock: clk},
-		Personal: &personal.Service{DB: tdb.App, Mail: m, Pepper: []byte("pepper-de-pruebas-0123456789abcdef"), ImagenURL: img.URL},
-		Imagenes: img,
-		Nodos:    nodos.New(tdb.App, clk),
+		Auth:       &auth.Handlers{Svc: &auth.Service{DB: tdb.App, Signer: signer, Mail: m, Clock: clk, BackofficeURL: "http://bo.test"}},
+		Salon:      &salon.Service{DB: tdb.App},
+		Catalogo:   &catalogo.Service{DB: tdb.App, ImagenURL: img.URL, Clock: clk},
+		Personal:   &personal.Service{DB: tdb.App, Mail: m, Pepper: []byte("pepper-de-pruebas-0123456789abcdef"), ImagenURL: img.URL},
+		Imagenes:   img,
+		Nodos:      nodos.New(tdb.App, clk),
+		Impresoras: &impresoras.Service{DB: tdb.App, Clock: clk},
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
@@ -246,7 +248,7 @@ func TestFlujoDelDueno(t *testing.T) {
 	}
 
 	c.do("GET", "/v1/resumen", nil, 200, &resumen)
-	if resumen.Progreso != 75 { // menú (<3 platos) pendiente; fotos, salón y equipo listos
+	if resumen.Progreso != 60 { // menú (<3 platos) e impresoras pendientes; fotos, salón y equipo listos
 		t.Fatalf("progreso = %d: %+v", resumen.Progreso, resumen.Pasos)
 	}
 }

@@ -42,7 +42,7 @@ func resumen(d *db.DB) http.HandlerFunc {
 
 func calcularResumen(ctx context.Context, d *db.DB, p auth.Principal) (Resumen, error) {
 	var res Resumen
-	var productos, conFoto, categorias, mesas, personal int
+	var productos, conFoto, categorias, mesas, personal, conImpresora int
 	err := d.InTenant(ctx, p.TenantID, func(tx db.Tx) error {
 		return tx.QueryRow(ctx, `SELECT
 			(SELECT nombre_comercial FROM tenants),
@@ -50,8 +50,9 @@ func calcularResumen(ctx context.Context, d *db.DB, p auth.Principal) (Resumen, 
 			(SELECT count(*) FROM productos WHERE deleted_at IS NULL AND imagen_key IS NOT NULL)::int,
 			(SELECT count(*) FROM categorias WHERE deleted_at IS NULL)::int,
 			(SELECT count(*) FROM mesas WHERE deleted_at IS NULL)::int,
-			(SELECT count(*) FROM usuarios WHERE activo AND NOT es_dueno)::int`).
-			Scan(&res.NombreComercial, &productos, &conFoto, &categorias, &mesas, &personal)
+			(SELECT count(*) FROM usuarios WHERE activo AND NOT es_dueno)::int,
+			(SELECT count(DISTINCT ei.estacion_id) FROM estacion_impresoras ei JOIN impresoras i ON i.id = ei.impresora_id WHERE i.deleted_at IS NULL AND i.activa)::int`).
+			Scan(&res.NombreComercial, &productos, &conFoto, &categorias, &mesas, &personal, &conImpresora)
 	})
 	if err != nil {
 		return res, err
@@ -62,7 +63,7 @@ func calcularResumen(ctx context.Context, d *db.DB, p auth.Principal) (Resumen, 
 		{"fotos", "Ponle fotos a tus platos", "Los platos con foto se venden más. Usa las tuyas o elige de la galería.", "camera", productos > 0 && conFoto >= min(3, productos), true, "/menu"},
 		{"salon", "Dibuja tu salón", "Crea tus zonas y mesas en segundos.", "armchair", mesas >= 2, true, "/salon"},
 		{"personal", "Suma a tu equipo", "Crea a tus meseros con nombre y PIN.", "users", personal >= 1, true, "/personal"},
-		{"impresoras", "Conecta tus impresoras", "Cocina y bar imprimen solos. Llega con el Nodo Local.", "printer", false, false, "/impresoras"},
+		{"impresoras", "Conecta tus impresoras", "Activa el Nodo Local y asigna una impresora a cada estación: cocina y bar imprimen solos.", "printer", conImpresora >= 1, true, "/impresoras"},
 		{"sri", "Activa la facturación SRI", "Sube tu firma electrónica y factura sin esperas.", "receipt", false, false, "/facturacion"},
 	}
 	total, hechos := 0, 0

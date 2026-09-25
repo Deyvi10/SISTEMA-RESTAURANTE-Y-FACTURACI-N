@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { del, get, post, put, patch } from "./client";
 import type {
-  Categoria, CodigoNodo, Estacion, FotoGaleria, Grupo, IconoCategoria, Imagen, Local, Mesa, NodoLocal, Persona, Producto, Resumen, TarifaIVA, Zona,
+  Categoria, CodigoNodo, ComandoNodo, Estacion, Impresora, FotoGaleria, Grupo, IconoCategoria, Imagen, Local, Mesa, NodoLocal, Persona, Producto, Resumen, TarifaIVA, Zona,
 } from "./types";
 
 export const useResumen = () => useQuery({ queryKey: ["resumen"], queryFn: () => get<Resumen>("/v1/resumen") });
@@ -17,6 +17,7 @@ export const useZonas = () => useQuery({ queryKey: ["zonas"], queryFn: () => get
 export const useMesas = () => useQuery({ queryKey: ["mesas"], queryFn: () => get<Mesa[]>("/v1/mesas") });
 // El estado del nodo se refresca solo cada 15 s (heartbeat cada 60 s).
 export const useNodos = () => useQuery({ queryKey: ["nodos"], queryFn: () => get<NodoLocal[]>("/v1/nodos"), refetchInterval: 15_000 });
+export const useImpresoras = () => useQuery({ queryKey: ["impresoras"], queryFn: () => get<Impresora[]>("/v1/impresoras"), refetchInterval: 10_000 });
 export const usePersonal = () => useQuery({ queryKey: ["personal"], queryFn: () => get<Persona[]>("/v1/usuarios") });
 
 /** Mutación que al terminar refresca las listas afectadas y el progreso de la guía. */
@@ -60,6 +61,13 @@ export const api = {
   editarPersona: (id: string, b: object) => put<Persona>(`/v1/usuarios/${id}`, b),
   cambiarPIN: (id: string, pin: string) => put<void>(`/v1/usuarios/${id}/pin`, { pin }),
   cambiarEstado: (id: string, activo: boolean) => put<Persona>(`/v1/usuarios/${id}/estado`, { activo }),
+  crearImpresora: (b: object) => post<Impresora>("/v1/impresoras", b),
+  editarImpresora: (id: string, b: object) => put<Impresora>(`/v1/impresoras/${id}`, b),
+  borrarImpresora: (id: string) => del(`/v1/impresoras/${id}`),
+  probarImpresora: (id: string) => post<ComandoNodo>(`/v1/impresoras/${id}/prueba`, {}),
+  comandoNodo: (id: string) => get<ComandoNodo>(`/v1/comandos-nodo/${id}`),
+  asignarImpresoras: (estacionId: string, impresoras: string[]) => put<void>(`/v1/estaciones/${estacionId}/impresoras`, { impresoras }),
+  rutearCategoria: (categoriaId: string, estacionId: string | null) => put<void>(`/v1/categorias/${categoriaId}/estacion`, { estacionId }),
   generarCodigoNodo: (localId: string) => post<CodigoNodo>("/v1/nodos/codigos", { localId }),
   revocarNodo: (id: string) => post<void>(`/v1/nodos/${id}/revocar`, {}),
 };

@@ -9,7 +9,7 @@ export const SECCIONES = [
   { to: "/salon", label: "Salón", icono: "salon", tint: "green", permiso: "CONFIGURAR_SALON" },
   { to: "/personal", label: "Personal", icono: "personal", tint: "indigo", permiso: "GESTIONAR_PERSONAL" },
   { to: "/nodo", label: "Nodo Local", icono: "servidor", tint: "orange", permiso: "CONFIGURAR_SALON", soloEscritorio: true },
-  { to: "/impresoras", label: "Impresoras", icono: "printer", tint: "gray", permiso: "CONFIGURAR_SALON", pronto: true },
+  { to: "/impresoras", label: "Impresoras", icono: "printer", tint: "gray", permiso: "CONFIGURAR_SALON", soloEscritorio: true },
   { to: "/facturacion", label: "Facturación SRI", icono: "receipt", tint: "pink", permiso: "CONFIGURAR_SRI", pronto: true },
   { to: "/ajustes", label: "Ajustes", icono: "ajustes", tint: "gray", permiso: "CONFIGURAR_SALON" },
 ] as const;

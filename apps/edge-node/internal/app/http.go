@@ -1,13 +1,17 @@
 package app
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"log/slog"
+	"net"
 	"net/http"
 	"runtime/debug"
+	"strings"
 
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/edge-node/internal/web"
+	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/ids"
 )
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
@@ -68,17 +72,82 @@ func (a *App) handleActivar(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	id, err := a.Activar(r.Context(), in.Codigo)
-	var p *Problema
-	switch {
-	case errors.As(err, &p):
-		writeProblem(w, p.Status, p.Code, p.Detail)
-	case err != nil:
-		a.Log.Error("activación fallida", "err", err)
-		writeProblem(w, http.StatusInternalServerError, "ERROR_INTERNO", "No se pudo activar el nodo. Intenta de nuevo.")
-	default:
-		writeJSON(w, http.StatusOK, map[string]any{
-			"nodoId": id.NodoID, "tenantId": id.TenantID, "localId": id.LocalID,
-			"nombreLocal": id.NombreLocal, "nombreComercial": id.NombreComercial,
-		})
+	if err != nil {
+		responderError(w, a.Log, err)
+		return
 	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"nodoId": id.NodoID, "tenantId": id.TenantID, "localId": id.LocalID,
+		"nombreLocal": id.NombreLocal, "nombreComercial": id.NombreComercial,
+	})
+}
+
+// soloLocal permite la petición solo desde esta misma PC (loopback). Hasta el emparejamiento
+// de dispositivos (F3-02) es la forma segura de exponer la operación en la LAN.
+func soloLocal(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		host, _, err := net.SplitHostPort(r.RemoteAddr)
+		if ip := net.ParseIP(host); err != nil || ip == nil || !ip.IsLoopback() {
+			writeProblem(w, http.StatusForbidden, "DISPOSITIVO_NO_EMPAREJADO", "Este equipo no está emparejado con el nodo.")
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// responderError traduce errores del nodo a RFC 9457 sin filtrar detalles internos.
+func responderError(w http.ResponseWriter, log *slog.Logger, err error) {
+	var p *Problema
+	if errors.As(err, &p) {
+		writeProblem(w, p.Status, p.Code, p.Detail)
+		return
+	}
+	log.Error("error inesperado", "err", err)
+	writeProblem(w, http.StatusInternalServerError, "ERROR_INTERNO", "Ocurrió un error inesperado en el nodo.")
+}
+
+func decodificarJSON(w http.ResponseWriter, r *http.Request, v any) error {
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 256<<10))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(v); err != nil {
+		return problema(http.StatusBadRequest, "JSON_INVALIDO", "La solicitud no es JSON válido: "+strings.TrimPrefix(err.Error(), "json: "))
+	}
+	return nil
+}
+
+func jsonHandler[In, Out any](fn func(context.Context, In) (Out, error), status int) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var in In
+		if err := decodificarJSON(w, r, &in); err != nil {
+			responderError(w, slog.Default(), err)
+			return
+		}
+		out, err := fn(r.Context(), in)
+		if err != nil {
+			responderError(w, slog.Default(), err)
+			return
+		}
+		writeJSON(w, status, out)
+	})
+}
+
+func conID[In, Out any](fn func(context.Context, ids.ID, In) (Out, error)) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		id, err := ids.Parse(r.PathValue("id"))
+		if err != nil {
+			writeProblem(w, http.StatusNotFound, "NO_ENCONTRADO", "No existe ese elemento.")
+			return
+		}
+		var in In
+		if err := decodificarJSON(w, r, &in); err != nil {
+			responderError(w, slog.Default(), err)
+			return
+		}
+		out, err := fn(r.Context(), id, in)
+		if err != nil {
+			responderError(w, slog.Default(), err)
+			return
+		}
+		writeJSON(w, http.StatusOK, out)
+	})
 }

@@ -191,3 +191,30 @@ export interface CodigoNodo {
   localId: UUID;
   expiraAt: string;
 }
+
+export type EstadoImpresora = "OK" | "POCO_PAPEL" | "SIN_PAPEL" | "TAPA_ABIERTA" | "SIN_CONEXION" | "ERROR" | "DESCONOCIDO";
+export interface Impresora {
+  id: UUID;
+  localId: UUID;
+  nombre: string;
+  conexion: "TCP" | "USB";
+  host: string | null;
+  puerto: number | null;
+  mac: string | null;
+  modelo: string;
+  anchoPapel: 58 | 80;
+  origen: "MANUAL" | "DETECTADA";
+  activa: boolean;
+  estaciones: UUID[];
+  estado: EstadoImpresora;
+  cola: number;
+  estadoAt: string | null;
+  nodoEnLinea: boolean;
+}
+export interface ComandoNodo {
+  id: UUID;
+  tipo: string;
+  createdAt: string;
+  ejecutadoAt: string | null;
+  resultado: string | null;
+}

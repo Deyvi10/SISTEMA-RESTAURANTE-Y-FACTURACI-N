@@ -66,7 +66,7 @@ var errOtroNodo = apperr.New(apperr.Forbidden, "NODO_AJENO", "El lote pertenece 
 
 // POST /v1/sync/push: lotes del outbox del nodo, aplicados en orden y una sola vez
 // (ADR-0012) dentro del tenant del nodo autenticado.
-func syncPush(d *db.DB) http.HandlerFunc {
+func syncPush(d *db.DB, svc *nodos.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		n := auth.MustNodo(r.Context())
 		var req edgesync.PushRequest
@@ -78,7 +78,7 @@ func syncPush(d *db.DB) http.HandlerFunc {
 			httpx.Error(w, r, errOtroNodo)
 			return
 		}
-		rec := &edgesync.Receiver{Begin: func(ctx context.Context, fn func(pgx.Tx) error) error {
+		rec := &edgesync.Receiver{Apply: svc.Aplicador(n), Begin: func(ctx context.Context, fn func(pgx.Tx) error) error {
 			return d.InTenant(ctx, n.TenantID, fn)
 		}}
 		res, err := rec.Push(r.Context(), req)

@@ -36,6 +36,11 @@ La documentación vive en `documentacion-proyecto/`: toda referencia a `docs/…
 | F2-02 | ✅ Activación por código (nube + nodo + pantalla en el backoffice y en el nodo), ADR-0014 |
 | F2-03 | ✅ Nube → Nodo: feed de cambios por tenant, long-poll con NOTIFY (33 ms medido), volcado consistente, réplica tolerante a columnas nuevas (ADR-0015) |
 | F2-06 | ✅ Hub WebSocket (`/v1/ws`): 60 dispositivos con p95 de 6 ms, cliente lento aislado, contratos de 16 eventos → Go/TS/Dart (`make contracts`), mDNS `_restpos._tcp`, semáforo `/v1/conectividad`. Por ahora solo acepta conexiones locales (loopback): los teléfonos entran con el emparejamiento de F3-02 |
+| F2-09 | ✅ Plantillas ESC/POS (comanda, ANULACIÓN, REIMPRESIÓN, 58/80 mm) desde F0-09 |
+| F2-10 | ✅ Impresoras en la nube (manual por IP o detectadas por el nodo), asignación N:M a estaciones, ruteo de categorías/productos; pantalla «Impresoras» con arrastrar y soltar e «Imprimir prueba» vía el nodo |
+| F2-11 | ✅ `POST /v1/comandas` en el nodo: idempotente, separa por estación, cola persistente por impresora, envío en paralelo (p95 49 ms en prueba; 23 ms contra printer-sim) |
+| F2-12 | ✅ DLE EOT cada 2 s: sin papel/tapa/sin conexión → `printer.status` + heartbeat inmediato; lo pendiente espera y sale solo; redirección de estación con re-render al ancho nuevo |
+| F2-13 | ✅ Reimpresión (sin platos anulados, con marca y hora original) y anulación de líneas, auditadas |
 | F2-04 | ✅ Push del outbox con tenant/RLS, heartbeat con telemetría y alerta de reloj |
 | F1-14 | 🟡 Imagen Docker lista (`deploy/docker/cloud-api.Dockerfile`, `-tags nodynamic`). Falta IaC (Terraform en `deploy/azure/`, ADR-0013) y despliegue a `dev` |
 
