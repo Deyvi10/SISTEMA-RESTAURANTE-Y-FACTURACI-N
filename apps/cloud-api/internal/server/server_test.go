@@ -54,7 +54,7 @@ func newEnv(t *testing.T) *env {
 		Catalogo:   &catalogo.Service{DB: tdb.App, ImagenURL: img.URL, Clock: clk},
 		Personal:   &personal.Service{DB: tdb.App, Mail: m, Pepper: []byte("pepper-de-pruebas-0123456789abcdef"), ImagenURL: img.URL},
 		Imagenes:   img,
-		Nodos:      nodos.New(tdb.App, clk),
+		Nodos:      nodos.New(tdb.App, clk, []byte("pepper-de-pruebas-0123456789abcdef")),
 		Impresoras: &impresoras.Service{DB: tdb.App, Clock: clk},
 	}
 	ctx, cancel := context.WithCancel(context.Background())

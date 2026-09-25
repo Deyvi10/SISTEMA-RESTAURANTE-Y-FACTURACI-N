@@ -109,6 +109,8 @@ func consultasVolcado(tabla string) (string, bool) {
 	switch tabla {
 	case "locales":
 		return `SELECT to_jsonb(t) FROM locales t WHERE t.id = $1 AND t.deleted_at IS NULL`, true
+	case "dispositivos":
+		return `SELECT to_jsonb(t) - 'llave_publica' FROM dispositivos t WHERE t.local_id = $1`, true
 	case "estaciones", "zonas", "mesas", "impresoras":
 		return fmt.Sprintf(`SELECT to_jsonb(t) FROM %s t WHERE t.local_id = $1 AND t.deleted_at IS NULL`, tabla), true
 	case "usuario_locales", "estacion_impresoras":

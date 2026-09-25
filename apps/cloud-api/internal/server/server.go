@@ -15,8 +15,8 @@ import (
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/personal"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/platform/db"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/platform/httpx"
-	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/rbac"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/salon"
+	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/rbac"
 )
 
 // Route es una ruta de la API. Access nil = ruta mal declarada (la prueba QA-11 falla).
@@ -152,6 +152,9 @@ func Routes(d Deps) []Route {
 		{"POST", "/v1/nodos/heartbeat", nodo, heartbeat(d.Nodos)},
 		{"POST", "/v1/sync/push", nodo, syncPush(d.DB, d.Nodos)},
 		{"GET", "/v1/sync/pull", nodo, syncPull(d.Nodos)},
+		{"GET", "/v1/nodos/secreto-pin", nodo, secretoPIN(d.Nodos)},
+		{"GET", "/v1/dispositivos", sal, list(d.Nodos.Dispositivos)},
+		{"POST", "/v1/dispositivos/{id}/revocar", sal, remove(d.Nodos.RevocarDispositivo)},
 
 		{"GET", "/v1/usuarios", per, list(pe.Listar)},
 		{"POST", "/v1/usuarios", per, create(pe.Crear)},

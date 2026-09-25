@@ -1,37 +1,27 @@
 package auth
 
 import (
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/hex"
 	"strings"
 
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/ids"
+	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/secreto"
 )
 
-// El PIN nunca se guarda ni se valida en el teléfono (hallazgo X-04). En la base queda:
-//   - pin_hash = Argon2id(HMAC-SHA256(pepper, pin‖usuario)): sin el pepper del servidor,
-//     un volcado de la base no permite probar las 10⁶ combinaciones.
-//   - pin_fingerprint = HMAC-SHA256(pepper, pin): permite exigir PIN único por tenant sin revelarlo.
+// El PIN nunca se guarda ni se valida en el teléfono (hallazgo X-04): se valida en la nube o
+// en el Nodo Local con el pepper del restaurante (packages/go/secreto).
 
-// HashPIN protege un PIN ya validado.
+// HashPIN protege un PIN ya validado. pepper es el del restaurante (secreto.PepperTenant).
 func HashPIN(pepper []byte, usuario ids.ID, pin string) (string, error) {
-	return HashPassword(pepperMAC(pepper, pin+"|"+usuario.String()))
+	return secreto.HashPIN(pepper, usuario, pin)
 }
 
 // VerifyPIN comprueba un PIN contra su hash.
 func VerifyPIN(pepper []byte, usuario ids.ID, pin, hash string) (bool, error) {
-	return VerifyPassword(pepperMAC(pepper, pin+"|"+usuario.String()), hash)
+	return secreto.VerifyPIN(pepper, usuario, pin, hash)
 }
 
 // FingerprintPIN es determinístico para detectar PIN repetidos.
-func FingerprintPIN(pepper []byte, pin string) string { return pepperMAC(pepper, "fp|"+pin) }
-
-func pepperMAC(pepper []byte, s string) string {
-	m := hmac.New(sha256.New, pepper)
-	m.Write([]byte(s))
-	return hex.EncodeToString(m.Sum(nil))
-}
+func FingerprintPIN(pepper []byte, pin string) string { return secreto.FingerprintPIN(pepper, pin) }
 
 // ValidarPIN aplica RF-01-04: 4 a 6 dígitos, sin PIN triviales. Devuelve un mensaje o "".
 func ValidarPIN(pin string) string {

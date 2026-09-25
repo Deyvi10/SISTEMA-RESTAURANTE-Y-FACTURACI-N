@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 
@@ -19,7 +20,20 @@ import (
 const (
 	EventoComandoEjecutado   = "comando.ejecutado"
 	EventoImpresoraDetectada = "impresora.detectada"
+	EventoDispositivo        = "dispositivo.emparejado"
+	EventoDispositivoUso     = "dispositivo.uso"
 )
+
+// DispositivoEmparejado lo informa el nodo al emparejar un teléfono o tablet (F3-02).
+type DispositivoEmparejado struct {
+	ID           ids.ID    `json:"id"`
+	Nombre       string    `json:"nombre"`
+	Tipo         string    `json:"tipo"`
+	LlavePublica []byte    `json:"llavePublica"`
+	Plataforma   string    `json:"plataforma"`
+	VersionApp   string    `json:"versionApp"`
+	EmparejadoAt time.Time `json:"emparejadoAt"`
+}
 
 // ComandoEjecutado informa el resultado de una orden de la nube (p. ej. imprimir prueba).
 type ComandoEjecutado struct {
@@ -66,6 +80,35 @@ func (s *Service) Aplicador(n auth.Nodo) edgesync.Applier {
 			}
 			_, err := tx.Exec(ctx, `UPDATE comandos_nodo SET ejecutado_at = $3, resultado = $4 WHERE id = $1 AND local_id = $2 AND ejecutado_at IS NULL`,
 				c.ComandoID, n.LocalID, e.CreatedAt, map[bool]string{true: "OK: ", false: "ERROR: "}[c.OK]+res)
+			return err
+		case EventoDispositivo:
+			var d DispositivoEmparejado
+			if err := json.Unmarshal(e.Payload, &d); err != nil || d.ID == ids.Nil || len(d.LlavePublica) != 32 {
+				return nil
+			}
+			if d.Tipo != "TABLET" && d.Tipo != "KDS" && d.Tipo != "POS" {
+				d.Tipo = "MOVIL"
+			}
+			nombre := strings.TrimSpace(d.Nombre)
+			if nombre == "" {
+				nombre = "Dispositivo"
+			}
+			if r := []rune(nombre); len(r) > 60 {
+				nombre = string(r[:60])
+			}
+			// Idempotente; un dispositivo revocado no se reactiva con un evento repetido.
+			_, err := tx.Exec(ctx, `INSERT INTO dispositivos (id, tenant_id, local_id, nombre, tipo, llave_publica, plataforma, version_app, emparejado_at)
+				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) ON CONFLICT (id) DO NOTHING`,
+				d.ID, n.TenantID, n.LocalID, nombre, d.Tipo, d.LlavePublica, truncarS(d.Plataforma, 40), truncarS(d.VersionApp, 40), d.EmparejadoAt)
+			return err
+		case EventoDispositivoUso:
+			var d struct {
+				ID ids.ID `json:"id"`
+			}
+			if json.Unmarshal(e.Payload, &d) != nil {
+				return nil
+			}
+			_, err := tx.Exec(ctx, `UPDATE dispositivos SET ultimo_uso_at = $2 WHERE id = $1 AND (ultimo_uso_at IS NULL OR ultimo_uso_at < $2)`, d.ID, e.CreatedAt)
 			return err
 		case EventoImpresoraDetectada:
 			var d ImpresoraDetectada
@@ -137,4 +180,11 @@ func (s *Service) registrarDetectada(ctx context.Context, tx pgx.Tx, n auth.Nodo
 			return nil
 		}
 	}
+}
+
+func truncarS(s string, n int) string {
+	if r := []rune(s); len(r) > n {
+		return string(r[:n])
+	}
+	return s
 }

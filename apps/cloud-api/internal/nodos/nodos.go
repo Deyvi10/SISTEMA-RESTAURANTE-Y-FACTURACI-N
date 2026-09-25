@@ -21,6 +21,7 @@ import (
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/clock"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/edgesync"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/ids"
+	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/secreto"
 )
 
 const (
@@ -35,15 +36,17 @@ const (
 )
 
 type Service struct {
-	DB      *db.DB
-	Clock   clock.Clock
-	Limiter *limite.Limiter // intentos de activación por IP
-	Avisos  *Avisos         // long-poll del pull (nil = sin espera)
+	DB *db.DB
+	// PinPepper es el pepper global de PIN; cada nodo recibe solo el de su restaurante.
+	PinPepper []byte
+	Clock     clock.Clock
+	Limiter   *limite.Limiter // intentos de activación por IP
+	Avisos    *Avisos         // long-poll del pull (nil = sin espera)
 }
 
 // New arma el servicio con su límite de intentos: 10 códigos erróneos por IP → 15 min.
-func New(d *db.DB, clk clock.Clock) *Service {
-	return &Service{DB: d, Clock: clk, Avisos: NewAvisos(), Limiter: &limite.Limiter{DB: d, Now: clk.Now, Max: 10, Bloqueo: 15 * time.Minute}}
+func New(d *db.DB, clk clock.Clock, pinPepper []byte) *Service {
+	return &Service{DB: d, Clock: clk, PinPepper: pinPepper, Avisos: NewAvisos(), Limiter: &limite.Limiter{DB: d, Now: clk.Now, Max: 10, Bloqueo: 15 * time.Minute}}
 }
 
 // NuevoCodigo genera un código legible «ABCD-EFGH».
@@ -306,4 +309,59 @@ func truncar(s string, n int) string {
 		return string(r[:n])
 	}
 	return strings.TrimSpace(s)
+}
+
+// SecretoPIN entrega al nodo el pepper de PIN de su restaurante para validar los PIN sin
+// internet (F3-04). Solo por el canal autenticado del nodo; nunca a un navegador.
+func (s *Service) SecretoPIN(n auth.Nodo) map[string]string {
+	return map[string]string{"pepper": base64.StdEncoding.EncodeToString(secreto.PepperTenant(s.PinPepper, n.TenantID))}
+}
+
+// ---------- Dispositivos (F3-02) ----------
+
+type Dispositivo struct {
+	ID           ids.ID     `json:"id"`
+	LocalID      ids.ID     `json:"localId"`
+	LocalNombre  string     `json:"localNombre"`
+	Nombre       string     `json:"nombre"`
+	Tipo         string     `json:"tipo"`
+	Plataforma   string     `json:"plataforma"`
+	VersionApp   string     `json:"versionApp"`
+	Estado       string     `json:"estado"`
+	EmparejadoAt time.Time  `json:"emparejadoAt"`
+	UltimoUsoAt  *time.Time `json:"ultimoUsoAt"`
+	RevocadoAt   *time.Time `json:"revocadoAt"`
+}
+
+func (s *Service) Dispositivos(ctx context.Context, p auth.Principal) ([]Dispositivo, error) {
+	out := []Dispositivo{}
+	err := s.DB.InTenant(ctx, p.TenantID, func(tx db.Tx) error {
+		rows, err := tx.Query(ctx, `SELECT d.id, d.local_id, l.nombre, d.nombre, d.tipo, d.plataforma, d.version_app, d.estado, d.emparejado_at, d.ultimo_uso_at, d.revocado_at
+			FROM dispositivos d JOIN locales l ON l.id = d.local_id ORDER BY (d.estado = 'AUTORIZADO') DESC, d.emparejado_at DESC LIMIT 200`)
+		if err != nil {
+			return err
+		}
+		out, err = pgx.CollectRows(rows, func(r pgx.CollectableRow) (Dispositivo, error) {
+			var d Dispositivo
+			err := r.Scan(&d.ID, &d.LocalID, &d.LocalNombre, &d.Nombre, &d.Tipo, &d.Plataforma, &d.VersionApp, &d.Estado, &d.EmparejadoAt, &d.UltimoUsoAt, &d.RevocadoAt)
+			return d, err
+		})
+		return err
+	})
+	if out == nil {
+		out = []Dispositivo{}
+	}
+	return out, err
+}
+
+// RevocarDispositivo desconecta un teléfono o tablet (perdido, robado o de alguien que ya no
+// trabaja). Llega al nodo por el feed y este lo desconecta al instante.
+func (s *Service) RevocarDispositivo(ctx context.Context, p auth.Principal, id ids.ID) error {
+	return s.DB.InTenant(ctx, p.TenantID, func(tx db.Tx) error {
+		tag, err := tx.Exec(ctx, `UPDATE dispositivos SET estado = 'REVOCADO', revocado_at = $2, revocado_por = $3 WHERE id = $1 AND estado = 'AUTORIZADO'`, id, s.Clock.Now(), p.UserID)
+		if err == nil && tag.RowsAffected() == 0 {
+			return apperr.ErrNotFound
+		}
+		return err
+	})
 }

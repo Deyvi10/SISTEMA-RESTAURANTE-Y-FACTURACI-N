@@ -36,6 +36,7 @@ type platoDemo struct {
 func demo(ctx context.Context, args []string) error {
 	fs := flag.NewFlagSet("demo", flag.ContinueOnError)
 	email := fs.String("email", "demo@donpepe.ec", "correo del dueño del restaurante demo")
+	soloPines := fs.Bool("pines", false, "solo vuelve a guardar los PIN del equipo demo (tras cambiar el esquema de PIN)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -44,6 +45,9 @@ func demo(ctx context.Context, args []string) error {
 		return err
 	}
 	defer app.DB.Close()
+	if *soloPines {
+		return reponerPinesDemo(ctx, app, *email)
+	}
 	if n, err := app.Imagenes.SembrarGaleria(ctx); err != nil {
 		return fmt.Errorf("galería: %w (¿está arriba `make dev`?)", err)
 	} else if n > 0 {
@@ -161,13 +165,7 @@ func demo(ctx context.Context, args []string) error {
 		return err
 	}
 
-	equipo := []personal.UsuarioInput{
-		{NombreMostrar: "Carlos M.", Rol: "MESERO", PIN: "8899"},
-		{NombreMostrar: "Ana R.", Rol: "MESERO", PIN: "1024"},
-		{NombreMostrar: "Luis P.", Rol: "CAJERO", PIN: "7391"},
-		{NombreMostrar: "María C.", Rol: "COCINA", PIN: "5821"},
-	}
-	for _, u := range equipo {
+	for _, u := range equipoDemo {
 		if _, err := app.Personal.Crear(ctx, p, u); err != nil {
 			return fmt.Errorf("%s: %w", u.NombreMostrar, err)
 		}
@@ -180,5 +178,40 @@ func demo(ctx context.Context, args []string) error {
   Menú:       %d platos con foto · 18 mesas en Salón y Terraza
   Equipo:     Carlos 8899 · Ana 1024 · Luis (caja) 7391 · María (cocina) 5821
 `, app.Cfg.BackofficeURL, *email, clave, len(platos))
+	return nil
+}
+
+var equipoDemo = []personal.UsuarioInput{
+	{NombreMostrar: "Carlos M.", Rol: "MESERO", PIN: "8899"},
+	{NombreMostrar: "Ana R.", Rol: "MESERO", PIN: "1024"},
+	{NombreMostrar: "Luis P.", Rol: "CAJERO", PIN: "7391"},
+	{NombreMostrar: "María C.", Rol: "COCINA", PIN: "5821"},
+}
+
+// reponerPinesDemo vuelve a guardar los PIN conocidos del equipo demo con el esquema vigente.
+func reponerPinesDemo(ctx context.Context, app *App, email string) error {
+	var usuario, tenant ids.ID
+	if err := app.DB.Global(ctx, func(tx db.Tx) error {
+		return tx.QueryRow(ctx, `SELECT usuario_id, tenant_id FROM auth_buscar_por_email($1)`, email).Scan(&usuario, &tenant)
+	}); err != nil {
+		return fmt.Errorf("no encontré el restaurante demo de %s: %w", email, err)
+	}
+	p := auth.Principal{TenantID: tenant, UserID: usuario}
+	gente, err := app.Personal.Listar(ctx, p)
+	if err != nil {
+		return err
+	}
+	n := 0
+	for _, u := range equipoDemo {
+		for _, g := range gente {
+			if g.NombreMostrar == u.NombreMostrar {
+				if err := app.Personal.CambiarPIN(ctx, p, g.ID, u.PIN); err != nil {
+					return fmt.Errorf("%s: %w", u.NombreMostrar, err)
+				}
+				n++
+			}
+		}
+	}
+	fmt.Printf("✓ %d PIN del equipo demo actualizados (Carlos 8899 · Ana 1024 · Luis 7391 · María 5821)\n", n)
 	return nil
 }

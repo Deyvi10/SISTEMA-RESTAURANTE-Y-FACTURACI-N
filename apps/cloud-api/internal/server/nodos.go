@@ -112,3 +112,11 @@ func syncPull(n *nodos.Service) http.HandlerFunc {
 		httpx.JSON(w, http.StatusOK, res)
 	}
 }
+
+// GET /v1/nodos/secreto-pin: pepper de PIN del restaurante del nodo (F3-04).
+func secretoPIN(n *nodos.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-store")
+		httpx.JSON(w, http.StatusOK, n.SecretoPIN(auth.MustNodo(r.Context())))
+	}
+}

@@ -14,8 +14,9 @@ import (
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/platform/apperr"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/platform/db"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/platform/mail"
-	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/rbac"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/ids"
+	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/rbac"
+	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/secreto"
 )
 
 type Service struct {
@@ -133,11 +134,12 @@ func (s *Service) Crear(ctx context.Context, p auth.Principal, in UsuarioInput) 
 	id := db.IDOrNew(in.ID)
 	var pinHash, fingerprint, pwHash *string
 	if in.PIN != "" {
-		h, err := auth.HashPIN(s.Pepper, id, in.PIN)
+		pep := secreto.PepperTenant(s.Pepper, p.TenantID)
+		h, err := auth.HashPIN(pep, id, in.PIN)
 		if err != nil {
 			return Usuario{}, err
 		}
-		fp := auth.FingerprintPIN(s.Pepper, in.PIN)
+		fp := auth.FingerprintPIN(pep, in.PIN)
 		pinHash, fingerprint = &h, &fp
 	}
 	temporal := ""
@@ -241,7 +243,7 @@ func (s *Service) Actualizar(ctx context.Context, p auth.Principal, id ids.ID, i
 			return traducir(err)
 		}
 		if pin != "" {
-			if err := s.guardarPIN(ctx, tx, id, pin); err != nil {
+			if err := s.guardarPIN(ctx, tx, p.TenantID, id, pin); err != nil {
 				return err
 			}
 		}
@@ -265,16 +267,17 @@ func (s *Service) CambiarPIN(ctx context.Context, p auth.Principal, id ids.ID, p
 		if _, err := s.obtener(ctx, tx, id); err != nil {
 			return err
 		}
-		return s.guardarPIN(ctx, tx, id, strings.TrimSpace(pin))
+		return s.guardarPIN(ctx, tx, p.TenantID, id, strings.TrimSpace(pin))
 	})
 }
 
-func (s *Service) guardarPIN(ctx context.Context, tx db.Tx, id ids.ID, pin string) error {
-	h, err := auth.HashPIN(s.Pepper, id, pin)
+func (s *Service) guardarPIN(ctx context.Context, tx db.Tx, tenant, id ids.ID, pin string) error {
+	pep := secreto.PepperTenant(s.Pepper, tenant)
+	h, err := auth.HashPIN(pep, id, pin)
 	if err != nil {
 		return err
 	}
-	_, err = tx.Exec(ctx, `UPDATE usuarios SET pin_hash=$2, pin_fingerprint=$3 WHERE id=$1`, id, h, auth.FingerprintPIN(s.Pepper, pin))
+	_, err = tx.Exec(ctx, `UPDATE usuarios SET pin_hash=$2, pin_fingerprint=$3 WHERE id=$1`, id, h, auth.FingerprintPIN(pep, pin))
 	return traducir(err)
 }
 

@@ -21,6 +21,7 @@ import (
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/edgesync"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/ids"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/nodoauth"
+	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/secreto"
 )
 
 // nodoSim es un Nodo Local de prueba: su llave privada nunca sale de aquí.
@@ -98,7 +99,19 @@ func (c *cliente) nodoOperativo() *nodoSim {
 	n.req("POST", "/v1/nodos/heartbeat", edgesync.Heartbeat{Version: "0.1.0", HoraNodo: time.Now()}, true, 200, nil)
 	n.req("POST", "/v1/sync/push", edgesync.PushRequest{NodeID: n.id, Events: []edgesync.Event{n.evento("prueba.creada")}}, true, 200, nil)
 	c.impresoraConPrueba(n, "10.0.0.9")
+	n.emparejar("Tablet de Carlos")
 	return n
+}
+
+// emparejar simula que el nodo emparejó un teléfono y lo informa a la nube.
+func (n *nodoSim) emparejar(nombre string) ids.ID {
+	n.e.t.Helper()
+	pub, _, _ := ed25519.GenerateKey(nil)
+	id := ids.New()
+	ev := n.evento(nodos.EventoDispositivo)
+	ev.Payload, _ = json.Marshal(nodos.DispositivoEmparejado{ID: id, Nombre: nombre, Tipo: "MOVIL", LlavePublica: pub, Plataforma: "android 14", VersionApp: "0.1.0", EmparejadoAt: time.Now()})
+	n.req("POST", "/v1/sync/push", edgesync.PushRequest{NodeID: n.id, Events: []edgesync.Event{ev}}, true, 200, nil)
+	return id
 }
 
 func TestActivacionDeNodo(t *testing.T) {
@@ -502,5 +515,57 @@ func TestConectarImpresorasDeWindows(t *testing.T) {
 	}
 	if !encontrada {
 		t.Fatal("el nodo no recibió nombre_windows")
+	}
+}
+
+func TestDispositivosYSecretoPIN(t *testing.T) {
+	e := newEnv(t)
+	dueno, r := e.restaurante("1790011674001", "a@a.ec")
+	n := e.nuevoNodo()
+	n.activar(dueno.codigoNodo().Codigo, 200)
+	var sec map[string]string
+	n.req("GET", "/v1/nodos/secreto-pin", nil, true, 200, &sec)
+	want := base64.StdEncoding.EncodeToString(secreto.PepperTenant([]byte("pepper-de-pruebas-0123456789abcdef"), r.TenantID))
+	if sec["pepper"] != want {
+		t.Fatal("el nodo recibió un pepper distinto al de su restaurante")
+	}
+	n.req("GET", "/v1/nodos/secreto-pin", nil, false, 401, nil)
+
+	// El PIN creado en el backoffice se valida con ese pepper (lo que hará el nodo sin internet).
+	var mesero struct{ ID ids.ID }
+	dueno.do("POST", "/v1/usuarios", map[string]any{"nombreMostrar": "Rosa", "rol": "MESERO", "pin": "5827"}, 201, &mesero)
+	var hash string
+	if err := e.tdb.App.InTenant(context.Background(), r.TenantID, func(tx pgx.Tx) error {
+		return tx.QueryRow(context.Background(), `SELECT pin_hash FROM usuarios WHERE id = $1`, mesero.ID).Scan(&hash)
+	}); err != nil {
+		t.Fatal(err)
+	}
+	pep, _ := base64.StdEncoding.DecodeString(sec["pepper"])
+	if ok, _ := secreto.VerifyPIN(pep, mesero.ID, "5827", hash); !ok {
+		t.Fatal("el nodo no podría validar el PIN")
+	}
+
+	base := n.pull(0, 0).Hasta
+	id := n.emparejar("Teléfono de Rosa")
+	n.emparejar("Teléfono de Rosa") // repetido: no duplica (otro id, pero el mismo no se reinserta)
+	var lista []nodos.Dispositivo
+	dueno.do("GET", "/v1/dispositivos", nil, 200, &lista)
+	if len(lista) != 2 || lista[0].Estado != "AUTORIZADO" {
+		t.Fatalf("dispositivos: %+v", lista)
+	}
+	dueno.do("POST", "/v1/dispositivos/"+id.String()+"/revocar", nil, 204, nil)
+	dueno.do("POST", "/v1/dispositivos/"+id.String()+"/revocar", nil, 404, nil)
+	var revocado bool
+	for _, c := range n.pull(base, 0).Cambios {
+		var d struct {
+			ID     ids.ID `json:"id"`
+			Estado string `json:"estado"`
+		}
+		if c.Tabla == "dispositivos" && json.Unmarshal(c.Datos, &d) == nil && d.ID == id && d.Estado == "REVOCADO" {
+			revocado = true
+		}
+	}
+	if !revocado {
+		t.Fatal("la revocación no llegó al nodo")
 	}
 }
