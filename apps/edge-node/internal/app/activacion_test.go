@@ -6,6 +6,7 @@ import (
 	"crypto/ed25519"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -33,6 +34,10 @@ type nubeFalsa struct {
 	heartbeats  int
 	eventos     []edgesync.Event
 	tenant, loc ids.ID
+	pulls       []int64 // cursor pedido en cada pull
+	llamadas    []string
+	feed        []edgesync.Cambio // cambios incrementales disponibles (seq 1..n)
+	volcado     []edgesync.Cambio
 }
 
 func newNubeFalsa() *nubeFalsa {
@@ -51,7 +56,30 @@ func (f *nubeFalsa) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		id, err := nodoauth.Verify(tok, func(id ids.ID) (ed25519.PublicKey, error) { return f.nodos[id], nil }, time.Now())
 		return id, err == nil && !f.revocados[id]
 	}
+	f.llamadas = append(f.llamadas, r.URL.Path)
 	switch r.URL.Path {
+	case "/v1/sync/pull":
+		if _, ok := autenticado(); !ok {
+			problema(401, "NODO_NO_AUTORIZADO")
+			return
+		}
+		var desde int64
+		_, _ = fmt.Sscan(r.URL.Query().Get("desde"), &desde)
+		f.pulls = append(f.pulls, desde)
+		ultimo := int64(len(f.feed))
+		if r.URL.Query().Get("volcado") == "1" {
+			_ = json.NewEncoder(w).Encode(edgesync.PullResponse{Modo: edgesync.PullCompleto, Hasta: ultimo, Cambios: f.volcado})
+			return
+		}
+		res := edgesync.PullResponse{Modo: edgesync.PullIncremental, Hasta: desde, Cambios: []edgesync.Cambio{}}
+		defer time.Sleep(20 * time.Millisecond) // sin long-poll real: evita un bucle apretado
+		for _, c := range f.feed {
+			if c.Seq > desde {
+				res.Cambios = append(res.Cambios, c)
+				res.Hasta = c.Seq
+			}
+		}
+		_ = json.NewEncoder(w).Encode(res)
 	case "/v1/nodos/activar":
 		var in map[string]any
 		_ = json.NewDecoder(r.Body).Decode(&in)
@@ -210,4 +238,92 @@ func esperar(t *testing.T, cond func() bool) {
 		time.Sleep(20 * time.Millisecond)
 	}
 	t.Fatal("la condición no se cumplió en 5 s")
+}
+
+func TestPullAplicaCambiosDeLaNube(t *testing.T) {
+	f := newNubeFalsa()
+	f.codigos["ABCDEFGH"] = true
+	f.volcado = []edgesync.Cambio{
+		{Tabla: "categorias", Op: "U", Datos: []byte(`{"id":"c1","tenant_id":"t","nombre":"Ceviches","orden":1}`)},
+		{Tabla: "productos", Op: "U", Datos: []byte(`{"id":"p1","tenant_id":"t","categoria_id":"c1","nombre":"Ceviche de camarón","precio":12.50,"tarifa_iva_id":"iva"}`)},
+	}
+	a, lan := nodoDePrueba(t, f)
+	var aplicados []CambiosAplicados
+	var mu sync.Mutex
+	a.alAplicar = func(c CambiosAplicados) { mu.Lock(); aplicados = append(aplicados, c); mu.Unlock() }
+	if st, _ := postJSON(t, lan.URL+"/v1/activacion", map[string]string{"codigo": "ABCDEFGH"}); st != 200 {
+		t.Fatal("activación")
+	}
+	// Tras activar, el nodo queda operativo sin reiniciar: el volcado llega solo.
+	esperar(t, func() bool {
+		var n int
+		_ = a.Store.Read().QueryRow(`SELECT count(*) FROM productos`).Scan(&n)
+		return n == 1
+	})
+	var precio string
+	_ = a.Store.Read().QueryRow(`SELECT precio FROM productos WHERE id='p1'`).Scan(&precio)
+	if precio != "12.50" {
+		t.Fatalf("precio = %q (debe llegar exacto, sin float)", precio)
+	}
+
+	// Un cambio incremental: nuevo precio y un producto borrado.
+	f.mu.Lock()
+	f.feed = []edgesync.Cambio{
+		{Seq: 1, Tabla: "productos", Op: "U", Datos: []byte(`{"id":"p1","tenant_id":"t","categoria_id":"c1","nombre":"Ceviche de camarón","precio":13.00,"tarifa_iva_id":"iva"}`)},
+		{Seq: 2, Tabla: "categorias", Op: "D", Datos: []byte(`{"id":"c1"}`)},
+	}
+	f.mu.Unlock()
+	esperar(t, func() bool {
+		_ = a.Store.Read().QueryRow(`SELECT precio FROM productos WHERE id='p1'`).Scan(&precio)
+		return precio == "13.00"
+	})
+	var cats int
+	_ = a.Store.Read().QueryRow(`SELECT count(*) FROM categorias`).Scan(&cats)
+	if cats != 0 {
+		t.Fatal("el borrado no se aplicó")
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if len(aplicados) < 2 || !aplicados[0].Completo || aplicados[0].Tablas["productos"] != 1 {
+		t.Fatalf("avisos al hub: %+v", aplicados)
+	}
+}
+
+// Regla docs/03 §5.6: con ventas pendientes, primero se envían y después se piden cambios.
+func TestPushAntesDePull(t *testing.T) {
+	f := newNubeFalsa()
+	f.codigos["ABCDEFGH"] = true
+	a, lan := nodoDePrueba(t, f)
+	a.bg = nil // activar sin arrancar la sincronización todavía
+	if st, _ := postJSON(t, lan.URL+"/v1/activacion", map[string]string{"codigo": "ABCDEFGH"}); st != 200 {
+		t.Fatal("activación")
+	}
+	ob, err := edgesync.NewOutbox(context.Background(), a.Store.Writer())
+	if err != nil {
+		t.Fatal(err)
+	}
+	ev, _ := edgesync.NewEvent("venta.cobrada", 1, ids.New(), map[string]string{"total": "10.00"}, time.Now())
+	if err := a.Store.Write(context.Background(), func(tx *store.Tx) error { _, err := ob.Append(context.Background(), tx, ev); return err }); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	a.bg = ctx
+	id, _ := a.Identidad(ctx)
+	a.iniciarSync(id)
+	esperar(t, func() bool { f.mu.Lock(); defer f.mu.Unlock(); return len(f.pulls) > 0 })
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	primeroPush, primerPull := -1, -1
+	for i, l := range f.llamadas {
+		if l == "/v1/sync/push" && primeroPush < 0 {
+			primeroPush = i
+		}
+		if l == "/v1/sync/pull" && primerPull < 0 {
+			primerPull = i
+		}
+	}
+	if primeroPush < 0 || primeroPush > primerPull {
+		t.Fatalf("orden de llamadas: %v", f.llamadas)
+	}
 }

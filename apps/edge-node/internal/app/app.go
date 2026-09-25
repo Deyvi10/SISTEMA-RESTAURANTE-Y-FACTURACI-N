@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/edge-node/internal/nube"
+	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/edge-node/internal/replica"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/edge-node/internal/store"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/edge-node/internal/web"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/clock"
@@ -40,6 +41,8 @@ type App struct {
 	nube       *nube.Client
 	outbox     *edgesync.Outbox
 	pusher     *edgesync.Pusher
+	replica    *replica.Replica
+	alAplicar  func(CambiosAplicados) // hub de tiempo real (F2-06)
 }
 
 // New abre la base (migrando) y prepara las rutas. No escucha todavía.
@@ -59,8 +62,13 @@ func New(ctx context.Context, cfg Config, log *slog.Logger) (*App, error) {
 		_ = st.Close()
 		return nil, err
 	}
+	rep, err := replica.Cargar(ctx, st.Read())
+	if err != nil {
+		_ = st.Close()
+		return nil, err
+	}
 	clk := clock.Real{}
-	a := &App{Cfg: cfg, Store: st, Clock: clk, Log: log, Inicio: inicio, mux: http.NewServeMux()}
+	a := &App{Cfg: cfg, Store: st, Clock: clk, Log: log, Inicio: inicio, mux: http.NewServeMux(), replica: rep}
 	a.routes()
 	return a, nil
 }

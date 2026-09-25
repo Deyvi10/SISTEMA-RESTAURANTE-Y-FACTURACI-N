@@ -5,6 +5,8 @@ import (
 	"errors"
 	"net"
 	"net/http"
+	"strconv"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 
@@ -87,6 +89,26 @@ func syncPush(d *db.DB) http.HandlerFunc {
 			httpx.Error(w, r, err)
 			return
 		}
+		httpx.JSON(w, http.StatusOK, res)
+	}
+}
+
+// GET /v1/sync/pull?desde=N&esperar=S[&volcado=1]: cambios de catálogo, salón y personal (F2-03).
+func syncPull(n *nodos.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query()
+		desde, err1 := strconv.ParseInt(q.Get("desde"), 10, 64)
+		esperar, err2 := strconv.Atoi(q.Get("esperar"))
+		if (q.Get("desde") != "" && (err1 != nil || desde < 0)) || (q.Get("esperar") != "" && err2 != nil) {
+			httpx.Error(w, r, apperr.New(apperr.Invalid, "PARAMETROS_INVALIDOS", "desde y esperar deben ser números enteros."))
+			return
+		}
+		res, err := n.Pull(r.Context(), auth.MustNodo(r.Context()), desde, q.Get("volcado") == "1", time.Duration(esperar)*time.Second)
+		if err != nil {
+			httpx.Error(w, r, err)
+			return
+		}
+		w.Header().Set("Cache-Control", "no-store")
 		httpx.JSON(w, http.StatusOK, res)
 	}
 }

@@ -105,3 +105,39 @@ type HeartbeatResponse struct {
 // MaxDerivaReloj: la fecha va dentro de la clave de acceso SRI, así que más de 60 s de
 // diferencia se alerta (F2-04).
 const MaxDerivaReloj = 60 * time.Second
+
+// ---------- Nube → Nodo (F2-03) ----------
+
+// Tablas que la nube replica al nodo, en el orden en que se aplica un volcado completo.
+// Es el contrato entre el trigger de db/cloud (registrar_cambio) y la réplica del nodo.
+var TablasReplica = []string{
+	"locales", "estaciones", "zonas", "mesas", "categorias", "productos", "grupos_modificadores",
+	"modificadores", "producto_grupos_modificadores", "notas_rapidas", "usuarios", "usuario_locales",
+	"permisos_usuario", "tarifas_iva",
+}
+
+// Cambio es una fila de la nube: op U = insertar o reemplazar, D = borrar.
+type Cambio struct {
+	Seq   int64           `json:"seq"`
+	Tabla string          `json:"tabla"`
+	Op    string          `json:"op"`
+	Datos json.RawMessage `json:"datos"`
+}
+
+// Modos de respuesta del pull.
+const (
+	PullCompleto    = "COMPLETO"    // volcado de todo: el nodo reemplaza su réplica
+	PullIncremental = "INCREMENTAL" // cambios desde el cursor
+)
+
+// PullResponse responde GET /v1/sync/pull?desde=N&esperar=S.
+// Hasta es el cursor que el nodo guarda tras aplicar; Mas indica que hay más cambios.
+type PullResponse struct {
+	Modo    string   `json:"modo"`
+	Hasta   int64    `json:"hasta"`
+	Mas     bool     `json:"mas"`
+	Cambios []Cambio `json:"cambios"`
+}
+
+// MaxPull es el máximo de cambios por respuesta incremental.
+const MaxPull = 500

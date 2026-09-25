@@ -75,9 +75,10 @@ func (a *App) iniciarSync(id *Identidad) {
 		return
 	}
 	a.outbox = ob
-	a.pusher = &edgesync.Pusher{Outbox: ob, NodeID: id.NodoID, URL: cli.URL("/v1/sync/push"), Client: cli.Firmado(), Clock: a.Clock, Log: a.Log}
+	a.pusher = &edgesync.Pusher{Outbox: ob, NodeID: id.NodoID, URL: cli.URL("/v1/sync/push"), Client: cli.Firmado(30 * time.Second), Clock: a.Clock, Log: a.Log}
 	a.wg.Go(func() { a.pusher.Run(ctx) })
 	a.wg.Go(func() { a.heartbeatLoop(ctx) })
+	a.wg.Go(func() { a.pullLoop(ctx) })
 	a.Log.Info("sincronización iniciada", "nodo", id.NodoID)
 }
 
@@ -113,12 +114,7 @@ func (a *App) EnviarHeartbeat(ctx context.Context) {
 	err := a.nube.Do(cctx, http.MethodPost, "/v1/nodos/heartbeat", hb, &res, true)
 	switch {
 	case nube.EsRevocado(err):
-		a.Log.Error("la nube revocó este nodo: se detiene la sincronización; la operación local continúa")
-		if err := a.marcarRevocado(context.WithoutCancel(ctx)); err != nil {
-			a.Log.Error("no se pudo marcar el nodo como revocado", "err", err)
-		}
-		a.salud.cambiar(func(e *EstadoNube) { e.Revocado = true })
-		go a.detenerSync()
+		a.revocado(ctx)
 	case err != nil:
 		if ctx.Err() == nil {
 			a.salud.fallo("Sin conexión con la nube")
@@ -130,6 +126,16 @@ func (a *App) EnviarHeartbeat(ctx context.Context) {
 			a.Log.Warn("el reloj de esta PC está desfasado respecto de la nube; corrígelo (afecta la fecha de las facturas)", "derivaSeg", res.DerivaSegundos)
 		}
 	}
+}
+
+// revocado detiene la sincronización cuando la nube ya no reconoce al nodo.
+func (a *App) revocado(ctx context.Context) {
+	a.Log.Error("la nube revocó este nodo: se detiene la sincronización; la operación local continúa")
+	if err := a.marcarRevocado(context.WithoutCancel(ctx)); err != nil {
+		a.Log.Error("no se pudo marcar el nodo como revocado", "err", err)
+	}
+	a.salud.cambiar(func(e *EstadoNube) { e.Revocado = true })
+	go a.detenerSync()
 }
 
 func (a *App) telemetria(ctx context.Context) edgesync.Heartbeat {

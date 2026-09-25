@@ -58,6 +58,20 @@ func (d *DB) InTenant(ctx context.Context, tenant ids.ID, fn func(Tx) error) err
 	})
 }
 
+// InTenantSnapshot es InTenant de solo lectura con REPEATABLE READ: todas las consultas
+// ven la misma foto de la base (volcados completos para el Nodo Local).
+func (d *DB) InTenantSnapshot(ctx context.Context, tenant ids.ID, fn func(Tx) error) error {
+	if tenant == ids.Nil {
+		return errors.New("db: InTenantSnapshot sin tenant")
+	}
+	return pgx.BeginTxFunc(ctx, d.Pool, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly}, func(tx pgx.Tx) error {
+		if _, err := tx.Exec(ctx, "SELECT set_config('app.tenant_id', $1, true)", tenant.String()); err != nil {
+			return err
+		}
+		return fn(tx)
+	})
+}
+
 // Global ejecuta fn sin tenant: RLS no devuelve filas de negocio. Solo para tablas globales
 // (planes, tarifas_iva, intentos_login) y funciones SECURITY DEFINER de autenticación.
 func (d *DB) Global(ctx context.Context, fn func(Tx) error) error {

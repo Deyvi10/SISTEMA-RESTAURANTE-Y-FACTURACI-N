@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"math/rand/v2"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/clock"
@@ -28,6 +29,7 @@ type Pusher struct {
 	MaxWait  time.Duration // tope de la espera exponencial; por defecto 30 s
 
 	wake chan struct{}
+	mu   sync.Mutex // un solo envío a la vez (Run y los vaciados previos al pull)
 }
 
 // Notify despierta al pusher en cuanto hay un evento nuevo (sin esperar el intervalo).
@@ -76,6 +78,8 @@ func (p *Pusher) Run(ctx context.Context) {
 
 // PushOnce envía un lote y devuelve cuántos eventos quedaron confirmados.
 func (p *Pusher) PushOnce(ctx context.Context) (int, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	batch, err := p.Outbox.Pending(ctx, MaxBatchEvents, MaxBatchBytes)
 	if err != nil || len(batch) == 0 {
 		return 0, err

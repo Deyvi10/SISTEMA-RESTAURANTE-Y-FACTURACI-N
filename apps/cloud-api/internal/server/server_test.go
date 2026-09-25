@@ -9,6 +9,7 @@ import (
 	"image/color"
 	"image/jpeg"
 	"io"
+	"log/slog"
 	"mime/multipart"
 	"net/http"
 	"net/http/cookiejar"
@@ -54,6 +55,9 @@ func newEnv(t *testing.T) *env {
 		Imagenes: img,
 		Nodos:    nodos.New(tdb.App, clk),
 	}
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	go deps.Nodos.Avisos.Escuchar(ctx, tdb.App.Pool, slog.Default())
 	srv := httptest.NewServer(server.Handler(deps, server.Routes(deps)))
 	img.PublicURL = srv.URL
 	t.Cleanup(srv.Close)

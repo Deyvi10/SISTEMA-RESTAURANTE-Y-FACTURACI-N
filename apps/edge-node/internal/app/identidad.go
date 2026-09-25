@@ -206,10 +206,12 @@ func (a *App) marcarRevocado(ctx context.Context) error {
 	})
 }
 
-// limpiarReplica borra los datos que vienen de la nube (se completa en F2-03).
+// limpiarReplica borra los datos que vienen de la nube y sus cursores.
 func (a *App) limpiarReplica(ctx context.Context, tx *store.Tx) error {
-	_, err := tx.ExecContext(ctx, `DELETE FROM inbox_cursores`)
-	return err
+	if _, err := tx.ExecContext(ctx, `DELETE FROM inbox_cursores`); err != nil {
+		return err
+	}
+	return a.replica.Vaciar(ctx, tx)
 }
 
 func (a *App) now() string { return a.Clock.Now().UTC().Format(time.RFC3339Nano) }

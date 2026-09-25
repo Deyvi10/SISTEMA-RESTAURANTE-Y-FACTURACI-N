@@ -225,6 +225,8 @@ Refresh tokens (hash) ligados a usuario + dispositivo; lista de revocación de J
 - **`inbox_cursores`** (nodo): `flujo`, `cursor`.
 - **`sync_cursores`** (nube): `nodo_id` PK, `tenant_id`, `ultimo_seq` (último `node_seq` aplicado, ADR-0012).
 - **`sync_eventos`** (nube, append-only): `evento_id` PK, `tenant_id`, `nodo_id`, `node_seq` (único por nodo), `tipo`, `version`, `agregado_id`, `payload JSONB`, `recibido_at`.
+- **`sync_cambios`** (nube, append-only): `(tenant_id, seq)` PK, `tabla`, `op (U/D)`, `local_id NULL`, `datos JSONB`. **`sync_seq_tenant`**: contador sin huecos por tenant (ADR-0015).
+- **Réplica en el nodo:** `locales`, `estaciones`, `zonas`, `mesas`, `tarifas_iva`, `categorias`, `productos`, `grupos_modificadores`, `modificadores`, `producto_grupos_modificadores`, `notas_rapidas`, `usuarios` (sin correo ni contraseña), `usuario_locales` y `permisos_usuario`. Mismas columnas que la nube y sin FK (`db/edge/migrations/…_replica.sql`).
 - **`nodo`**, **`identidad_pendiente`** (solo en el nodo): identidad activada y la que está en canje (ADR-0014).
 
 ## 10. Políticas RLS (patrón)

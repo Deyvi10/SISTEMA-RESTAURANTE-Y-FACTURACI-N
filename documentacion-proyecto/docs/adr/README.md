@@ -21,3 +21,4 @@ Registro de decisiones de arquitectura significativas, en formato [MADR](https:/
 | [0012](0012-resultado-spike-sync.md) | Resultado del spike de sincronización (F0-10) | Aceptado |
 | [0013](0013-nube-azure-y-almacenamiento.md) | Azure como nube principal y almacenamiento optimizado de comprobantes | Aceptado |
 | [0014](0014-identidad-del-nodo.md) | Identidad del Nodo Local: llave generada en el nodo y JWT por petición | Aceptado |
+| [0015](0015-nube-a-nodo-long-poll.md) | Nube → Nodo: feed de cambios por tenant con long-poll | Aceptado |

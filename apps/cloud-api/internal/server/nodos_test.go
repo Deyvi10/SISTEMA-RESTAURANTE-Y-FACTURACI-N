@@ -2,13 +2,17 @@ package server_test
 
 import (
 	"bytes"
+	"context"
 	"crypto/ed25519"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"testing"
 	"time"
+
+	"github.com/jackc/pgx/v5"
 
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/nodos"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/salon"
@@ -181,4 +185,124 @@ func TestBloqueoDeActivacion(t *testing.T) {
 		n.activar("AAAA-AAAA", 422)
 	}
 	n.activar(dueno.codigoNodo().Codigo, 429)
+}
+
+func (n *nodoSim) pull(desde int64, esperar int) edgesync.PullResponse {
+	n.e.t.Helper()
+	var res edgesync.PullResponse
+	volcado := 0
+	if desde == 0 {
+		volcado = 1
+	}
+	n.req("GET", fmt.Sprintf("/v1/sync/pull?desde=%d&esperar=%d&volcado=%d", desde, esperar, volcado), nil, true, 200, &res)
+	return res
+}
+
+func tablas(res edgesync.PullResponse) map[string]int {
+	m := map[string]int{}
+	for _, c := range res.Cambios {
+		m[c.Tabla+":"+c.Op]++
+	}
+	return m
+}
+
+func TestPullNubeANodo(t *testing.T) {
+	e := newEnv(t)
+	dueno, r := e.restaurante("1790011674001", "a@a.ec")
+	dueno.do("POST", "/v1/usuarios", map[string]any{"nombreMostrar": "Rosa", "rol": "MESERO", "pin": "5827"}, 201, nil)
+	n := e.nuevoNodo()
+	act := n.activar(dueno.codigoNodo().Codigo, 200)
+
+	// Primer pull: volcado completo y consistente.
+	full := n.pull(0, 0)
+	if full.Modo != edgesync.PullCompleto || full.Hasta == 0 {
+		t.Fatalf("volcado: modo=%s hasta=%d", full.Modo, full.Hasta)
+	}
+	tb := tablas(full)
+	if tb["locales:U"] != 1 || tb["usuarios:U"] != 2 || tb["tarifas_iva:U"] == 0 || tb["categorias:U"] == 0 {
+		t.Fatalf("volcado incompleto: %v", tb)
+	}
+	for _, c := range full.Cambios {
+		if c.Tabla == "usuarios" && (bytes.Contains(c.Datos, []byte("password_hash")) || bytes.Contains(c.Datos, []byte(`"email"`))) {
+			t.Fatalf("el nodo recibió credenciales o correo: %s", c.Datos)
+		}
+	}
+
+	// Sin cambios: incremental vacío con el mismo cursor.
+	if inc := n.pull(full.Hasta, 0); inc.Modo != edgesync.PullIncremental || len(inc.Cambios) != 0 || inc.Hasta != full.Hasta {
+		t.Fatalf("sin cambios: %+v", inc)
+	}
+
+	// Un cambio de otro local del mismo restaurante no llega, pero el cursor avanza.
+	otroLocal := ids.New()
+	if err := e.tdb.App.InTenant(context.Background(), r.TenantID, func(tx pgx.Tx) error {
+		_, err := tx.Exec(context.Background(), `INSERT INTO locales (id, tenant_id, nombre, codigo_establecimiento) VALUES ($1, $2, 'Sucursal', '002')`, otroLocal, r.TenantID)
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	var z salon.Zona
+	dueno.do("POST", "/v1/zonas", map[string]any{"nombre": "Terraza", "localId": act.LocalID}, 201, &z)
+	inc := n.pull(full.Hasta, 0)
+	if tb := tablas(inc); len(inc.Cambios) != 1 || tb["zonas:U"] != 1 || inc.Hasta != full.Hasta+2 {
+		t.Fatalf("incremental: %v hasta=%d (antes %d)", tb, inc.Hasta, full.Hasta)
+	}
+	dueno.do("DELETE", "/v1/zonas/"+z.ID.String(), nil, 204, nil)
+	del := n.pull(inc.Hasta, 0)
+	if len(del.Cambios) == 0 || del.Cambios[len(del.Cambios)-1].Tabla != "zonas" {
+		t.Fatalf("borrado de zona: %v", tablas(del))
+	}
+
+	// Long-poll: el pull espera y regresa apenas el dueño cambia algo (< 2 s).
+	desde := del.Hasta
+	type out struct {
+		res edgesync.PullResponse
+		d   time.Duration
+	}
+	ch := make(chan out, 1)
+	go func() {
+		t0 := time.Now()
+		res := n.pull(desde, 10)
+		ch <- out{res, time.Since(t0)}
+	}()
+	time.Sleep(400 * time.Millisecond)
+	var personas []map[string]any
+	dueno.do("GET", "/v1/usuarios", nil, 200, &personas)
+	var rosa string
+	for _, p := range personas {
+		if p["nombreMostrar"] == "Rosa" {
+			rosa = p["id"].(string)
+		}
+	}
+	t1 := time.Now()
+	dueno.do("PUT", "/v1/usuarios/"+rosa+"/estado", map[string]any{"activo": false}, 200, nil)
+	o := <-ch
+	if tb := tablas(o.res); tb["usuarios:U"] != 1 {
+		t.Fatalf("long-poll: %v", tb)
+	}
+	if lat := time.Since(t1); lat > 2*time.Second || o.d > 5*time.Second {
+		t.Fatalf("user.deactivated tardó %v en llegar al nodo", lat)
+	}
+
+	// Un cursor adelantado (nube restaurada) fuerza volcado completo.
+	if res := n.pull(o.res.Hasta+1000, 0); res.Modo != edgesync.PullCompleto {
+		t.Fatalf("cursor adelantado: %s", res.Modo)
+	}
+	_ = act
+}
+
+// El pull solo ve su tenant: el nodo de B no recibe nada de A.
+func TestPullAislado(t *testing.T) {
+	e := newEnv(t)
+	a, _ := e.restaurante("1790011674001", "a@a.ec")
+	b, _ := e.restaurante("1760001550001", "b@b.ec")
+	na, nb := e.nuevoNodo(), e.nuevoNodo()
+	na.activar(a.codigoNodo().Codigo, 200)
+	nb.activar(b.codigoNodo().Codigo, 200)
+	a.do("POST", "/v1/categorias", map[string]any{"nombre": "Secreta de A"}, 201, nil)
+	for _, c := range nb.pull(0, 0).Cambios {
+		if bytes.Contains(c.Datos, []byte("Secreta de A")) {
+			t.Fatal("el nodo de B recibió datos de A")
+		}
+	}
 }

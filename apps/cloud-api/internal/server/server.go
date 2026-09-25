@@ -134,6 +134,7 @@ func Routes(d Deps) []Route {
 		{"POST", "/v1/nodos/activar", publico, activarNodo(d.Nodos)},
 		{"POST", "/v1/nodos/heartbeat", nodo, heartbeat(d.Nodos)},
 		{"POST", "/v1/sync/push", nodo, syncPush(d.DB)},
+		{"GET", "/v1/sync/pull", nodo, syncPull(d.Nodos)},
 
 		{"GET", "/v1/usuarios", per, list(pe.Listar)},
 		{"POST", "/v1/usuarios", per, create(pe.Crear)},

@@ -42,22 +42,23 @@ type Client struct {
 	HTTP    *http.Client
 }
 
+// httpClient no fija timeout global: cada llamada lo pone con su contexto (el long-poll
+// del pull espera 25 s; un heartbeat, 15 s).
 func (c *Client) httpClient() *http.Client {
 	if c.HTTP != nil {
 		return c.HTTP
 	}
-	return &http.Client{Timeout: 15 * time.Second}
+	return http.DefaultClient
 }
 
-// Firmado devuelve un *http.Client que agrega el token del nodo a cada petición
-// (lo usa el pusher de edgesync, que arma sus propias peticiones).
-func (c *Client) Firmado() *http.Client {
-	base := c.httpClient()
-	rt := base.Transport
+// Firmado devuelve un *http.Client que agrega el token del nodo a cada petición, con el
+// timeout indicado (lo usa el pusher de edgesync, que arma sus propias peticiones).
+func (c *Client) Firmado(timeout time.Duration) *http.Client {
+	rt := c.httpClient().Transport
 	if rt == nil {
 		rt = http.DefaultTransport
 	}
-	return &http.Client{Timeout: base.Timeout, Transport: firmador{c: c, next: rt}}
+	return &http.Client{Timeout: timeout, Transport: firmador{c: c, next: rt}}
 }
 
 type firmador struct {
@@ -103,7 +104,7 @@ func (c *Client) Do(ctx context.Context, method, path string, in, out any, firma
 	req.Header.Set("Accept", "application/json")
 	hc := c.httpClient()
 	if firmar {
-		hc = c.Firmado()
+		hc = c.Firmado(0)
 	}
 	res, err := hc.Do(req)
 	if err != nil {

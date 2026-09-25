@@ -34,6 +34,7 @@ La documentación vive en `documentacion-proyecto/`: toda referencia a `docs/…
 | F1-10…F1-12 | ✅ Backoffice React (`apps/backoffice-web`): login promocional, guía de 5 pasos, menú con fotos, salón, personal con PIN, ajustes |
 | F2-01 | ✅ Nodo Local (`apps/edge-node`): servicio de Windows/systemd, SQLite con un solo escritor, watchdog, prueba kill -9 |
 | F2-02 | ✅ Activación por código (nube + nodo + pantalla en el backoffice y en el nodo), ADR-0014 |
+| F2-03 | ✅ Nube → Nodo: feed de cambios por tenant, long-poll con NOTIFY (33 ms medido), volcado consistente, réplica tolerante a columnas nuevas (ADR-0015) |
 | F2-04 | ✅ Push del outbox con tenant/RLS, heartbeat con telemetría y alerta de reloj |
 | F1-14 | 🟡 Imagen Docker lista (`deploy/docker/cloud-api.Dockerfile`, `-tags nodynamic`). Falta IaC (Terraform en `deploy/azure/`, ADR-0013) y despliegue a `dev` |
 

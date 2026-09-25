@@ -129,7 +129,7 @@ sequenceDiagram
         C-->>N: ACK {ultimo_seq_aplicado}
         N->>N: Marcar outbox ≤ seq como enviado
     end
-    loop Push por WS + pull de respaldo
+    loop Long-poll GET /sync/pull (ADR-0015)
         C-->>N: cambios de catálogo/config/estado fiscal (desde cursor)
         N->>N: Aplicar en inbox (idempotente) y avanzar cursor
         N-->>C: ACK cursor

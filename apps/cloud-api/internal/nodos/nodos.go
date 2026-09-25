@@ -38,11 +38,12 @@ type Service struct {
 	DB      *db.DB
 	Clock   clock.Clock
 	Limiter *limite.Limiter // intentos de activación por IP
+	Avisos  *Avisos         // long-poll del pull (nil = sin espera)
 }
 
 // New arma el servicio con su límite de intentos: 10 códigos erróneos por IP → 15 min.
 func New(d *db.DB, clk clock.Clock) *Service {
-	return &Service{DB: d, Clock: clk, Limiter: &limite.Limiter{DB: d, Now: clk.Now, Max: 10, Bloqueo: 15 * time.Minute}}
+	return &Service{DB: d, Clock: clk, Avisos: NewAvisos(), Limiter: &limite.Limiter{DB: d, Now: clk.Now, Max: 10, Bloqueo: 15 * time.Minute}}
 }
 
 // NuevoCodigo genera un código legible «ABCD-EFGH».
