@@ -74,6 +74,8 @@ func (a *App) iniciarSync(id *Identidad) {
 	a.wg.Go(func() { a.heartbeatLoop(ctx) })
 	a.wg.Go(func() { a.pullLoop(ctx) })
 	a.wg.Go(func() { a.busquedaLoop(ctx) })
+	a.fotos.NubeURL = id.NubeURL
+	a.wg.Go(func() { a.fotosLoop(ctx) })
 	a.Log.Info("sincronización iniciada", "nodo", id.NodoID)
 }
 

@@ -87,6 +87,7 @@
       fila('Versión', e.version), fila('Encendido', duracion(e.arranque)),
       fila('Disco libre', e.discoLibreMb >= 0 ? `${(e.discoLibreMb / 1024).toFixed(1)} GB` : '—', e.discoLibreMb >= 0 && e.discoLibreMb < 2048 ? 'amarillo' : undefined),
       fila('Base de datos', `${e.baseMb} MB`),
+      fila('Fotos del menú guardadas', `${e.fotosArchivos / 2 | 0} platos · ${e.fotosKb >= 1024 ? (e.fotosKb / 1024).toFixed(1) + ' MB' : e.fotosKb + ' KB'}`),
     );
   }
   async function cargar() {

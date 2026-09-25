@@ -32,7 +32,9 @@ type EstadoNodo struct {
 	Buscando       bool               `json:"buscando"`
 	Encontradas    int                `json:"encontradas"`
 	// Los comprobantes electrónicos llegan en la Fase 5; hasta entonces siempre 0.
-	ComprobantesPendientes int `json:"comprobantesPendientes"`
+	ComprobantesPendientes int   `json:"comprobantesPendientes"`
+	FotosArchivos          int   `json:"fotosArchivos"`
+	FotosKB                int64 `json:"fotosKb"`
 }
 
 func (a *App) estadoNodo(ctx context.Context) EstadoNodo {
@@ -55,6 +57,8 @@ func (a *App) estadoNodo(ctx context.Context) EstadoNodo {
 			e.BaseMB += fi.Size() >> 20
 		}
 	}
+	archivos, bytes := a.fotos.Tamano()
+	e.FotosArchivos, e.FotosKB = archivos, bytes>>10
 	ultima, encontradas, enCurso := a.busqueda.copia()
 	if !ultima.IsZero() {
 		e.UltimaBusqueda = &ultima

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/edge-node/internal/descubrir"
+	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/edge-node/internal/fotos"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/edge-node/internal/hub"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/edge-node/internal/impresion"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/edge-node/internal/nube"
@@ -52,6 +53,8 @@ type App struct {
 	motor       *impresion.Motor
 	heartbeatYa chan struct{}
 	buscarYa    chan struct{}
+	fotosYa     chan struct{}
+	fotos       *fotos.Cache
 	busqueda    Busqueda
 	buscar      func(context.Context) []descubrir.Encontrada // las pruebas lo reemplazan
 	ultimaCaida atomic.Int64                                 // unix nano de la última búsqueda por caída
@@ -85,6 +88,8 @@ func New(ctx context.Context, cfg Config, log *slog.Logger) (*App, error) {
 	a.hub = hub.New(log, clk.Now)
 	a.heartbeatYa = make(chan struct{}, 1)
 	a.buscarYa = make(chan struct{}, 1)
+	a.fotosYa = make(chan struct{}, 1)
+	a.fotos = &fotos.Cache{Dir: dirFotos(cfg.DataDir), NubeURL: cfg.NubeURL, Log: log, Pausa: 100 * time.Millisecond}
 	a.buscar = func(ctx context.Context) []descubrir.Encontrada { return descubrir.Buscar(ctx, nil) }
 	if a.outbox, err = edgesync.NewOutbox(ctx, st.Writer()); err != nil {
 		_ = st.Close()
@@ -93,6 +98,9 @@ func New(ctx context.Context, cfg Config, log *slog.Logger) (*App, error) {
 	a.motor = a.nuevoMotor(impresion.TCP{})
 	a.alAplicar = func(c CambiosAplicados) {
 		a.difundirCambios(c)
+		if c.Completo || c.Tablas["productos"] > 0 {
+			a.pedirFotos()
+		}
 		a.sincronizarImpresoras(context.Background())
 		a.ejecutarComandos(context.Background())
 	}
@@ -109,6 +117,7 @@ func (a *App) routes() {
 	a.mux.HandleFunc("GET /activar", pagina("activar.html"))
 	a.mux.HandleFunc("GET /estado", pagina("estado.html"))
 	a.mux.HandleFunc("GET /v1/estado", a.handleEstado)
+	a.mux.Handle("GET /media/", a.fotos.Handler())
 	a.mux.Handle("POST /v1/impresoras/buscar", soloLocal(http.HandlerFunc(a.handleBuscarAhora)))
 	a.mux.Handle("POST /v1/activacion", soloLocal(http.HandlerFunc(a.handleActivar)))
 	a.mux.HandleFunc("GET /v1/conectividad", a.handleConectividad)

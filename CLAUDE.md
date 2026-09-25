@@ -43,6 +43,8 @@ La documentación vive en `documentacion-proyecto/`: toda referencia a `docs/…
 | F2-11 | ✅ `POST /v1/comandas` en el nodo: idempotente, separa por estación, cola persistente por impresora, envío en paralelo (p95 49 ms en prueba; 23 ms contra printer-sim) |
 | F2-12 | ✅ DLE EOT cada 2 s: sin papel/tapa/sin conexión → `printer.status` + heartbeat inmediato; lo pendiente espera y sale solo; redirección de estación con re-render al ancho nuevo |
 | F2-13 | ✅ Reimpresión (sin platos anulados, con marca y hora original) y anulación de líneas, auditadas |
+| F2-15 | ✅ Caché de fotos del menú en el nodo (WebP sm/md, descarga atómica en segundo plano, limpieza de lo que ya no se usa, `/media/…` en la LAN) |
+| F2-07, F2-14 | ⏳ TLS en la LAN depende del dominio (DP-10); el MSI firmado necesita certificado de firma de código (F0-01) |
 | F2-04 | ✅ Push del outbox con tenant/RLS, heartbeat con telemetría y alerta de reloj |
 | F1-14 | 🟡 Imagen Docker lista (`deploy/docker/cloud-api.Dockerfile`, `-tags nodynamic`). Falta IaC (Terraform en `deploy/azure/`, ADR-0013) y despliegue a `dev` |
 
