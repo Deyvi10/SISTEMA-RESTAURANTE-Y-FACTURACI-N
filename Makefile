@@ -88,6 +88,12 @@ api: ## Corre la API en :8080 (migra y siembra la galería en local; requiere `m
 demo: ## Crea el restaurante de demostración «Cevichería Don Pepe» con fotos (demo@donpepe.ec / DonPepe2026)
 	$(GO) run ./apps/cloud-api/cmd/cloud-api demo
 
+nodo: ## Corre el Nodo Local en primer plano en http://localhost:7080 (datos en .nodo-data/)
+	RESTPOS_DATA=$(CURDIR)/.nodo-data RESTPOS_HTTP=127.0.0.1:7080 $(GO) run ./apps/edge-node/cmd/restpos-nodo run
+
+nodo-win: ## Compila el Nodo Local para Windows x64 en dist/restpos-nodo.exe
+	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 $(GO) build -trimpath -ldflags "-s -w" -o dist/restpos-nodo.exe ./apps/edge-node/cmd/restpos-nodo
+
 bo: ## Corre el backoffice en http://localhost:5173 (con `make api` en otra terminal)
 	npm install --no-audit --no-fund && npm run dev -w @restpos/backoffice-web
 
