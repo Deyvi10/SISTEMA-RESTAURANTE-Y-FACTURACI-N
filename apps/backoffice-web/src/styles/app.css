@@ -237,3 +237,41 @@ h1, h2, h3 { text-wrap: balance; margin: 0; }
   .page-actions .rp-btn { flex: 1; }
 }
 @media (prefers-reduced-motion: reduce) { .login-hero .mosaic img { animation: none; } }
+
+/* ---------- Nodo Local (F2-02) ---------- */
+.nodo-hero { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 24px; padding: 24px; border-radius: 24px; background: var(--rp-color-surface); box-shadow: var(--rp-shadow-card); }
+.nodo-hero__texto { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.nodo-hero__texto h2 { margin: 6px 0 0; }
+.nodo-hero__texto p { margin: 0; }
+.nodo-hero__codigo { display: flex; flex-direction: column; gap: 14px; justify-content: center; min-width: 0; }
+.nodo-pasos { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.nodo-pasos li { display: flex; gap: 12px; align-items: flex-start; }
+.nodo-pasos li > span { flex: none; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: var(--rp-color-accent-soft); color: var(--rp-color-accent); font-weight: 700; font-size: 14px; }
+.nodo-pasos code { font-family: var(--rp-font-mono); background: var(--rp-color-fill); padding: 2px 6px; border-radius: 6px; font-size: 14px; }
+.codigo-nodo { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 20px 12px; border-radius: 20px; background: var(--rp-color-background); }
+.codigo-nodo--vacio { color: var(--rp-color-label-secondary); text-align: center; min-height: 128px; justify-content: center; }
+.codigo-nodo--vacio p { margin: 0; font-size: 14px; }
+.codigo-nodo__cajas { display: flex; align-items: center; gap: 6px; }
+.codigo-nodo__cajas span { width: 42px; height: 54px; display: grid; place-items: center; border-radius: 12px; background: var(--rp-color-surface); box-shadow: var(--rp-shadow-card); font: 700 26px/1 var(--rp-font-mono); animation: rp-toast-in var(--rp-duration-base) var(--rp-ease-spring) both; }
+.codigo-nodo__cajas i { width: 10px; height: 3px; border-radius: 2px; background: var(--rp-color-label-tertiary); }
+.codigo-nodo[data-vencido="true"] .codigo-nodo__cajas span { opacity: .35; text-decoration: line-through; }
+.codigo-nodo__pie { margin: 0; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: center; font-size: 14px; color: var(--rp-color-label-secondary); }
+.nodos { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
+.nodo-card { display: flex; flex-direction: column; gap: 14px; padding: 18px; border-radius: 20px; background: var(--rp-color-surface); box-shadow: var(--rp-shadow-card); }
+.nodo-card[data-activo="false"] { opacity: .7; }
+.nodo-card header { display: flex; align-items: center; gap: 12px; }
+.nodo-card__titulo { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.nodo-card__titulo b, .nodo-card__titulo span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nodo-card__titulo span { font-size: 13px; }
+.nodo-card__datos { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 0; }
+.nodo-card__datos div { padding: 10px 12px; border-radius: 12px; background: var(--rp-color-background); }
+.nodo-card__datos dt { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--rp-color-label-secondary); }
+.nodo-card__datos dd { margin: 2px 0 0; font-weight: 600; }
+.nodo-card__aviso { display: flex; gap: 8px; margin: 0; padding: 10px 12px; border-radius: 12px; background: var(--rp-color-warning-soft); color: var(--rp-color-warning-text); font-size: 13px; }
+.nodo-card__aviso svg { flex: none; margin-top: 1px; }
+.nodo-card footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; }
+.texto-alerta { color: var(--rp-color-warning-text); }
+.texto-peligro { color: var(--rp-color-danger-text) !important; }
+.en-linea::before { box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 25%, transparent); }
+@media (max-width: 860px) { .nodo-hero { grid-template-columns: minmax(0, 1fr); padding: 18px; } }
+@media (max-width: 420px) { .codigo-nodo__cajas { gap: 4px; } .codigo-nodo__cajas span { width: 32px; height: 44px; font-size: 20px; border-radius: 9px; } .nodo-card__datos { grid-template-columns: 1fr; } .nodos { grid-template-columns: minmax(0, 1fr); } }

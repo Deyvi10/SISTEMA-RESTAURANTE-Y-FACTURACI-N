@@ -10,6 +10,7 @@ import (
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/auth"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/catalogo"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/imagenes"
+	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/nodos"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/personal"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/platform/db"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/platform/httpx"
@@ -28,6 +29,7 @@ var (
 	publico     = &auth.Access{Public: true}
 	autenticado = &auth.Access{}
 	tempPwd     = &auth.Access{AllowTempPwd: true}
+	nodo        = &auth.Access{Nodo: true}
 )
 
 func con(p rbac.Permiso) *auth.Access { return &auth.Access{Permiso: p} }
@@ -41,6 +43,7 @@ type Deps struct {
 	Catalogo      *catalogo.Service
 	Personal      *personal.Service
 	Imagenes      *imagenes.Service
+	Nodos         *nodos.Service
 	BackofficeURL string
 }
 
@@ -124,6 +127,13 @@ func Routes(d Deps) []Route {
 			}
 			d.Imagenes.HandleSubir(w, r)
 		}},
+
+		{"GET", "/v1/nodos", sal, list(d.Nodos.Listar)},
+		{"POST", "/v1/nodos/codigos", sal, create(d.Nodos.GenerarCodigo)},
+		{"POST", "/v1/nodos/{id}/revocar", sal, remove(d.Nodos.Revocar)},
+		{"POST", "/v1/nodos/activar", publico, activarNodo(d.Nodos)},
+		{"POST", "/v1/nodos/heartbeat", nodo, heartbeat(d.Nodos)},
+		{"POST", "/v1/sync/push", nodo, syncPush(d.DB)},
 
 		{"GET", "/v1/usuarios", per, list(pe.Listar)},
 		{"POST", "/v1/usuarios", per, create(pe.Crear)},

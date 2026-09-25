@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { del, get, post, put, patch } from "./client";
 import type {
-  Categoria, Estacion, FotoGaleria, Grupo, IconoCategoria, Imagen, Local, Mesa, Persona, Producto, Resumen, TarifaIVA, Zona,
+  Categoria, CodigoNodo, Estacion, FotoGaleria, Grupo, IconoCategoria, Imagen, Local, Mesa, NodoLocal, Persona, Producto, Resumen, TarifaIVA, Zona,
 } from "./types";
 
 export const useResumen = () => useQuery({ queryKey: ["resumen"], queryFn: () => get<Resumen>("/v1/resumen") });
@@ -15,6 +15,8 @@ export const useLocales = () => useQuery({ queryKey: ["locales"], queryFn: () =>
 export const useEstaciones = () => useQuery({ queryKey: ["estaciones"], queryFn: () => get<Estacion[]>("/v1/estaciones") });
 export const useZonas = () => useQuery({ queryKey: ["zonas"], queryFn: () => get<Zona[]>("/v1/zonas") });
 export const useMesas = () => useQuery({ queryKey: ["mesas"], queryFn: () => get<Mesa[]>("/v1/mesas") });
+// El estado del nodo se refresca solo cada 15 s (heartbeat cada 60 s).
+export const useNodos = () => useQuery({ queryKey: ["nodos"], queryFn: () => get<NodoLocal[]>("/v1/nodos"), refetchInterval: 15_000 });
 export const usePersonal = () => useQuery({ queryKey: ["personal"], queryFn: () => get<Persona[]>("/v1/usuarios") });
 
 /** Mutación que al terminar refresca las listas afectadas y el progreso de la guía. */
@@ -58,4 +60,6 @@ export const api = {
   editarPersona: (id: string, b: object) => put<Persona>(`/v1/usuarios/${id}`, b),
   cambiarPIN: (id: string, pin: string) => put<void>(`/v1/usuarios/${id}/pin`, { pin }),
   cambiarEstado: (id: string, activo: boolean) => put<Persona>(`/v1/usuarios/${id}/estado`, { activo }),
+  generarCodigoNodo: (localId: string) => post<CodigoNodo>("/v1/nodos/codigos", { localId }),
+  revocarNodo: (id: string) => post<void>(`/v1/nodos/${id}/revocar`, {}),
 };

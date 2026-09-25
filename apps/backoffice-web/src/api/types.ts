@@ -164,3 +164,30 @@ export interface Persona {
   avatarKey: string | null;
   avatarUrl: string | null;
 }
+
+export interface SaludNodo {
+  discoLibreMb?: number;
+  baseMb?: number;
+  outboxPendientes?: number;
+  outboxAntiguedadSeg?: number;
+  derivaSegundos?: number;
+  alertaReloj?: boolean;
+}
+export interface NodoLocal {
+  id: UUID;
+  localId: UUID;
+  localNombre: string;
+  nombreEquipo: string;
+  estado: "ACTIVO" | "REVOCADO";
+  version: string;
+  enLinea: boolean;
+  ultimoHeartbeatAt: string | null;
+  salud: SaludNodo;
+  activadoAt: string;
+  revocadoAt: string | null;
+}
+export interface CodigoNodo {
+  codigo: string;
+  localId: UUID;
+  expiraAt: string;
+}

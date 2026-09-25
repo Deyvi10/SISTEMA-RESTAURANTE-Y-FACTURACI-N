@@ -5,8 +5,6 @@ package auth
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -18,6 +16,7 @@ import (
 
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/platform/apperr"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/platform/db"
+	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/platform/limite"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/platform/mail"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/clock"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/ids"
@@ -385,41 +384,22 @@ func cargarUsuario(ctx context.Context, tx db.Tx, id ids.ID) (Usuario, error) {
 
 // ---------- bloqueo por intentos ----------
 
-func lockKey(login, ip string) string {
-	h := sha256.Sum256([]byte(login + "|" + ip))
-	return hex.EncodeToString(h[:])
+func lockKey(login, ip string) string { return limite.Clave(login, ip) }
+
+func (s *Service) limiter() *limite.Limiter {
+	return &limite.Limiter{DB: s.DB, Now: s.Clock.Now, Max: maxFallos, Bloqueo: bloqueo}
 }
 
 func (s *Service) bloqueado(ctx context.Context, clave string) (bool, error) {
-	var hasta *time.Time
-	err := s.DB.Global(ctx, func(tx db.Tx) error {
-		return tx.QueryRow(ctx, `SELECT bloqueado_hasta FROM intentos_login WHERE clave = $1`, clave).Scan(&hasta)
-	})
-	if errors.Is(err, pgx.ErrNoRows) {
-		return false, nil
-	}
-	return err == nil && hasta != nil && s.Clock.Now().Before(*hasta), err
+	return s.limiter().Bloqueado(ctx, clave)
 }
 
 func (s *Service) registrarFallo(ctx context.Context, clave string) error {
-	now := s.Clock.Now()
-	return s.DB.Global(ctx, func(tx db.Tx) error {
-		// Un bloqueo vencido reinicia el conteo.
-		_, err := tx.Exec(ctx, `INSERT INTO intentos_login (clave, fallos, updated_at) VALUES ($1, 1, $2)
-			ON CONFLICT (clave) DO UPDATE SET
-			  fallos = CASE WHEN intentos_login.bloqueado_hasta IS NOT NULL AND intentos_login.bloqueado_hasta <= $2 THEN 1 ELSE intentos_login.fallos + 1 END,
-			  bloqueado_hasta = CASE WHEN intentos_login.bloqueado_hasta IS NOT NULL AND intentos_login.bloqueado_hasta <= $2 THEN NULL
-			                         WHEN intentos_login.fallos + 1 >= $3 THEN $2 + $4::interval ELSE intentos_login.bloqueado_hasta END,
-			  updated_at = $2`, clave, now, maxFallos, fmt.Sprintf("%d seconds", int(bloqueo.Seconds())))
-		return err
-	})
+	return s.limiter().Fallo(ctx, clave)
 }
 
 func (s *Service) limpiarFallos(ctx context.Context, clave string) error {
-	return s.DB.Global(ctx, func(tx db.Tx) error {
-		_, err := tx.Exec(ctx, `DELETE FROM intentos_login WHERE clave = $1`, clave)
-		return err
-	})
+	return s.limiter().Limpiar(ctx, clave)
 }
 
 func fieldErr(campo, msg string) error {

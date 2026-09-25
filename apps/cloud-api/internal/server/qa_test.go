@@ -20,6 +20,7 @@ func TestQA11TodaRutaDeclaraAcceso(t *testing.T) {
 		"GET /health": true, "GET /ready": true, "GET /media/{ruta...}": true,
 		"POST /v1/auth/login": true, "POST /v1/auth/refresh": true, "POST /v1/auth/logout": true,
 		"POST /v1/auth/password/olvide": true, "POST /v1/auth/password/restablecer": true,
+		"POST /v1/nodos/activar": true,
 	}
 	routes := server.Routes(server.Deps{})
 	if len(routes) < 40 {
@@ -39,7 +40,7 @@ func TestQA11TodaRutaDeclaraAcceso(t *testing.T) {
 		if r.Access.Public && !publicasPermitidas[k] {
 			t.Errorf("%s es pública sin estar en la lista permitida", k)
 		}
-		if strings.HasPrefix(r.Path, "/v1/") && !r.Access.Public && r.Access.Permiso == "" && !strings.Contains("GET /v1/me POST /v1/auth/password/cambiar GET /v1/resumen GET /v1/tarifas-iva GET /v1/iconos-categoria GET /v1/permisos POST /v1/imagenes", k) {
+		if strings.HasPrefix(r.Path, "/v1/") && !r.Access.Public && !r.Access.Nodo && r.Access.Permiso == "" && !strings.Contains("GET /v1/me POST /v1/auth/password/cambiar GET /v1/resumen GET /v1/tarifas-iva GET /v1/iconos-categoria GET /v1/permisos POST /v1/imagenes", k) {
 			t.Errorf("%s solo exige sesión: declara un permiso concreto", k)
 		}
 	}
@@ -64,6 +65,7 @@ func TestQA06AislamientoDeTenants(t *testing.T) {
 		c.do("POST", "/v1/productos", map[string]any{"categoriaId": cats[0].ID, "nombre": "Plato", "precio": "5", "tarifaIvaId": tarifas[0].ID, "gruposModificadores": []any{g.ID}}, 201, nil)
 		c.do("POST", "/v1/usuarios", map[string]any{"nombreMostrar": "Mesero", "rol": "MESERO", "pin": "8899"}, 201, nil)
 		c.do("POST", "/v1/auth/password/olvide", map[string]string{"email": "noexiste@x.ec"}, 202, nil)
+		c.nodoOperativo()
 	}
 	_ = e.ten // tokens_recuperacion: solicitud real para A
 	a.do("POST", "/v1/auth/password/olvide", map[string]string{"email": "a@a.ec"}, 202, nil)

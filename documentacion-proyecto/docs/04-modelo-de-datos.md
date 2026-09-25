@@ -73,7 +73,7 @@ Define los límites y los *feature flags* (RF-09-01).
 `id`, `tenant_id`, `nombre`, `direccion`, `codigo_establecimiento CHAR(3)`, `zona_horaria`, `propina_legal_activa BOOL`, `propina_porcentaje NUMERIC(5,2) DEFAULT 10`, `precios_incluyen_iva BOOL`.
 
 ### `nodos`
-`id`, `tenant_id`, `local_id` (único entre los nodos activos), `estado ENUM(ACTIVO, REVOCADO)`, `llave_publica`, `version_software`, `ultimo_heartbeat_at`, `activado_at`, `revocado_at`.
+`id` (UUID v7 generado por el nodo), `tenant_id`, `local_id` (único entre los nodos activos), `nombre_equipo`, `estado ENUM(ACTIVO, REVOCADO)`, `llave_publica` (ed25519, 32 bytes; la privada no sale del nodo, ADR-0014), `version_software`, `ultimo_heartbeat_at`, `heartbeat JSONB` (última telemetría), `activado_at`, `activado_por`, `revocado_at`.
 
 ### `usuarios`
 | Columna | Tipo | Regla |
@@ -100,7 +100,7 @@ Relación N:M de usuarios con locales (un mesero puede trabajar en dos sucursale
 `id`, `tenant_id`, `local_id`, `nombre`, `tipo ENUM(MOVIL, TABLET, KDS, POS)`, `llave_publica`, `plataforma`, `version_app`, `estado ENUM(AUTORIZADO, REVOCADO)`, `emparejado_at`, `ultimo_uso_at`.
 
 ### `tokens_emparejamiento` · `codigos_activacion_nodo`
-Tokens de un solo uso con expiración (`expira_at`, `usado_at`).
+Tokens de un solo uso con expiración (`expira_at`, `usado_at`). `codigos_activacion_nodo` guarda solo `codigo_hash`, el `local_id` y el `nodo_id` que lo canjeó.
 
 ### `sesiones` · `revocaciones`
 Refresh tokens (hash) ligados a usuario + dispositivo; lista de revocación de JTI.
@@ -223,7 +223,9 @@ Refresh tokens (hash) ligados a usuario + dispositivo; lista de revocación de J
 - **`auditoria`** (**append-only**, con cadena de hash): `id`, `tenant_id`, `local_id`, `usuario_id`, `autorizado_por NULL`, `dispositivo_id`, `accion`, `entidad`, `entidad_id`, `antes JSONB`, `despues JSONB`, `monto NULL`, `motivo`, `created_at`, `hash_anterior`, `hash`.
 - **`outbox`** (nodo): `seq INTEGER PK`, `evento_id UUID`, `tipo`, `version`, `agregado_id`, `payload`, `created_at`, `enviado_at NULL`.
 - **`inbox_cursores`** (nodo): `flujo`, `cursor`.
-- **`sync_recibidos`** (nube): `(nodo_id, node_seq)` PK.
+- **`sync_cursores`** (nube): `nodo_id` PK, `tenant_id`, `ultimo_seq` (último `node_seq` aplicado, ADR-0012).
+- **`sync_eventos`** (nube, append-only): `evento_id` PK, `tenant_id`, `nodo_id`, `node_seq` (único por nodo), `tipo`, `version`, `agregado_id`, `payload JSONB`, `recibido_at`.
+- **`nodo`**, **`identidad_pendiente`** (solo en el nodo): identidad activada y la que está en canje (ADR-0014).
 
 ## 10. Políticas RLS (patrón)
 

@@ -8,6 +8,7 @@ export const SECCIONES = [
   { to: "/menu", label: "Menú", icono: "utensils", tint: "orange", permiso: "CONFIGURAR_MENU" },
   { to: "/salon", label: "Salón", icono: "salon", tint: "green", permiso: "CONFIGURAR_SALON" },
   { to: "/personal", label: "Personal", icono: "personal", tint: "indigo", permiso: "GESTIONAR_PERSONAL" },
+  { to: "/nodo", label: "Nodo Local", icono: "servidor", tint: "orange", permiso: "CONFIGURAR_SALON", soloEscritorio: true },
   { to: "/impresoras", label: "Impresoras", icono: "printer", tint: "gray", permiso: "CONFIGURAR_SALON", pronto: true },
   { to: "/facturacion", label: "Facturación SRI", icono: "receipt", tint: "pink", permiso: "CONFIGURAR_SRI", pronto: true },
   { to: "/ajustes", label: "Ajustes", icono: "ajustes", tint: "gray", permiso: "CONFIGURAR_SALON" },
@@ -46,7 +47,7 @@ export function Shell() {
         <Outlet />
       </main>
       <nav className="rp-tabbar tabbar-movil" aria-label="Secciones">
-        {visibles.filter((s) => !("pronto" in s && s.pronto)).slice(0, 5).map((s) => (
+        {visibles.filter((s) => !("pronto" in s && s.pronto) && !("soloEscritorio" in s)).slice(0, 5).map((s) => (
           <NavLink key={s.to} to={s.to} end={s.to === "/"} className="rp-tab"
             style={({ isActive }) => ({ color: isActive ? "var(--rp-color-accent)" : undefined })}>
             <Icon name={s.icono} size={24} />

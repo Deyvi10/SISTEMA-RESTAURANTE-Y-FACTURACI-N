@@ -53,6 +53,7 @@ type Access struct {
 	Public       bool         // sin sesión (login, recuperación)
 	Permiso      rbac.Permiso // "" = cualquier usuario autenticado
 	AllowTempPwd bool         // permitida aunque deba cambiar la contraseña
+	Nodo         bool         // solo el Nodo Local con su token firmado (F2-02)
 }
 
 // Guard verifica token, sesión viva, usuario activo y permiso. La consulta revisa la
@@ -61,6 +62,9 @@ type Access struct {
 func Guard(d *db.DB, signer *Signer, now func() time.Time, a Access, next http.Handler) http.Handler {
 	if a.Public {
 		return next
+	}
+	if a.Nodo {
+		return guardNodo(d, now, next)
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()

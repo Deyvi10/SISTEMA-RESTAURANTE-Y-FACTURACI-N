@@ -75,3 +75,33 @@ func (r PushRequest) Validate() error {
 	}
 	return nil
 }
+
+// Heartbeat es la telemetría de salud que el nodo envía cada 60 s (F2-04, docs/03 §10).
+// Sin datos personales: solo números y estados.
+type Heartbeat struct {
+	Version          string           `json:"version"`
+	HoraNodo         time.Time        `json:"horaNodo"`
+	ArranqueAt       time.Time        `json:"arranqueAt"`
+	DiscoLibreMB     int64            `json:"discoLibreMb"`
+	BaseMB           int64            `json:"baseMb"`
+	OutboxPendientes int              `json:"outboxPendientes"`
+	OutboxAntiguedad int64            `json:"outboxAntiguedadSeg"` // del evento más viejo sin confirmar
+	Impresoras       []ImpresoraSalud `json:"impresoras"`
+}
+
+type ImpresoraSalud struct {
+	ID     ids.ID `json:"id"`
+	Estado string `json:"estado"` // OK, SIN_PAPEL, TAPA_ABIERTA, SIN_CONEXION…
+	Cola   int    `json:"cola"`
+}
+
+// HeartbeatResponse devuelve la hora de la nube para medir la deriva del reloj del nodo.
+type HeartbeatResponse struct {
+	HoraNube       time.Time `json:"horaNube"`
+	DerivaSegundos int64     `json:"derivaSegundos"` // hora del nodo − hora de la nube
+	AlertaReloj    bool      `json:"alertaReloj"`
+}
+
+// MaxDerivaReloj: la fecha va dentro de la clave de acceso SRI, así que más de 60 s de
+// diferencia se alerta (F2-04).
+const MaxDerivaReloj = 60 * time.Second

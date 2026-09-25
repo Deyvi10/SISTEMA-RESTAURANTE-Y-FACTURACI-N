@@ -12,8 +12,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/edge-node/internal/nube"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/edge-node/internal/store"
+	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/edge-node/internal/web"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/clock"
+	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/edgesync"
 )
 
 // App es el nodo en ejecución.
@@ -25,6 +28,18 @@ type App struct {
 	Inicio time.Time
 
 	mux *http.ServeMux
+
+	// Procesos de fondo: bg vive mientras corre Run; la sincronización tiene su propio
+	// contexto para poder detenerla si la nube revoca al nodo.
+	bg         context.Context
+	wg         sync.WaitGroup
+	syncMu     sync.Mutex
+	syncCancel context.CancelFunc
+	salud      Salud
+	httpNube   *http.Client // nil = cliente por defecto (las pruebas lo reemplazan)
+	nube       *nube.Client
+	outbox     *edgesync.Outbox
+	pusher     *edgesync.Pusher
 }
 
 // New abre la base (migrando) y prepara las rutas. No escucha todavía.
@@ -54,6 +69,10 @@ func (a *App) routes() {
 	a.mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 200, map[string]any{"estado": "ok", "version": Version})
 	})
+	a.mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServerFS(web.Static())))
+	a.mux.HandleFunc("GET /{$}", a.inicio)
+	a.mux.HandleFunc("GET /activar", pagina("activar.html"))
+	a.mux.HandleFunc("POST /v1/activacion", a.handleActivar)
 }
 
 // Handler es el router completo (lo usan las pruebas con httptest).
@@ -68,10 +87,19 @@ func (a *App) Run(ctx context.Context) error {
 		return fmt.Errorf("no se pudo escuchar en %s (¿otro programa usa el puerto?): %w", a.Cfg.HTTPAddr, err)
 	}
 	srv := &http.Server{Handler: a.Handler(), ReadHeaderTimeout: 5 * time.Second}
-	var wg sync.WaitGroup
 	bg, cancel := context.WithCancel(ctx)
 	defer cancel()
-	wg.Go(func() { a.watchdog(bg) })
+	a.syncMu.Lock()
+	a.bg = bg
+	a.syncMu.Unlock()
+	a.wg.Go(func() { a.watchdog(bg) })
+	if id, err := a.Identidad(ctx); err != nil {
+		a.Log.Error("no se pudo leer la identidad del nodo", "err", err)
+	} else if id == nil {
+		a.Log.Info("nodo sin activar: abre esta PC en el navegador para ingresar el código", "url", urlLocal(ln.Addr().String())+"/activar")
+	} else {
+		a.iniciarSync(id)
+	}
 
 	errc := make(chan error, 1)
 	go func() { errc <- srv.Serve(ln) }()
@@ -85,7 +113,7 @@ func (a *App) Run(ctx context.Context) error {
 	defer scancel()
 	_ = srv.Shutdown(sctx)
 	cancel()
-	wg.Wait()
+	a.wg.Wait()
 	if cerr := a.Store.Close(); cerr != nil {
 		err = errors.Join(err, cerr)
 	}
@@ -115,4 +143,13 @@ func (a *App) watchdog(ctx context.Context) {
 			os.Exit(3)
 		}
 	}
+}
+
+// urlLocal convierte la dirección de escucha en una URL que el dueño puede abrir en esta PC.
+func urlLocal(addr string) string {
+	_, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		return "http://localhost"
+	}
+	return "http://localhost:" + port
 }

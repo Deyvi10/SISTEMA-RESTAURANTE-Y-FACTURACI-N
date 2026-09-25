@@ -19,6 +19,7 @@ import (
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/auth"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/catalogo"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/imagenes"
+	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/nodos"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/personal"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/platform/mail"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/platform/testdb"
@@ -51,6 +52,7 @@ func newEnv(t *testing.T) *env {
 		Catalogo: &catalogo.Service{DB: tdb.App, ImagenURL: img.URL, Clock: clk},
 		Personal: &personal.Service{DB: tdb.App, Mail: m, Pepper: []byte("pepper-de-pruebas-0123456789abcdef"), ImagenURL: img.URL},
 		Imagenes: img,
+		Nodos:    nodos.New(tdb.App, clk),
 	}
 	srv := httptest.NewServer(server.Handler(deps, server.Routes(deps)))
 	img.PublicURL = srv.URL

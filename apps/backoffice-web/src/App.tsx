@@ -5,6 +5,7 @@ import { Shell } from "./layout/Shell";
 import { CambiarClave, Login, Olvide, Restablecer } from "./pages/Acceso";
 import { Inicio, Proximamente } from "./pages/Inicio";
 import { Menu } from "./pages/Menu";
+import { Nodo } from "./pages/Nodo";
 import { Ajustes, Personal } from "./pages/Personal";
 import { Salon } from "./pages/Salon";
 
@@ -36,6 +37,7 @@ export function App() {
         <Route path="salon" element={<Salon />} />
         <Route path="personal" element={<Personal />} />
         <Route path="ajustes" element={<Ajustes />} />
+        <Route path="nodo" element={<Nodo />} />
         <Route path="impresoras" element={<Proximamente titulo="Impresoras sin complicaciones" icono="printer" tint="gray"
           texto="Tu Nodo Local encontrará solas las impresoras de cocina, bar y caja. Tú solo arrastras cada categoría a su estación."
           beneficios={["Detección automática por red y USB", "Comandas en cocina en menos de 1,5 segundos", "Si se acaba el papel, no se pierde ningún pedido"]} />} />

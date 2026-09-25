@@ -29,6 +29,7 @@ func outputs(t *Tokens) map[string]string {
 		"packages/ts/ui/src/tailwind.css":                genTailwind(t),
 		"packages/ts/ui/src/tokens.ts":                   genTS(t),
 		"packages/dart/restpos_ui/lib/src/tokens.g.dart": genDart(t),
+		"apps/edge-node/internal/web/static/tokens.css":  genCSS(t),
 	}
 }
 

@@ -37,8 +37,20 @@ func JSON(w http.ResponseWriter, status int, v any) {
 
 // Decode lee un JSON estricto: rechaza campos desconocidos y cuerpos de más de 1 MB.
 func Decode(w http.ResponseWriter, r *http.Request, v any) error {
-	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxBody))
-	dec.DisallowUnknownFields()
+	return decode(w, r, v, maxBody, true)
+}
+
+// DecodeNodo lee lo que envía el Nodo Local: tolera campos nuevos (un nodo con una versión
+// más reciente sigue funcionando, docs/03 §5.4) y admite lotes de sincronización de hasta 2 MB.
+func DecodeNodo(w http.ResponseWriter, r *http.Request, v any) error {
+	return decode(w, r, v, 2*maxBody, false)
+}
+
+func decode(w http.ResponseWriter, r *http.Request, v any, limit int64, strict bool) error {
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, limit))
+	if strict {
+		dec.DisallowUnknownFields()
+	}
 	if err := dec.Decode(v); err != nil {
 		var syn *json.SyntaxError
 		var typ *json.UnmarshalTypeError
@@ -50,7 +62,7 @@ func Decode(w http.ResponseWriter, r *http.Request, v any) error {
 				Fields: []apperr.FieldError{{Campo: typ.Field, Mensaje: "Tipo incorrecto."}},
 			}
 		case errors.As(err, &tooBig):
-			return apperr.New(apperr.Invalid, "CUERPO_GRANDE", "La solicitud supera 1 MB.")
+			return apperr.New(apperr.Invalid, "CUERPO_GRANDE", fmt.Sprintf("La solicitud supera %d MB.", limit>>20))
 		case strings.HasPrefix(err.Error(), "json: unknown field"):
 			return apperr.New(apperr.Invalid, "CAMPO_DESCONOCIDO", "La solicitud trae un campo que no existe: "+strings.TrimPrefix(err.Error(), "json: unknown field "))
 		case errors.As(err, &syn), errors.Is(err, io.EOF), errors.Is(err, io.ErrUnexpectedEOF):

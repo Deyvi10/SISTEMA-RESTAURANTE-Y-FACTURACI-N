@@ -15,7 +15,8 @@ import (
 )
 
 // ReceiverSchema crea las tablas de sincronización en PostgreSQL.
-// En la Fase 2 (F2-04) pasan a db/cloud/migrations con tenant_id y RLS.
+// En la nube las tablas reales están en db/cloud/migrations (con tenant_id y RLS);
+// este esquema sin tenant queda para las pruebas del paquete.
 const ReceiverSchema = `
 CREATE TABLE IF NOT EXISTS sync_cursores (
   nodo_id     uuid PRIMARY KEY,
@@ -53,6 +54,9 @@ type Receiver struct {
 	Pool  *pgxpool.Pool
 	Apply Applier
 	Log   *slog.Logger
+	// Begin abre la transacción del lote. La nube la usa para fijar el tenant del nodo
+	// (RLS); si es nil se usa Pool directamente.
+	Begin func(ctx context.Context, fn func(pgx.Tx) error) error
 }
 
 // Push aplica un lote validado y devuelve el último seq aplicado.
@@ -69,8 +73,12 @@ func (r *Receiver) Push(ctx context.Context, req PushRequest) (PushResponse, err
 	if apply == nil {
 		apply = StoreEvent
 	}
+	begin := r.Begin
+	if begin == nil {
+		begin = func(ctx context.Context, fn func(pgx.Tx) error) error { return pgx.BeginFunc(ctx, r.Pool, fn) }
+	}
 	var last int64
-	err := pgx.BeginFunc(ctx, r.Pool, func(tx pgx.Tx) error {
+	err := begin(ctx, func(tx pgx.Tx) error {
 		if _, err := tx.Exec(ctx, `INSERT INTO sync_cursores (nodo_id) VALUES ($1) ON CONFLICT DO NOTHING`, req.NodeID); err != nil {
 			return err
 		}

@@ -1,0 +1,57 @@
+/* Estilos de las páginas del Nodo Local (activación y estado). Usa los tokens del sistema de diseño. */
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; min-height: 100dvh; background: var(--rp-color-background); color: var(--rp-color-label);
+  font-family: var(--rp-font-text); font-size: var(--rp-text-body-size); line-height: var(--rp-text-body-line);
+  -webkit-font-smoothing: antialiased;
+}
+main { max-width: 560px; margin: 0 auto; padding: 48px 16px 64px; }
+h1 { font-family: var(--rp-font-display); font-size: var(--rp-text-title1-size); line-height: var(--rp-text-title1-line); font-weight: 700; letter-spacing: var(--rp-text-title1-tracking); margin: 20px 0 8px; text-align: center; }
+.sub { color: var(--rp-color-label-secondary); text-align: center; margin: 0 auto 32px; max-width: 420px; }
+.app-icon {
+  width: 88px; height: 88px; margin: 0 auto; border-radius: 22px; display: grid; place-items: center; color: #fff;
+  background: linear-gradient(145deg, #FF9F0A, #FFCC00); box-shadow: 0 10px 30px rgba(255, 159, 10, .35);
+}
+.app-icon svg { width: 46px; height: 46px; }
+
+/* Código de 8 casillas estilo «código de verificación» de iOS */
+.codigo { display: flex; justify-content: center; align-items: center; gap: 8px; }
+.codigo input {
+  width: 48px; height: 60px; border-radius: 12px; border: 2px solid transparent; background: var(--rp-color-surface);
+  box-shadow: var(--rp-shadow-card); text-align: center; font: 600 28px/1 var(--rp-font-mono); color: var(--rp-color-label);
+  text-transform: uppercase; caret-color: var(--rp-color-accent); transition: border-color var(--rp-duration-fast), transform var(--rp-duration-fast);
+}
+.codigo input:focus { outline: none; border-color: var(--rp-color-accent); transform: translateY(-2px); }
+.codigo .guion { width: 12px; height: 3px; border-radius: 2px; background: var(--rp-color-label-tertiary); }
+.codigo[data-estado="error"] { animation: temblor .4s var(--rp-ease-standard); }
+.codigo[data-estado="error"] input { border-color: var(--rp-color-danger-fill); }
+.codigo[data-estado="cargando"] input { opacity: .55; }
+@keyframes temblor { 20%, 60% { transform: translateX(-8px); } 40%, 80% { transform: translateX(8px); } }
+@media (max-width: 480px) { .codigo { gap: 5px; } .codigo input { width: 36px; height: 50px; font-size: 22px; border-radius: 10px; } .codigo .guion { width: 8px; } }
+
+.mensaje { min-height: 48px; margin-top: 20px; text-align: center; font-size: var(--rp-text-subhead-size); }
+.mensaje.error { color: var(--rp-color-danger-text); }
+.ayuda { margin-top: 28px; background: var(--rp-color-surface); border-radius: var(--rp-radius-lg); padding: 16px; box-shadow: var(--rp-shadow-card); }
+.ayuda ol { margin: 0; padding-left: 20px; color: var(--rp-color-label-secondary); font-size: var(--rp-text-subhead-size); }
+.ayuda li + li { margin-top: 6px; }
+.ayuda b { color: var(--rp-color-label); }
+
+.spinner { width: 22px; height: 22px; border-radius: 50%; border: 3px solid var(--rp-color-fill); border-top-color: var(--rp-color-accent); animation: giro .8s linear infinite; display: inline-block; vertical-align: middle; }
+@keyframes giro { to { transform: rotate(360deg); } }
+
+/* Marca de verificación animada */
+.listo { text-align: center; }
+.check { width: 96px; height: 96px; margin: 8px auto 0; }
+.check circle { fill: var(--rp-tint-green); transform-origin: center; animation: pop .35s var(--rp-ease-spring) both; }
+.check path { fill: none; stroke: #fff; stroke-width: 7; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 60; stroke-dashoffset: 60; animation: trazo .45s .25s var(--rp-ease-standard) forwards; }
+@keyframes pop { from { transform: scale(.4); opacity: 0; } }
+@keyframes trazo { to { stroke-dashoffset: 0; } }
+
+.boton {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 50px; padding: 0 22px; border-radius: 14px;
+  background: var(--rp-color-accent-fill); color: var(--rp-color-on-accent); font-weight: 600; text-decoration: none; border: 0; font-size: 17px; cursor: pointer;
+}
+.boton:focus-visible { outline: 3px solid var(--rp-color-accent-soft); outline-offset: 2px; }
+[hidden] { display: none !important; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } .check path { stroke-dashoffset: 0; } }

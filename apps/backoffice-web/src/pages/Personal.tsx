@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router";
 import { ApiError, uuidv7 } from "../api/client";
 import { api, useGuardar, useLocales, usePersonal } from "../api/hooks";
 import { useSession } from "../api/session";
@@ -216,6 +217,14 @@ export function Ajustes() {
           <ToggleRow label="Mis precios incluyen IVA" detalle={`Recomendado: lo que ve el cliente es lo que paga. Ej.: ${formatUSD("15.00")} ya con IVA.`} checked={form.preciosIncluyenIva} onChange={(v) => set("preciosIncluyenIva", v)} />
         </div>
         {errores.propinaPorcentaje && <p className="error-inline">{errores.propinaPorcentaje}</p>}
+        <div className="rp-section-header" style={{ margin: "0 4px -10px" }}>Equipos</div>
+        <div className="rp-group" style={{ margin: 0 }}>
+          <Link to="/nodo" className="rp-cell" style={{ color: "inherit", textDecoration: "none" }}>
+            <AppIcon icono="servidor" tint="orange" size={30} />
+            <span className="rp-cell__body"><span className="rp-cell__title">Nodo Local</span><span className="rp-cell__subtitle">La PC de caja que funciona sin internet</span></span>
+            <Icon name="chevronRight" size={18} className="rp-cell__chevron" />
+          </Link>
+        </div>
       </div>
     </>
   );

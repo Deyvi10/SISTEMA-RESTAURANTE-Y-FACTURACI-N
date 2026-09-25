@@ -2,7 +2,7 @@
 // Importación explícita: el paquete solo incluye lo que se usa.
 import {
   Armchair, Banknote, Beef, Beer, CakeSlice, Camera, Check, ChefHat, Cherry, ChevronLeft, ChevronRight, CircleAlert,
-  CircleCheck, Citrus, Clock, CloudOff, Coffee, Cookie, CookingPot, Croissant, Crown, CupSoda, Dessert, Donut,
+  CircleCheck, Citrus, Clock, CloudOff, Coffee, Copy, HardDrive, RefreshCw, Server, Activity, Cookie, CookingPot, Croissant, Crown, CupSoda, Dessert, Donut,
   Drumstick, EggFried, Eye, EyeOff, Fish, Flame, GlassWater, GripVertical, Ham, House, IceCreamCone, ImagePlus,
   Images, Info, KeyRound, LayoutGrid, LogOut, type LucideIcon, Mail, MapPin, Martini, Milk, Minus, Monitor, Pencil,
   Percent, Pizza, Plus, Popcorn, Printer, QrCode, Receipt, Rocket, Salad, Sandwich, Search, Settings, ShieldCheck,
@@ -27,7 +27,7 @@ export const ICONOS: Record<string, LucideIcon> = {
   etiqueta: Tag, exito: CircleCheck, error: CircleAlert, info: Info, pin: KeyRound, seguro: ShieldCheck,
   tiempo: Clock, ubicacion: MapPin, porcentaje: Percent, nube: CloudOff, cohete: Rocket, qr: QrCode, menos: Minus,
   dueno: Crown, tendencia: TrendingUp, rayo: Zap, camera: Camera, armchair: Armchair, users: Users, printer: Printer,
-  receipt: Receipt,
+  receipt: Receipt, servidor: Server, disco: HardDrive, copiar: Copy, recargar: RefreshCw, actividad: Activity,
 };
 
 export function Icon({ name, size = 20, strokeWidth = 2, className }: { name: string; size?: number; strokeWidth?: number; className?: string }) {
