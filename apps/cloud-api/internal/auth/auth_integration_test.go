@@ -135,12 +135,20 @@ func TestRefreshRotaYDetectaReutilizacion(t *testing.T) {
 	if err != nil || s2.RefreshToken == s1.RefreshToken {
 		t.Fatalf("rotación: %v", err)
 	}
-	// Alguien reutiliza el token viejo (robado): se revoca toda la familia.
+	// Recargar justo mientras se renovaba reenvía el token viejo: dentro de 30 s es benigno.
+	s2b, err := f.svc.Refresh(ctx, s1.RefreshToken, auth.Cliente{})
+	if err != nil || s2b.RefreshToken == "" {
+		t.Fatalf("carrera benigna dentro de la gracia: %v", err)
+	}
+	// Pasada la gracia, alguien reutiliza el token viejo (robado): se revoca toda la familia.
+	f.clock.Advance(31 * time.Second)
 	if _, err := f.svc.Refresh(ctx, s1.RefreshToken, auth.Cliente{}); code(err) != "SESION_VENCIDA" {
 		t.Fatalf("reutilización: %v", err)
 	}
-	if _, err := f.svc.Refresh(ctx, s2.RefreshToken, auth.Cliente{}); code(err) != "SESION_VENCIDA" {
-		t.Fatal("tras detectar reutilización, el token nuevo también debe quedar revocado")
+	for _, tok := range []string{s2.RefreshToken, s2b.RefreshToken} {
+		if _, err := f.svc.Refresh(ctx, tok, auth.Cliente{}); code(err) != "SESION_VENCIDA" {
+			t.Fatal("tras detectar reutilización, los tokens nuevos también deben quedar revocados")
+		}
 	}
 	s3, _ := f.svc.Login(ctx, f.email, f.alta.PasswordTemporal, auth.Cliente{})
 	f.clock.Advance(auth.RefreshTTL + time.Minute)
@@ -150,6 +158,41 @@ func TestRefreshRotaYDetectaReutilizacion(t *testing.T) {
 }
 
 var tokenRe = regexp.MustCompile(`token=([A-Za-z0-9_-]+)`)
+
+// Dos renovaciones simultáneas con el mismo token (recargar durante una renovación):
+// ambas deben terminar bien, sin cerrar la sesión del usuario.
+func TestRefreshSimultaneo(t *testing.T) {
+	f := setup(t)
+	ctx := context.Background()
+	s1, _ := f.svc.Login(ctx, f.email, f.alta.PasswordTemporal, auth.Cliente{})
+	const n = 8
+	errs := make(chan error, n)
+	for range n {
+		go func() {
+			_, err := f.svc.Refresh(ctx, s1.RefreshToken, auth.Cliente{})
+			errs <- err
+		}()
+	}
+	for range n {
+		if err := <-errs; err != nil {
+			t.Fatalf("renovación simultánea falló: %v", err)
+		}
+	}
+}
+
+// Tras cerrar sesión, ni siquiera dentro de la gracia se reabre una sesión con el token viejo.
+func TestGraciaNoSobreviveAlLogout(t *testing.T) {
+	f := setup(t)
+	ctx := context.Background()
+	s1, _ := f.svc.Login(ctx, f.email, f.alta.PasswordTemporal, auth.Cliente{})
+	s2, _ := f.svc.Refresh(ctx, s1.RefreshToken, auth.Cliente{})
+	if err := f.svc.Logout(ctx, s2.RefreshToken); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.svc.Refresh(ctx, s1.RefreshToken, auth.Cliente{}); code(err) != "SESION_VENCIDA" {
+		t.Fatalf("tras logout el token viejo no debe servir: %v", err)
+	}
+}
 
 func TestRecuperacion(t *testing.T) {
 	f := setup(t)

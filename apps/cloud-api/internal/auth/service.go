@@ -24,9 +24,12 @@ import (
 )
 
 const (
-	maxFallos = 5
-	bloqueo   = 15 * time.Minute
-	resetTTL  = 30 * time.Minute
+	// graciaRotacion: un refresh recién rotado que llega dentro de esta ventana es una carrera
+	// benigna (recargar mientras se renovaba, dos pestañas), no un robo.
+	graciaRotacion = 30 * time.Second
+	maxFallos      = 5
+	bloqueo        = 15 * time.Minute
+	resetTTL       = 30 * time.Minute
 )
 
 var (
@@ -109,14 +112,13 @@ func (s *Service) Login(ctx context.Context, login, password string, cli Cliente
 	if err := s.limpiarFallos(ctx, clave); err != nil {
 		return Sesion{}, err
 	}
-	return s.abrirSesion(ctx, tenantID, userID, ids.New(), cli)
+	return s.abrirSesion(ctx, tenantID, userID, ids.New(), ids.New(), cli)
 }
 
 // abrirSesion crea una sesión (o la siguiente de una familia al rotar) y emite los tokens.
-func (s *Service) abrirSesion(ctx context.Context, tenantID, userID, familia ids.ID, cli Cliente) (Sesion, error) {
+func (s *Service) abrirSesion(ctx context.Context, tenantID, userID, familia, sid ids.ID, cli Cliente) (Sesion, error) {
 	var out Sesion
 	refresh, hash := NewOpaqueToken()
-	sid := ids.New()
 	now := s.Clock.Now()
 	err := s.DB.InTenant(ctx, tenantID, func(tx db.Tx) error {
 		u, err := cargarUsuario(ctx, tx, userID)
@@ -138,8 +140,9 @@ func (s *Service) abrirSesion(ctx context.Context, tenantID, userID, familia ids
 	return out, err
 }
 
-// Refresh rota el refresh token. Si llega uno ya rotado (robado y reutilizado), se revoca
-// toda la familia: el atacante y el usuario legítimo deben volver a iniciar sesión.
+// Refresh rota el refresh token. Si llega uno ya rotado fuera de la ventana de gracia
+// (robado y reutilizado), se revoca toda la familia: atacante y usuario legítimo deben
+// volver a iniciar sesión. Dentro de la ventana se trata como una carrera benigna.
 func (s *Service) Refresh(ctx context.Context, refresh string, cli Cliente) (Sesion, error) {
 	if refresh == "" {
 		return Sesion{}, errSesion
@@ -147,9 +150,10 @@ func (s *Service) Refresh(ctx context.Context, refresh string, cli Cliente) (Ses
 	var sid, tenantID, userID, familia ids.ID
 	var expira time.Time
 	var revocada *time.Time
+	var reemplazada *ids.ID
 	err := s.DB.Global(ctx, func(tx db.Tx) error {
-		return tx.QueryRow(ctx, `SELECT sesion_id, tenant_id, usuario_id, familia, expira_at, revocada_at FROM auth_buscar_sesion($1)`, HashToken(refresh)).
-			Scan(&sid, &tenantID, &userID, &familia, &expira, &revocada)
+		return tx.QueryRow(ctx, `SELECT sesion_id, tenant_id, usuario_id, familia, expira_at, revocada_at, reemplazada_por FROM auth_buscar_sesion($1)`, HashToken(refresh)).
+			Scan(&sid, &tenantID, &userID, &familia, &expira, &revocada, &reemplazada)
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Sesion{}, errSesion
@@ -158,35 +162,62 @@ func (s *Service) Refresh(ctx context.Context, refresh string, cli Cliente) (Ses
 		return Sesion{}, err
 	}
 	now := s.Clock.Now()
+	if now.After(expira) {
+		return Sesion{}, errSesion
+	}
+	nueva := ids.New()
 	if revocada != nil {
+		if reemplazada != nil && now.Sub(*revocada) <= graciaRotacion {
+			return s.reabrirEnGracia(ctx, tenantID, userID, familia, nueva, cli)
+		}
 		if err := s.revocarFamilia(ctx, tenantID, familia); err != nil {
 			return Sesion{}, err
 		}
 		slog.WarnContext(ctx, "auth: refresh reutilizado, familia revocada", "tenant_id", tenantID, "user_id", userID)
 		return Sesion{}, errSesion
 	}
-	if now.After(expira) {
-		return Sesion{}, errSesion
-	}
-	// Revocar la actual y abrir la siguiente de la misma familia.
+	// Revocar la actual (anotando su reemplazo) y abrir la siguiente de la misma familia.
 	var activo bool
 	err = s.DB.InTenant(ctx, tenantID, func(tx db.Tx) error {
 		if err := tx.QueryRow(ctx, `SELECT activo FROM usuarios WHERE id = $1`, userID).Scan(&activo); err != nil {
 			return err
 		}
-		tag, err := tx.Exec(ctx, `UPDATE sesiones SET revocada_at = $2 WHERE id = $1 AND revocada_at IS NULL`, sid, now)
+		tag, err := tx.Exec(ctx, `UPDATE sesiones SET revocada_at = $2, reemplazada_por = $3 WHERE id = $1 AND revocada_at IS NULL`, sid, now, nueva)
 		if err == nil && tag.RowsAffected() == 0 {
-			return errSesion // otra petición la rotó al mismo tiempo
+			return errRotadaEnParalelo
 		}
 		return err
 	})
+	if errors.Is(err, errRotadaEnParalelo) {
+		// Dos renovaciones simultáneas con el mismo token (recarga durante una renovación):
+		// la otra ya rotó hace instantes, así que es la misma carrera benigna.
+		return s.reabrirEnGracia(ctx, tenantID, userID, familia, nueva, cli)
+	}
 	if err != nil {
 		return Sesion{}, err
 	}
 	if !activo {
 		return Sesion{}, errSesion
 	}
-	return s.abrirSesion(ctx, tenantID, userID, familia, cli)
+	return s.abrirSesion(ctx, tenantID, userID, familia, nueva, cli)
+}
+
+var errRotadaEnParalelo = errors.New("auth: sesión rotada por otra petición")
+
+// reabrirEnGracia abre otra sesión en la familia si sigue viva. Tras un logout o si el
+// usuario fue desactivado, no se reabre nada.
+func (s *Service) reabrirEnGracia(ctx context.Context, tenantID, userID, familia, nueva ids.ID, cli Cliente) (Sesion, error) {
+	var viva bool
+	if err := s.DB.InTenant(ctx, tenantID, func(tx db.Tx) error {
+		return tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM sesiones s JOIN usuarios u ON u.id = s.usuario_id
+			WHERE s.familia = $1 AND s.revocada_at IS NULL AND u.activo)`, familia).Scan(&viva)
+	}); err != nil {
+		return Sesion{}, err
+	}
+	if !viva {
+		return Sesion{}, errSesion
+	}
+	return s.abrirSesion(ctx, tenantID, userID, familia, nueva, cli)
 }
 
 func (s *Service) revocarFamilia(ctx context.Context, tenantID, familia ids.ID) error {
@@ -203,11 +234,7 @@ func (s *Service) Logout(ctx context.Context, refresh string) error {
 	}
 	var tenantID, familia ids.ID
 	err := s.DB.Global(ctx, func(tx db.Tx) error {
-		var sid, uid ids.ID
-		var exp time.Time
-		var rev *time.Time
-		return tx.QueryRow(ctx, `SELECT sesion_id, tenant_id, usuario_id, familia, expira_at, revocada_at FROM auth_buscar_sesion($1)`, HashToken(refresh)).
-			Scan(&sid, &tenantID, &uid, &familia, &exp, &rev)
+		return tx.QueryRow(ctx, `SELECT tenant_id, familia FROM auth_buscar_sesion($1)`, HashToken(refresh)).Scan(&tenantID, &familia)
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil
@@ -321,7 +348,7 @@ func (s *Service) CambiarPassword(ctx context.Context, p Principal, actual, nuev
 	if err != nil {
 		return Sesion{}, err
 	}
-	return s.abrirSesion(ctx, p.TenantID, p.UserID, ids.New(), cli)
+	return s.abrirSesion(ctx, p.TenantID, p.UserID, ids.New(), ids.New(), cli)
 }
 
 // guardarPassword actualiza el hash y revoca todas las sesiones del usuario.
