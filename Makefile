@@ -64,7 +64,23 @@ printer-sim: ## Corre el simulador de impresoras sin Docker
 sri-stub: ## Corre el stub del SRI sin Docker
 	$(GO) run ./tools/sri-stub
 
+tokens: ## Regenera los tokens de diseño (CSS, TS, Tailwind, Dart) y verifica contraste AA
+	$(GO) run ./tools/design-tokens
+
+tokens-check: ## Falla si los tokens generados están desactualizados o el contraste no cumple AA
+	$(GO) run ./tools/design-tokens -check
+
+ui-test: ## Tipos y pruebas del paquete @restpos/ui
+	cd packages/ts/ui && npx -y -p typescript@5.9 tsc --noEmit -p . && node --experimental-strip-types --test src/*.test.ts
+
+ui-docs: ## Sirve la guía de estilo viva en http://localhost:8095/docs/
+	@echo "Guía de estilo: http://localhost:8095/docs/"
+	cd packages/ts/ui && python3 -m http.server 8095 --bind 127.0.0.1
+
+flutter-ui: ## Analiza y prueba el paquete Flutter restpos_ui con Docker (no requiere Flutter instalado)
+	docker run --rm -v "$$PWD/packages/dart/restpos_ui":/pkg -w /pkg ghcr.io/cirruslabs/flutter:stable sh -c "flutter pub get && flutter analyze && flutter test; s=$$?; chown -R $$(id -u):$$(id -g) /pkg; exit $$s"
+
 backlog: ## Regenera docs/12-backlog-tickets.md desde el JSON
 	python3 documentacion-proyecto/docs/backlog/generar.py
 
-.PHONY: help hooks dev down reset logs test test-long cover fmt lint check-float golden printer-sim sri-stub backlog
+.PHONY: help hooks dev down reset logs test test-long cover fmt lint check-float golden printer-sim sri-stub tokens tokens-check ui-test ui-docs flutter-ui backlog

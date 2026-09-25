@@ -18,6 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       go: ${{ steps.f.outputs.go }}
+      ui: ${{ steps.f.outputs.ui }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -35,6 +36,11 @@ jobs:
               - 'apps/edge-node/**'
               - 'contracts/**'
               - '.golangci.yml'
+              - 'packages/design/**'
+            ui:
+              - 'packages/design/**'
+              - 'packages/ts/**'
+              - 'packages/dart/**'
 
   go:
     needs: cambios
@@ -73,8 +79,29 @@ jobs:
         run: go tool cover -func=coverage.out | tail -1
       - name: Vulnerabilidades (govulncheck)
         run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+      - name: Tokens de diseño al día y contraste AA
+        run: go run ./tools/design-tokens -check
       - name: Golden de tickets sin cambios
         run: go test ./packages/go/escpos -update && git diff --exit-code packages/go/escpos/testdata
+
+  ui:
+    needs: cambios
+    if: needs.cambios.outputs.ui == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Tipos y pruebas de @restpos/ui
+        working-directory: packages/ts/ui
+        run: npx -y -p typescript@5.9 tsc --noEmit -p . && node --experimental-strip-types --test src/*.test.ts
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - name: Análisis y pruebas de restpos_ui (Flutter)
+        working-directory: packages/dart/restpos_ui
+        run: flutter pub get && flutter analyze && flutter test
 
   secretos:
     runs-on: ubuntu-latest
