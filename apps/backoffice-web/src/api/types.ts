@@ -197,7 +197,8 @@ export interface Impresora {
   id: UUID;
   localId: UUID;
   nombre: string;
-  conexion: "TCP" | "USB";
+  conexion: "TCP" | "USB" | "WINDOWS";
+  nombreWindows: string | null;
   host: string | null;
   puerto: number | null;
   mac: string | null;
@@ -217,4 +218,18 @@ export interface ComandoNodo {
   createdAt: string;
   ejecutadoAt: string | null;
   resultado: string | null;
+}
+
+/** Impresora instalada en Windows en la PC del Nodo Local. */
+export interface ImpresoraInstalada {
+  nombre: string;
+  puerto: string;
+  driver: string;
+  host?: string;
+  puertoTcp?: number;
+  estado: EstadoImpresora;
+  anchoSugerido: 58 | 80;
+  predeterminada?: boolean;
+  localId: UUID;
+  impresoraId: UUID | null;
 }

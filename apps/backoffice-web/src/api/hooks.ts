@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { del, get, post, put, patch } from "./client";
 import type {
-  Categoria, CodigoNodo, ComandoNodo, Estacion, Impresora, FotoGaleria, Grupo, IconoCategoria, Imagen, Local, Mesa, NodoLocal, Persona, Producto, Resumen, TarifaIVA, Zona,
+  Categoria, CodigoNodo, ComandoNodo, Estacion, Impresora, ImpresoraInstalada, FotoGaleria, Grupo, IconoCategoria, Imagen, Local, Mesa, NodoLocal, Persona, Producto, Resumen, TarifaIVA, Zona,
 } from "./types";
 
 export const useResumen = () => useQuery({ queryKey: ["resumen"], queryFn: () => get<Resumen>("/v1/resumen") });
@@ -17,6 +17,7 @@ export const useZonas = () => useQuery({ queryKey: ["zonas"], queryFn: () => get
 export const useMesas = () => useQuery({ queryKey: ["mesas"], queryFn: () => get<Mesa[]>("/v1/mesas") });
 // El estado del nodo se refresca solo cada 15 s (heartbeat cada 60 s).
 export const useNodos = () => useQuery({ queryKey: ["nodos"], queryFn: () => get<NodoLocal[]>("/v1/nodos"), refetchInterval: 15_000 });
+export const useInstaladas = () => useQuery({ queryKey: ["impresoras", "instaladas"], queryFn: () => get<ImpresoraInstalada[]>("/v1/impresoras/instaladas"), refetchInterval: 30_000 });
 export const useImpresoras = () => useQuery({ queryKey: ["impresoras"], queryFn: () => get<Impresora[]>("/v1/impresoras"), refetchInterval: 10_000 });
 export const usePersonal = () => useQuery({ queryKey: ["personal"], queryFn: () => get<Persona[]>("/v1/usuarios") });
 
@@ -66,6 +67,7 @@ export const api = {
   borrarImpresora: (id: string) => del(`/v1/impresoras/${id}`),
   probarImpresora: (id: string) => post<ComandoNodo>(`/v1/impresoras/${id}/prueba`, {}),
   comandoNodo: (id: string) => get<ComandoNodo>(`/v1/comandos-nodo/${id}`),
+  conectarImpresora: (b: object) => post<Impresora>("/v1/impresoras/conectar", b),
   buscarImpresoras: (localId: string) => post<ComandoNodo>("/v1/impresoras/buscar", { localId }),
   asignarImpresoras: (estacionId: string, impresoras: string[]) => put<void>(`/v1/estaciones/${estacionId}/impresoras`, { impresoras }),
   rutearCategoria: (categoriaId: string, estacionId: string | null) => put<void>(`/v1/categorias/${categoriaId}/estacion`, { estacionId }),

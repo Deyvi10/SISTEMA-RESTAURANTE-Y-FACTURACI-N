@@ -4,8 +4,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "react-router";
 import { ApiError, uuidv7 } from "../api/client";
-import { api, useCategorias, useEstaciones, useGuardar, useImpresoras, useLocales } from "../api/hooks";
-import type { Categoria, EstadoImpresora, Estacion, Impresora } from "../api/types";
+import { api, useCategorias, useEstaciones, useGuardar, useImpresoras, useInstaladas, useLocales } from "../api/hooks";
+import type { Categoria, EstadoImpresora, Estacion, Impresora, ImpresoraInstalada } from "../api/types";
 import { useFeedback } from "../components/feedback";
 import { AppIcon, Empty, Field, Segmented, Sheet, Spinner, ToggleRow } from "../components/ui";
 import { Icon } from "../lib/icons";
@@ -24,6 +24,22 @@ export function describirEstado(i: Pick<Impresora, "estado" | "nodoEnLinea" | "a
     DESCONOCIDO: { texto: "Buscando…", tono: "neutral" },
   };
   return m[i.estado] ?? m.DESCONOCIDO;
+}
+
+/** Cómo se conecta la impresora, en palabras. */
+export function describirConexion(i: Pick<Impresora, "conexion" | "host" | "puerto" | "nombreWindows">): string {
+  if (i.conexion === "WINDOWS") return `Windows · ${i.nombreWindows}`;
+  if (i.conexion === "TCP") return `${i.host}:${i.puerto}`;
+  return "USB";
+}
+
+/** Cómo llega Windows a una impresora instalada. */
+export function tipoInstalada(i: Pick<ImpresoraInstalada, "puerto" | "host">): string {
+  if (i.host) return `Red · ${i.host}`;
+  if (/^usb/i.test(i.puerto)) return "USB";
+  if (/^wsd/i.test(i.puerto)) return "Red (WSD)";
+  if (/^(lpt|com)/i.test(i.puerto)) return i.puerto.replace(/:$/, "");
+  return i.puerto;
 }
 
 /** A qué estación va cada categoría: la suya o la estación por defecto. */
@@ -67,7 +83,7 @@ function TarjetaImpresora({ i, onEditar }: { i: Impresora; onEditar: () => void 
         <AppIcon icono="printer" tint={est.tono === "success" ? "green" : est.tono === "danger" ? "red" : est.tono === "warning" ? "orange" : "gray"} size={46} />
         <div className="imp-card__titulo">
           <b>{i.nombre}</b>
-          <span className="rp-secondary">{i.conexion === "TCP" ? `${i.host}:${i.puerto}` : "USB"} · {i.anchoPapel} mm{i.modelo ? ` · ${i.modelo}` : ""}</span>
+          <span className="rp-secondary">{describirConexion(i)} · {i.anchoPapel} mm{i.modelo && i.conexion !== "WINDOWS" ? ` · ${i.modelo}` : ""}</span>
         </div>
         <span className={`rp-status rp-status--${est.tono}`}>{est.texto}</span>
       </header>
@@ -81,6 +97,57 @@ function TarjetaImpresora({ i, onEditar }: { i: Impresora; onEditar: () => void 
         </button>
       </footer>
     </article>
+  );
+}
+
+function FilaInstalada({ i, onConectar }: { i: ImpresoraInstalada; onConectar: () => void }) {
+  const est = describirEstado({ estado: i.estado, nodoEnLinea: true, activa: true });
+  return (
+    <div className="inst-fila">
+      <AppIcon icono="printer" tint={i.impresoraId ? "green" : "gray"} size={38} />
+      <div className="inst-fila__txt">
+        <b>{i.nombre}{i.predeterminada && <small className="rp-secondary"> · predeterminada</small>}</b>
+        <span className="rp-secondary">{tipoInstalada(i)} · {i.driver}</span>
+      </div>
+      {i.impresoraId ? (
+        <span className="rp-status rp-status--success">Conectada</span>
+      ) : (
+        <>
+          {est.tono !== "success" && <span className={`rp-status rp-status--${est.tono}`}>{est.texto}</span>}
+          <button type="button" className="rp-btn rp-btn--tinted rp-btn--sm" onClick={onConectar}><Icon name="agregar" size={15} /> Conectar</button>
+        </>
+      )}
+    </div>
+  );
+}
+
+function ConectarSheet({ i, onClose }: { i: ImpresoraInstalada; onClose: () => void }) {
+  const { toast } = useFeedback();
+  const [nombre, setNombre] = useState(i.nombre.slice(0, 40));
+  const [ancho, setAncho] = useState<"58" | "80">(String(i.anchoSugerido) as "58" | "80");
+  const [errores, setErrores] = useState<Record<string, string>>({});
+  const conectar = useGuardar(() => api.conectarImpresora({ localId: i.localId, nombreWindows: i.nombre, nombre, anchoPapel: Number(ancho) }), ["impresoras"]);
+  async function onSave() {
+    setErrores({});
+    try {
+      await conectar.mutateAsync(undefined);
+      toast(`«${nombre}» conectada. Asígnala a una estación.`);
+      onClose();
+    } catch (e) {
+      if (e instanceof ApiError) setErrores(e.fields), toast(e.message, "error");
+    }
+  }
+  return (
+    <Sheet open title="Conectar impresora" onClose={onClose} onSave={() => void onSave()} busy={conectar.isPending}>
+      <div className="form">
+        <p className="rp-secondary" style={{ margin: 0 }}>
+          <b>{i.nombre}</b> ya está instalada en la PC de caja ({tipoInstalada(i)}).
+          {i.host ? " El nodo le imprimirá directo por su IP." : " El nodo le imprimirá a través de Windows."}
+        </p>
+        <Field label="¿Cómo la llamamos?" error={errores.nombre}>{(fid) => <input id={fid} value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Caja" autoFocus />}</Field>
+        <Segmented label="Ancho del papel" value={ancho} onChange={setAncho} options={[{ value: "80", label: "80 mm (estándar)" }, { value: "58", label: "58 mm (pequeña)" }]} />
+      </div>
+    </Sheet>
   );
 }
 
@@ -203,6 +270,8 @@ function ImpresoraSheet({ imp, localId, onClose }: { imp: Impresora | null; loca
 
 export function Impresoras() {
   const impresoras = useImpresoras();
+  const instaladas = useInstaladas();
+  const [conectar, setConectar] = useState<ImpresoraInstalada | null>(null);
   const estaciones = useEstaciones();
   const categorias = useCategorias();
   const locales = useLocales();
@@ -297,6 +366,16 @@ export function Impresoras() {
         )}
       </section>
 
+      {(instaladas.data?.length ?? 0) > 0 && (
+        <section className="seccion">
+          <h2 className="rp-t-title3" style={{ marginBottom: 4 }}>En la PC de caja</h2>
+          <p className="rp-secondary" style={{ margin: "0 0 12px" }}>Impresoras que ya están instaladas en Windows. Conéctalas para usarlas en el sistema.</p>
+          <div className="rp-group inst-lista" style={{ margin: 0 }}>
+            {instaladas.data!.map((i) => <FilaInstalada key={i.localId + i.nombre} i={i} onConectar={() => setConectar(i)} />)}
+          </div>
+        </section>
+      )}
+
       <section className="seccion">
         <h2 className="rp-t-title3" style={{ marginBottom: 4 }}>¿Qué sale en cada estación?</h2>
         <p className="rp-secondary" style={{ margin: "0 0 14px" }}>Lo que no asignes sale en la estación por defecto: ninguna comanda se pierde.</p>
@@ -316,6 +395,7 @@ export function Impresoras() {
         )}
       </section>
 
+      {conectar && <ConectarSheet i={conectar} onClose={() => setConectar(null)} />}
       {editar && <ImpresoraSheet imp={editar === "nueva" ? null : editar} localId={locales.data?.[0]?.id ?? ""} onClose={() => setEditar(null)} />}
     </>
   );

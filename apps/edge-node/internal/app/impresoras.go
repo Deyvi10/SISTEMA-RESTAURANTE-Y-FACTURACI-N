@@ -122,6 +122,9 @@ func (a *App) ejecutarComandos(ctx context.Context) {
 				}
 				t := impresion.Trabajo{ID: ids.New(), ImpresoraID: imp.ID, Tipo: "PRUEBA", ComandoID: &c.id}
 				conexion := "Red · " + net.JoinHostPort(imp.Host, strconv.Itoa(imp.Puerto))
+				if imp.ColaWindows != "" {
+					conexion = "Windows · " + imp.ColaWindows
+				}
 				if err := impresion.Encolar(ctx, tx, t, nil, escpos.ImprimirPrueba(imp.Ancho, imp.Nombre, conexion, now.In(a.zonaLocal(ctx))), nil, now); err != nil {
 					return err
 				}
@@ -175,8 +178,8 @@ func (a *App) informarComando(id string, ok bool, resultado string) {
 func impresoraPorID(ctx context.Context, q queryer, id ids.ID) (impresion.Impresora, error) {
 	var x impresion.Impresora
 	var ancho int
-	err := q.QueryRowContext(ctx, `SELECT nombre, coalesce(host, ''), coalesce(puerto, 9100), ancho_papel FROM impresoras WHERE id = ? AND deleted_at IS NULL`, id.String()).
-		Scan(&x.Nombre, &x.Host, &x.Puerto, &ancho)
+	err := q.QueryRowContext(ctx, `SELECT nombre, coalesce(host, ''), coalesce(puerto, 9100), ancho_papel, `+colaWindows+` FROM impresoras WHERE id = ? AND deleted_at IS NULL`, id.String()).
+		Scan(&x.Nombre, &x.Host, &x.Puerto, &ancho, &x.ColaWindows)
 	x.ID, x.Ancho = id, escpos.Paper(ancho)
 	return x, err
 }

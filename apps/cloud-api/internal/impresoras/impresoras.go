@@ -18,6 +18,7 @@ import (
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/platform/apperr"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/platform/db"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/clock"
+	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/edgesync"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/ids"
 )
 
@@ -27,18 +28,20 @@ type Service struct {
 }
 
 type Impresora struct {
-	ID         ids.ID   `json:"id"`
-	LocalID    ids.ID   `json:"localId"`
-	Nombre     string   `json:"nombre"`
-	Conexion   string   `json:"conexion"`
-	Host       *string  `json:"host"`
-	Puerto     *int     `json:"puerto"`
-	MAC        *string  `json:"mac"`
-	Modelo     string   `json:"modelo"`
-	AnchoPapel int      `json:"anchoPapel"`
-	Origen     string   `json:"origen"`
-	Activa     bool     `json:"activa"`
-	Estaciones []ids.ID `json:"estaciones"`
+	ID         ids.ID  `json:"id"`
+	LocalID    ids.ID  `json:"localId"`
+	Nombre     string  `json:"nombre"`
+	Conexion   string  `json:"conexion"`
+	Host       *string `json:"host"`
+	Puerto     *int    `json:"puerto"`
+	MAC        *string `json:"mac"`
+	Modelo     string  `json:"modelo"`
+	AnchoPapel int     `json:"anchoPapel"`
+	Origen     string  `json:"origen"`
+	// NombreWindows: cola del spooler si vino de las impresoras instaladas en la PC del nodo.
+	NombreWindows *string  `json:"nombreWindows"`
+	Activa        bool     `json:"activa"`
+	Estaciones    []ids.ID `json:"estaciones"`
 	// Estado vivo según el último heartbeat del nodo (DESCONOCIDO si el nodo no la reporta).
 	Estado    string     `json:"estado"`
 	Cola      int        `json:"cola"`
@@ -49,7 +52,7 @@ type Impresora struct {
 func (s *Service) Listar(ctx context.Context, p auth.Principal) ([]Impresora, error) {
 	out := []Impresora{}
 	err := s.DB.InTenant(ctx, p.TenantID, func(tx db.Tx) error {
-		rows, err := tx.Query(ctx, `SELECT i.id, i.local_id, i.nombre, i.conexion, i.host, i.puerto, i.mac, i.modelo, i.ancho_papel, i.origen, i.activa,
+		rows, err := tx.Query(ctx, `SELECT i.id, i.local_id, i.nombre, i.conexion, i.host, i.puerto, i.mac, i.modelo, i.ancho_papel, i.origen, i.nombre_windows, i.activa,
 			coalesce((SELECT array_agg(ei.estacion_id ORDER BY ei.estacion_id) FROM estacion_impresoras ei WHERE ei.impresora_id = i.id), '{}')
 			FROM impresoras i WHERE i.deleted_at IS NULL ORDER BY i.created_at`)
 		if err != nil {
@@ -57,7 +60,7 @@ func (s *Service) Listar(ctx context.Context, p auth.Principal) ([]Impresora, er
 		}
 		out, err = pgx.CollectRows(rows, func(r pgx.CollectableRow) (Impresora, error) {
 			var x Impresora
-			err := r.Scan(&x.ID, &x.LocalID, &x.Nombre, &x.Conexion, &x.Host, &x.Puerto, &x.MAC, &x.Modelo, &x.AnchoPapel, &x.Origen, &x.Activa, &x.Estaciones)
+			err := r.Scan(&x.ID, &x.LocalID, &x.Nombre, &x.Conexion, &x.Host, &x.Puerto, &x.MAC, &x.Modelo, &x.AnchoPapel, &x.Origen, &x.NombreWindows, &x.Activa, &x.Estaciones)
 			x.Estado = "DESCONOCIDO"
 			return x, err
 		})
@@ -118,20 +121,26 @@ type Input struct {
 
 var hostnameRe = regexp.MustCompile(`^[a-zA-Z0-9]([a-zA-Z0-9-]{0,62}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,62}[a-zA-Z0-9])?)*$`)
 
-func (in *Input) validar(v *apperr.Validation) {
+func (in *Input) validar(v *apperr.Validation) { in.validarPara(v, "TCP") }
+
+// validarPara valida según la conexión: las de Windows no llevan IP ni puerto.
+func (in *Input) validarPara(v *apperr.Validation, conexion string) {
 	in.Nombre = strings.TrimSpace(in.Nombre)
 	in.Host = strings.TrimSpace(in.Host)
 	v.Check(len([]rune(in.Nombre)) >= 1 && len([]rune(in.Nombre)) <= 40, "nombre", "Ponle un nombre de 1 a 40 caracteres, como «Cocina caliente».")
+	if in.AnchoPapel == 0 {
+		in.AnchoPapel = 80
+	}
+	v.Check(in.AnchoPapel == 58 || in.AnchoPapel == 80, "anchoPapel", "El papel térmico es de 58 mm o de 80 mm.")
+	if conexion != "TCP" {
+		return
+	}
 	ip := net.ParseIP(in.Host)
 	v.Check(in.Host != "" && ((ip != nil && ip.To4() != nil) || (ip == nil && hostnameRe.MatchString(in.Host))), "host", "Escribe la IP de la impresora, como 192.168.1.50. La encuentras imprimiendo su hoja de configuración.")
 	if in.Puerto == 0 {
 		in.Puerto = 9100
 	}
 	v.Check(in.Puerto >= 1 && in.Puerto <= 65535, "puerto", "El puerto va de 1 a 65535 (casi siempre es 9100).")
-	if in.AnchoPapel == 0 {
-		in.AnchoPapel = 80
-	}
-	v.Check(in.AnchoPapel == 58 || in.AnchoPapel == 80, "anchoPapel", "El papel térmico es de 58 mm o de 80 mm.")
 }
 
 var (
@@ -169,12 +178,16 @@ func (s *Service) Crear(ctx context.Context, p auth.Principal, in Input) (Impres
 }
 
 func (s *Service) Actualizar(ctx context.Context, p auth.Principal, id ids.ID, in Input) (Impresora, error) {
-	var v apperr.Validation
-	in.validar(&v)
-	if err := v.Err(); err != nil {
-		return Impresora{}, err
-	}
 	err := s.DB.InTenant(ctx, p.TenantID, func(tx db.Tx) error {
+		var conexion string
+		if err := db.NotFound(tx.QueryRow(ctx, `SELECT conexion FROM impresoras WHERE id = $1 AND deleted_at IS NULL`, id).Scan(&conexion)); err != nil {
+			return err
+		}
+		var v apperr.Validation
+		in.validarPara(&v, conexion)
+		if err := v.Err(); err != nil {
+			return err
+		}
 		tag, err := tx.Exec(ctx, `UPDATE impresoras SET nombre = $2, ancho_papel = $3, activa = coalesce($4, activa),
 			host = CASE WHEN conexion = 'TCP' THEN $5 ELSE host END, puerto = CASE WHEN conexion = 'TCP' THEN $6 ELSE puerto END
 			WHERE id = $1 AND deleted_at IS NULL`, id, in.Nombre, in.AnchoPapel, in.Activa, in.Host, in.Puerto)
@@ -375,4 +388,139 @@ func (s *Service) Comando(ctx context.Context, p auth.Principal, id ids.ID) (Com
 			Scan(&c.ID, &c.Tipo, &c.CreatedAt, &c.EjecutadoAt, &c.Resultado))
 	})
 	return c, err
+}
+
+// Instalada es una impresora de Windows de la PC del nodo, con su estado de conexión al sistema.
+type Instalada struct {
+	edgesync.ImpresoraInstalada
+	LocalID     ids.ID  `json:"localId"`
+	ImpresoraID *ids.ID `json:"impresoraId"` // ya conectada al sistema
+}
+
+// Instaladas lista las impresoras de Windows que informó el nodo de cada local (F2-08).
+func (s *Service) Instaladas(ctx context.Context, p auth.Principal) ([]Instalada, error) {
+	out := []Instalada{}
+	err := s.DB.InTenant(ctx, p.TenantID, func(tx db.Tx) error {
+		lista, err := instaladasDe(ctx, tx, nil)
+		if err != nil {
+			return err
+		}
+		for _, i := range lista {
+			var id ids.ID
+			err := tx.QueryRow(ctx, `SELECT id FROM impresoras WHERE local_id = $1 AND deleted_at IS NULL
+				AND (nombre_windows = $2 OR ($3 <> '' AND conexion = 'TCP' AND host = $3 AND puerto = $4)) LIMIT 1`,
+				i.LocalID, i.Nombre, i.Host, i.PuertoTCP).Scan(&id)
+			if err == nil {
+				i.ImpresoraID = &id
+			} else if !errors.Is(err, pgx.ErrNoRows) {
+				return err
+			}
+			out = append(out, i)
+		}
+		return nil
+	})
+	return out, err
+}
+
+func instaladasDe(ctx context.Context, tx db.Tx, local *ids.ID) ([]Instalada, error) {
+	rows, err := tx.Query(ctx, `SELECT local_id, heartbeat->'instaladas' FROM nodos
+		WHERE estado = 'ACTIVO' AND ($1::uuid IS NULL OR local_id = $1) AND heartbeat ? 'instaladas'`, local)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Instalada
+	for rows.Next() {
+		var l ids.ID
+		var raw []byte
+		if err := rows.Scan(&l, &raw); err != nil {
+			return nil, err
+		}
+		var lista []edgesync.ImpresoraInstalada
+		_ = json.Unmarshal(raw, &lista)
+		for _, x := range lista {
+			out = append(out, Instalada{ImpresoraInstalada: x, LocalID: l})
+		}
+	}
+	return out, rows.Err()
+}
+
+// ConectarInput elige una impresora instalada en la PC del nodo para usarla en el sistema.
+type ConectarInput struct {
+	LocalID       ids.ID `json:"localId"`
+	NombreWindows string `json:"nombreWindows"`
+	Nombre        string `json:"nombre"`
+	AnchoPapel    int    `json:"anchoPapel"`
+}
+
+// Conectar agrega al sistema una impresora instalada en Windows. Si Windows la usa por red
+// con puerto TCP/IP estándar, el nodo le imprime directo por IP (más rápido y con estado
+// de papel); si no (USB, WSD…), por el spooler de Windows.
+func (s *Service) Conectar(ctx context.Context, p auth.Principal, in ConectarInput) (Impresora, error) {
+	var id ids.ID
+	err := s.DB.InTenant(ctx, p.TenantID, func(tx db.Tx) error {
+		lista, err := instaladasDe(ctx, tx, &in.LocalID)
+		if err != nil {
+			return err
+		}
+		var elegida *Instalada
+		for i := range lista {
+			if lista[i].Nombre == in.NombreWindows {
+				elegida = &lista[i]
+			}
+		}
+		if elegida == nil {
+			return apperr.New(apperr.Invalid, "NO_INSTALADA", "Esa impresora ya no aparece en la PC de caja. Revisa que siga instalada en Windows y que el nodo esté en línea.")
+		}
+		if strings.TrimSpace(in.Nombre) == "" {
+			in.Nombre = elegida.Nombre
+		}
+		if r := []rune(strings.TrimSpace(in.Nombre)); len(r) > 40 {
+			in.Nombre = string(r[:40])
+		}
+		if in.AnchoPapel == 0 {
+			in.AnchoPapel = elegida.AnchoSugerido
+		}
+		datos := Input{Nombre: in.Nombre, AnchoPapel: in.AnchoPapel, Host: elegida.Host, Puerto: elegida.PuertoTCP}
+		var v apperr.Validation
+		conexion := "WINDOWS"
+		if elegida.EsRed() {
+			conexion = "TCP"
+		}
+		datos.validarPara(&v, conexion)
+		if err := v.Err(); err != nil {
+			return err
+		}
+		// ¿Ya existe (por la cola o por su IP)? Se completa en lugar de duplicarla.
+		err = tx.QueryRow(ctx, `SELECT id FROM impresoras WHERE local_id = $1 AND deleted_at IS NULL
+			AND (nombre_windows = $2 OR ($3 <> '' AND conexion = 'TCP' AND host = $3 AND puerto = $4)) LIMIT 1`,
+			in.LocalID, elegida.Nombre, elegida.Host, elegida.PuertoTCP).Scan(&id)
+		if err == nil {
+			_, err = tx.Exec(ctx, `UPDATE impresoras SET nombre_windows = $2, activa = true WHERE id = $1`, id, elegida.Nombre)
+			return traducir(err)
+		}
+		if !errors.Is(err, pgx.ErrNoRows) {
+			return err
+		}
+		id = ids.New()
+		var host, puerto any
+		if conexion == "TCP" {
+			host, puerto = elegida.Host, elegida.PuertoTCP
+		}
+		_, err = tx.Exec(ctx, `INSERT INTO impresoras (id, tenant_id, local_id, nombre, conexion, host, puerto, nombre_windows, modelo, ancho_papel, origen, created_by)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'DETECTADA', $11)`,
+			id, p.TenantID, in.LocalID, datos.Nombre, conexion, host, puerto, elegida.Nombre, truncarTexto(elegida.Driver, 80), datos.AnchoPapel, p.UserID)
+		return traducir(err)
+	})
+	if err != nil {
+		return Impresora{}, err
+	}
+	return s.una(ctx, p, id)
+}
+
+func truncarTexto(s string, n int) string {
+	if r := []rune(s); len(r) > n {
+		return string(r[:n])
+	}
+	return s
 }

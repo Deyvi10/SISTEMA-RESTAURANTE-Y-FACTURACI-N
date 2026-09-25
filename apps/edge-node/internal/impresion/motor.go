@@ -35,9 +35,17 @@ type Impresora struct {
 	Host   string
 	Puerto int
 	Ancho  escpos.Paper
+	// ColaWindows: si no está vacía, se imprime por el spooler de Windows con esa cola.
+	ColaWindows string
 }
 
-func (i Impresora) Addr() string { return net.JoinHostPort(i.Host, strconv.Itoa(i.Puerto)) }
+// Addr es «host:puerto» para red o el nombre de la cola de Windows.
+func (i Impresora) Addr() string {
+	if i.ColaWindows != "" {
+		return i.ColaWindows
+	}
+	return net.JoinHostPort(i.Host, strconv.Itoa(i.Puerto))
+}
 
 // Estado es la salud de una impresora para la caja, la app y el heartbeat.
 type Estado struct {
@@ -65,7 +73,8 @@ type Trabajo struct {
 // una impresora caída nunca frena a las demás (RF-02-04.3).
 type Motor struct {
 	DB        *store.Store
-	T         Transporte
+	T         Transporte // impresoras de red (RAW 9100)
+	Spooler   Transporte // impresoras instaladas en Windows (nil = no disponible)
 	Log       *slog.Logger
 	Now       func() time.Time
 	Sondeo    time.Duration // cada cuánto revisa el estado aunque no haya trabajos
@@ -259,7 +268,8 @@ func (m *Motor) ronda(ctx context.Context, w *worker) time.Duration {
 	w.mu.Lock()
 	cfg := w.cfg
 	w.mu.Unlock()
-	st, soporta, err := m.T.Consultar(ctx, cfg.Addr())
+	t := m.transporte(cfg)
+	st, soporta, err := t.Consultar(ctx, cfg.Addr())
 	if err != nil {
 		m.fijarEstado(w, EstadoSinConexion, "No se puede conectar con la impresora. Revisa que esté encendida y conectada a la red.")
 		m.fallarPendientes(ctx, w, "sin conexión")
@@ -272,7 +282,7 @@ func (m *Motor) ronda(ctx context.Context, w *worker) time.Duration {
 		return m.Sondeo
 	}
 	for ctx.Err() == nil {
-		t, payload, err := m.siguiente(ctx, cfg.ID)
+		trabajo, payload, err := m.siguiente(ctx, cfg.ID)
 		if errors.Is(err, sql.ErrNoRows) {
 			return m.Sondeo
 		}
@@ -280,24 +290,44 @@ func (m *Motor) ronda(ctx context.Context, w *worker) time.Duration {
 			m.Log.Error("cola de impresión ilegible", "impresora", cfg.Nombre, "err", err)
 			return m.Reintento
 		}
-		if err := m.T.Enviar(ctx, cfg.Addr(), payload); err != nil {
-			m.registrarFallo(ctx, t, err.Error())
+		if err := t.Enviar(ctx, cfg.Addr(), payload); err != nil {
+			m.registrarFallo(ctx, trabajo, err.Error())
 			m.fijarEstado(w, EstadoSinConexion, "La impresora dejó de responder al imprimir. Se reintentará sola.")
 			return m.Reintento
 		}
 		if err := m.DB.Write(ctx, func(tx *store.Tx) error {
-			_, err := tx.ExecContext(ctx, `UPDATE trabajos_impresion SET estado = 'IMPRESO', impreso_at = ?, intentos = intentos + 1 WHERE id = ?`, m.ahora(), t.ID.String())
+			_, err := tx.ExecContext(ctx, `UPDATE trabajos_impresion SET estado = 'IMPRESO', impreso_at = ?, intentos = intentos + 1 WHERE id = ?`, m.ahora(), trabajo.ID.String())
 			return err
 		}); err != nil {
 			m.Log.Error("no se pudo marcar el trabajo como impreso", "err", err)
 			return m.Reintento
 		}
 		if m.AlImprimir != nil {
-			m.AlImprimir(t)
+			m.AlImprimir(trabajo)
 		}
 	}
 	return m.Sondeo
 }
+
+// transporte elige cómo hablar con la impresora: red directa o spooler de Windows.
+func (m *Motor) transporte(cfg Impresora) Transporte {
+	if cfg.ColaWindows != "" {
+		if m.Spooler == nil {
+			return sinSpooler{}
+		}
+		return m.Spooler
+	}
+	return m.T
+}
+
+type sinSpooler struct{}
+
+var errSinSpooler = fmt.Errorf("%w: esta PC no tiene el spooler de Windows", ErrSinConexion)
+
+func (sinSpooler) Consultar(context.Context, string) (escpos.Status, bool, error) {
+	return escpos.Status{}, false, errSinSpooler
+}
+func (sinSpooler) Enviar(context.Context, string, []byte) error { return errSinSpooler }
 
 func (m *Motor) siguiente(ctx context.Context, impresora ids.ID) (Trabajo, []byte, error) {
 	var t Trabajo

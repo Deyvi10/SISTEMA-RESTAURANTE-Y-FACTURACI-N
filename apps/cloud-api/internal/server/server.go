@@ -138,6 +138,8 @@ func Routes(d Deps) []Route {
 			return d.Impresoras.ImprimirPrueba(ctx, p, id)
 		})},
 		{"POST", "/v1/impresoras/buscar", sal, create(d.Impresoras.BuscarImpresoras)},
+		{"GET", "/v1/impresoras/instaladas", sal, list(d.Impresoras.Instaladas)},
+		{"POST", "/v1/impresoras/conectar", sal, create(d.Impresoras.Conectar)},
 		{"GET", "/v1/comandos-nodo/{id}", sal, get(d.Impresoras.Comando)},
 		{"PUT", "/v1/estaciones/{id}/impresoras", sal, updateNoContent(d.Impresoras.AsignarAEstacion)},
 		{"PUT", "/v1/categorias/{id}/estacion", menu, updateNoContent(d.Impresoras.RutearCategoria)},

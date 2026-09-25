@@ -173,23 +173,33 @@ func impresorasDe(ctx context.Context, q queryer, est ids.ID) ([]impresion.Impre
 	var rows *sql.Rows
 	switch {
 	case err == nil:
-		rows, err = q.QueryContext(ctx, `SELECT id, nombre, coalesce(host, ''), coalesce(puerto, 9100), ancho_papel FROM impresoras
+		rows, err = q.QueryContext(ctx, `SELECT id, nombre, coalesce(host, ''), coalesce(puerto, 9100), ancho_papel, `+colaWindows+` FROM impresoras
 			WHERE id = ? AND deleted_at IS NULL AND activa = 1`, redir)
 	case errors.Is(err, sql.ErrNoRows):
-		rows, err = q.QueryContext(ctx, `SELECT i.id, i.nombre, coalesce(i.host, ''), coalesce(i.puerto, 9100), i.ancho_papel FROM impresoras i
+		rows, err = q.QueryContext(ctx, `SELECT i.id, i.nombre, coalesce(i.host, ''), coalesce(i.puerto, 9100), i.ancho_papel, `+colaWindowsI+` FROM impresoras i
 			JOIN estacion_impresoras ei ON ei.impresora_id = i.id
 			WHERE ei.estacion_id = ? AND i.deleted_at IS NULL AND i.activa = 1 ORDER BY i.nombre`, est.String())
 	}
 	if err != nil {
 		return nil, err
 	}
+	return leerImpresoras(rows)
+}
+
+// Cola de Windows solo si la impresora se usa por el spooler (las de red van directo).
+const (
+	colaWindows  = `CASE WHEN conexion = 'WINDOWS' THEN coalesce(nombre_windows, '') ELSE '' END`
+	colaWindowsI = `CASE WHEN i.conexion = 'WINDOWS' THEN coalesce(i.nombre_windows, '') ELSE '' END`
+)
+
+func leerImpresoras(rows *sql.Rows) ([]impresion.Impresora, error) {
 	defer func() { _ = rows.Close() }()
 	var out []impresion.Impresora
 	for rows.Next() {
 		var id string
 		var x impresion.Impresora
 		var ancho int
-		if err := rows.Scan(&id, &x.Nombre, &x.Host, &x.Puerto, &ancho); err != nil {
+		if err := rows.Scan(&id, &x.Nombre, &x.Host, &x.Puerto, &ancho, &x.ColaWindows); err != nil {
 			return nil, err
 		}
 		x.ID, _ = ids.Parse(id)
@@ -201,25 +211,13 @@ func impresorasDe(ctx context.Context, q queryer, est ids.ID) ([]impresion.Impre
 
 // impresorasActivas es la configuración del motor (impresoras de red activas).
 func (a *App) impresorasActivas(ctx context.Context) ([]impresion.Impresora, error) {
-	rows, err := a.Store.Read().QueryContext(ctx, `SELECT id, nombre, host, puerto, ancho_papel FROM impresoras
-		WHERE deleted_at IS NULL AND activa = 1 AND conexion = 'TCP' AND host IS NOT NULL AND puerto IS NOT NULL`)
+	rows, err := a.Store.Read().QueryContext(ctx, `SELECT id, nombre, coalesce(host, ''), coalesce(puerto, 9100), ancho_papel, `+colaWindows+` FROM impresoras
+		WHERE deleted_at IS NULL AND activa = 1 AND (
+			(conexion = 'TCP' AND host IS NOT NULL AND puerto IS NOT NULL) OR (conexion = 'WINDOWS' AND nombre_windows IS NOT NULL))`)
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = rows.Close() }()
-	var out []impresion.Impresora
-	for rows.Next() {
-		var id string
-		var x impresion.Impresora
-		var ancho int
-		if err := rows.Scan(&id, &x.Nombre, &x.Host, &x.Puerto, &ancho); err != nil {
-			return nil, err
-		}
-		x.ID, _ = ids.Parse(id)
-		x.Ancho = escpos.Paper(ancho)
-		out = append(out, x)
-	}
-	return out, rows.Err()
+	return leerImpresoras(rows)
 }
 
 // zona del local para imprimir la hora (la base guarda UTC).

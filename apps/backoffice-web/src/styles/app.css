@@ -317,3 +317,10 @@ h1, h2, h3 { text-wrap: balance; margin: 0; }
 .cat-menu button { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 8px; border: 0; border-radius: 10px; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; }
 .cat-menu button:hover, .cat-menu button:focus-visible { background: var(--rp-color-fill); }
 @media (max-width: 420px) { .imps, .estaciones-tablero { grid-template-columns: minmax(0, 1fr); } }
+.inst-lista { overflow: hidden; }
+.inst-fila { display: flex; align-items: center; gap: 12px; padding: 12px 16px; }
+.inst-fila + .inst-fila { border-top: 0.5px solid var(--rp-color-separator); }
+.inst-fila__txt { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.inst-fila__txt b, .inst-fila__txt span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.inst-fila__txt span { font-size: 13px; }
+@media (max-width: 420px) { .inst-fila { flex-wrap: wrap; } .inst-fila__txt { flex-basis: calc(100% - 50px); } }

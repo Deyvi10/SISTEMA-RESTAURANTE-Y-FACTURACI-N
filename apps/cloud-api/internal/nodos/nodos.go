@@ -288,7 +288,7 @@ func (s *Service) Heartbeat(ctx context.Context, n auth.Nodo, hb edgesync.Heartb
 	salud, err := json.Marshal(map[string]any{
 		"discoLibreMb": hb.DiscoLibreMB, "baseMb": hb.BaseMB, "outboxPendientes": hb.OutboxPendientes,
 		"outboxAntiguedadSeg": hb.OutboxAntiguedad, "impresoras": hb.Impresoras, "derivaSegundos": res.DerivaSegundos,
-		"alertaReloj": res.AlertaReloj, "arranqueAt": hb.ArranqueAt,
+		"alertaReloj": res.AlertaReloj, "arranqueAt": hb.ArranqueAt, "instaladas": hb.Instaladas,
 	})
 	if err != nil {
 		return res, err

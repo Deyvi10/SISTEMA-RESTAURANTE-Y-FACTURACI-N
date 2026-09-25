@@ -19,6 +19,7 @@ import (
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/edge-node/internal/impresion"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/edge-node/internal/nube"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/edge-node/internal/replica"
+	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/edge-node/internal/spooler"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/edge-node/internal/store"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/edge-node/internal/web"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/clock"
@@ -55,10 +56,12 @@ type App struct {
 	buscarYa    chan struct{}
 	fotosYa     chan struct{}
 	fotos       *fotos.Cache
-	busqueda    Busqueda
-	buscar      func(context.Context) []descubrir.Encontrada // las pruebas lo reemplazan
-	ultimaCaida atomic.Int64                                 // unix nano de la última búsqueda por caída
-	sinMDNS     bool                                         // pruebas: no anunciar en la red
+	// listarInstaladas lee las impresoras de Windows (las pruebas lo reemplazan).
+	listarInstaladas func() ([]spooler.Instalada, error)
+	busqueda         Busqueda
+	buscar           func(context.Context) []descubrir.Encontrada // las pruebas lo reemplazan
+	ultimaCaida      atomic.Int64                                 // unix nano de la última búsqueda por caída
+	sinMDNS          bool                                         // pruebas: no anunciar en la red
 }
 
 // New abre la base (migrando) y prepara las rutas. No escucha todavía.
@@ -96,6 +99,8 @@ func New(ctx context.Context, cfg Config, log *slog.Logger) (*App, error) {
 		return nil, err
 	}
 	a.motor = a.nuevoMotor(impresion.TCP{})
+	a.motor.Spooler = spooler.Transporte{}
+	a.listarInstaladas = spooler.Listar
 	a.alAplicar = func(c CambiosAplicados) {
 		a.difundirCambios(c)
 		if c.Completo || c.Tablas["productos"] > 0 {

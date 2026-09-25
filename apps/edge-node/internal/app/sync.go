@@ -158,6 +158,12 @@ func (a *App) telemetria(ctx context.Context) edgesync.Heartbeat {
 			hb.BaseMB += fi.Size() >> 20
 		}
 	}
+	if lista, err := a.listarInstaladas(); err == nil {
+		for _, i := range lista {
+			hb.Instaladas = append(hb.Instaladas, edgesync.ImpresoraInstalada{Nombre: i.Nombre, Puerto: i.Puerto, Driver: i.Driver,
+				Host: i.Host, PuertoTCP: i.PuertoTCP, Estado: i.Estado, AnchoSugerido: i.AnchoSugerido, Predeterminada: i.Predeterminada})
+		}
+	}
 	if a.outbox != nil {
 		if st, err := a.outbox.Stats(ctx); err == nil {
 			hb.OutboxPendientes = st.Pending

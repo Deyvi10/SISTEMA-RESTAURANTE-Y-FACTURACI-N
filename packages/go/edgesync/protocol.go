@@ -87,7 +87,24 @@ type Heartbeat struct {
 	OutboxPendientes int              `json:"outboxPendientes"`
 	OutboxAntiguedad int64            `json:"outboxAntiguedadSeg"` // del evento más viejo sin confirmar
 	Impresoras       []ImpresoraSalud `json:"impresoras"`
+	// Instaladas son las impresoras de Windows de la PC del nodo (vacío fuera de Windows).
+	Instaladas []ImpresoraInstalada `json:"instaladas,omitempty"`
 }
+
+// ImpresoraInstalada es una cola del spooler de Windows que el dueño puede conectar.
+type ImpresoraInstalada struct {
+	Nombre         string `json:"nombre"`
+	Puerto         string `json:"puerto"`
+	Driver         string `json:"driver"`
+	Host           string `json:"host,omitempty"`
+	PuertoTCP      int    `json:"puertoTcp,omitempty"`
+	Estado         string `json:"estado"`
+	AnchoSugerido  int    `json:"anchoSugerido"`
+	Predeterminada bool   `json:"predeterminada,omitempty"`
+}
+
+// EsRed indica que Windows la usa por red con IP y puerto RAW conocidos.
+func (i ImpresoraInstalada) EsRed() bool { return i.Host != "" && i.PuertoTCP > 0 }
 
 type ImpresoraSalud struct {
 	ID     ids.ID `json:"id"`

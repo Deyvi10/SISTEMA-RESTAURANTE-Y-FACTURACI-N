@@ -12,11 +12,14 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/edge-node/internal/descubrir"
+	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/edge-node/internal/impresion"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/edge-node/internal/impresion/termica"
+	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/edge-node/internal/spooler"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/edge-node/internal/store"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/escpos"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/ids"
@@ -373,5 +376,82 @@ func TestPaginaDeEstado(t *testing.T) {
 	_ = res.Body.Close()
 	if res.StatusCode != 200 || !strings.Contains(string(body), "Estado del Nodo") {
 		t.Fatalf("/estado = %d", res.StatusCode)
+	}
+}
+
+// spoolerFalso imita el spooler de Windows: guarda lo enviado por nombre de cola.
+type spoolerFalso struct {
+	mu       sync.Mutex
+	enviados map[string][][]byte
+	st       escpos.Status
+}
+
+func (s *spoolerFalso) Consultar(_ context.Context, cola string) (escpos.Status, bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if cola != "EPSON TM-T20III Receipt" {
+		return escpos.Status{}, false, impresion.ErrSinConexion
+	}
+	return s.st, true, nil
+}
+
+func (s *spoolerFalso) Enviar(_ context.Context, cola string, b []byte) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.enviados[cola] = append(s.enviados[cola], b)
+	return nil
+}
+
+func (s *spoolerFalso) n(cola string) int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return len(s.enviados[cola])
+}
+
+// Una impresora instalada en Windows (USB) imprime por el spooler y aparece en el heartbeat.
+func TestImpresoraInstaladaEnWindows(t *testing.T) {
+	r := nuevoRestaurante(t)
+	sp := &spoolerFalso{enviados: map[string][][]byte{}}
+	r.a.motor.Spooler = sp
+	r.a.listarInstaladas = func() ([]spooler.Instalada, error) {
+		return []spooler.Instalada{{Nombre: "EPSON TM-T20III Receipt", Puerto: "USB001", Driver: "EPSON TM-T20III Receipt", Estado: "OK", AnchoSugerido: 80}}, nil
+	}
+	caja := ids.New()
+	if err := r.a.Store.Write(context.Background(), func(tx *store.Tx) error {
+		// El bar pasa a imprimir en la EPSON USB de la PC de caja.
+		if _, err := tx.Exec(`INSERT INTO impresoras (id, tenant_id, local_id, nombre, conexion, nombre_windows, ancho_papel) VALUES (?, 't', 'l', 'EPSON USB', 'WINDOWS', 'EPSON TM-T20III Receipt', 80)`, caja.String()); err != nil {
+			return err
+		}
+		_, err := tx.Exec(`UPDATE estacion_impresoras SET impresora_id = ? WHERE estacion_id = ?`, caja.String(), r.estBar.String())
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	r.a.sincronizarImpresoras(context.Background())
+	if st, _, raw := r.enviar(t, "c-windows", linea(r.cerveza, "2")); st != 201 {
+		t.Fatalf("envío: %d %v", st, raw)
+	}
+	esperar(t, func() bool { return sp.n("EPSON TM-T20III Receipt") == 1 })
+	if tx := escpos.Decode(sp.enviados["EPSON TM-T20III Receipt"][0]).Text(); !strings.Contains(tx, "Cerveza") {
+		t.Fatalf("ticket por el spooler: %q", tx)
+	}
+	// Sin papel según Windows: espera y reanuda.
+	sp.mu.Lock()
+	sp.st = escpos.Status{PaperOut: true}
+	sp.mu.Unlock()
+	r.enviar(t, "c-windows-2", linea(r.cerveza, "1"))
+	esperar(t, func() bool { return r.a.motor.Estado(caja).Estado == "SIN_PAPEL" })
+	time.Sleep(150 * time.Millisecond)
+	if sp.n("EPSON TM-T20III Receipt") != 1 {
+		t.Fatal("envió sin papel")
+	}
+	sp.mu.Lock()
+	sp.st = escpos.Status{}
+	sp.mu.Unlock()
+	esperar(t, func() bool { return sp.n("EPSON TM-T20III Receipt") == 2 })
+
+	hb := r.a.telemetria(context.Background())
+	if len(hb.Instaladas) != 1 || hb.Instaladas[0].Nombre != "EPSON TM-T20III Receipt" || hb.Instaladas[0].Puerto != "USB001" {
+		t.Fatalf("instaladas en el heartbeat: %+v", hb.Instaladas)
 	}
 }

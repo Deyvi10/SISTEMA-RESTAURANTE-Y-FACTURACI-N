@@ -440,3 +440,67 @@ func TestImpresorasRuteoYPrueba(t *testing.T) {
 		t.Fatalf("orden: %+v", busca)
 	}
 }
+
+// Impresoras ya instaladas en Windows en la PC de caja: aparecen para conectarlas.
+func TestConectarImpresorasDeWindows(t *testing.T) {
+	e := newEnv(t)
+	dueno, _ := e.restaurante("1790011674001", "a@a.ec")
+	var locales []salon.Local
+	dueno.do("GET", "/v1/locales", nil, 200, &locales)
+	local := locales[0].ID
+	n := e.nuevoNodo()
+	n.activar(dueno.codigoNodo().Codigo, 200)
+	n.req("POST", "/v1/nodos/heartbeat", edgesync.Heartbeat{HoraNodo: time.Now(), Instaladas: []edgesync.ImpresoraInstalada{
+		{Nombre: "EPSON TM-T20III Receipt", Puerto: "USB001", Driver: "EPSON TM-T20III Receipt", Estado: "OK", AnchoSugerido: 80, Predeterminada: true},
+		{Nombre: "Cocina Xprinter", Puerto: "IP_192.168.1.50", Driver: "XP-80C", Host: "192.168.1.50", PuertoTCP: 9100, Estado: "OK", AnchoSugerido: 80},
+		{Nombre: "POS-58", Puerto: "USB002", Driver: "POS-58", Estado: "SIN_PAPEL", AnchoSugerido: 58},
+	}}, true, 200, nil)
+
+	var inst []impresoras.Instalada
+	dueno.do("GET", "/v1/impresoras/instaladas", nil, 200, &inst)
+	if len(inst) != 3 || inst[0].ImpresoraID != nil || inst[0].LocalID != local {
+		t.Fatalf("instaladas: %+v", inst)
+	}
+	var usb, red, otra impresoras.Impresora
+	dueno.do("POST", "/v1/impresoras/conectar", map[string]any{"localId": local, "nombreWindows": "EPSON TM-T20III Receipt", "nombre": "Caja"}, 201, &usb)
+	if usb.Conexion != "WINDOWS" || usb.NombreWindows == nil || *usb.NombreWindows != "EPSON TM-T20III Receipt" || usb.Host != nil {
+		t.Fatalf("USB: %+v", usb)
+	}
+	dueno.do("POST", "/v1/impresoras/conectar", map[string]any{"localId": local, "nombreWindows": "Cocina Xprinter"}, 201, &red)
+	if red.Conexion != "TCP" || *red.Host != "192.168.1.50" || *red.Puerto != 9100 || red.Nombre != "Cocina Xprinter" {
+		t.Fatalf("red: %+v", red)
+	}
+	dueno.do("POST", "/v1/impresoras/conectar", map[string]any{"localId": local, "nombreWindows": "POS-58"}, 201, &otra)
+	if otra.AnchoPapel != 58 {
+		t.Fatalf("ancho sugerido: %d", otra.AnchoPapel)
+	}
+	// Conectar dos veces no duplica.
+	var otraVez impresoras.Impresora
+	dueno.do("POST", "/v1/impresoras/conectar", map[string]any{"localId": local, "nombreWindows": "EPSON TM-T20III Receipt"}, 201, &otraVez)
+	if otraVez.ID != usb.ID {
+		t.Fatal("se duplicó la impresora")
+	}
+	dueno.do("GET", "/v1/impresoras/instaladas", nil, 200, &inst)
+	for _, i := range inst {
+		if i.ImpresoraID == nil {
+			t.Fatalf("%s sigue sin conectar", i.Nombre)
+		}
+	}
+	// Editar una de Windows no pide IP.
+	dueno.do("PUT", "/v1/impresoras/"+usb.ID.String(), map[string]any{"nombre": "Caja principal", "anchoPapel": 80}, 200, nil)
+	dueno.do("POST", "/v1/impresoras/conectar", map[string]any{"localId": local, "nombreWindows": "Impresora fantasma"}, 422, nil)
+
+	// El nodo recibe la cola de Windows en su réplica.
+	var encontrada bool
+	for _, c := range n.pull(0, 0).Cambios {
+		var fila struct {
+			NombreWindows *string `json:"nombre_windows"`
+		}
+		if c.Tabla == "impresoras" && json.Unmarshal(c.Datos, &fila) == nil && fila.NombreWindows != nil && *fila.NombreWindows == "EPSON TM-T20III Receipt" {
+			encontrada = true
+		}
+	}
+	if !encontrada {
+		t.Fatal("el nodo no recibió nombre_windows")
+	}
+}
