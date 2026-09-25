@@ -94,11 +94,12 @@ func TestImprimeEnOrdenYEnParalelo(t *testing.T) {
 	if e.ultimoEstado(ic.ID) != EstadoOK {
 		t.Fatalf("estado = %s", e.ultimoEstado(ic.ID))
 	}
-	var pendientes int
-	_ = e.st.Read().QueryRow(`SELECT count(*) FROM trabajos_impresion WHERE estado = 'PENDIENTE'`).Scan(&pendientes)
-	if pendientes != 0 {
-		t.Fatalf("quedaron %d pendientes", pendientes)
-	}
+	// La impresora recibe los bytes un instante antes de que el motor marque el trabajo.
+	esperar(t, func() bool {
+		var pendientes int
+		_ = e.st.Read().QueryRow(`SELECT count(*) FROM trabajos_impresion WHERE estado = 'PENDIENTE'`).Scan(&pendientes)
+		return pendientes == 0
+	})
 }
 
 // RF-02-04.3 y DoD de F2: al desconectar una impresora el trabajo se conserva y se imprime
@@ -152,10 +153,10 @@ func TestSinPapelEsperaYReanuda(t *testing.T) {
 	if e.ultimoEstado(imp.ID) != EstadoPocoPapel {
 		t.Fatalf("estado = %s", e.ultimoEstado(imp.ID))
 	}
-	estados := e.m.Estados(context.Background())
-	if len(estados) != 1 || estados[0].Cola != 0 {
-		t.Fatalf("Estados = %+v", estados)
-	}
+	esperar(t, func() bool {
+		estados := e.m.Estados(context.Background())
+		return len(estados) == 1 && estados[0].Cola == 0
+	})
 }
 
 func TestImpresoraGenericaSinEstado(t *testing.T) {

@@ -116,10 +116,22 @@ func (s *Service) Login(ctx context.Context, login, password string, cli Cliente
 
 // abrirSesion crea una sesión (o la siguiente de una familia al rotar) y emite los tokens.
 func (s *Service) abrirSesion(ctx context.Context, tenantID, userID, familia, sid ids.ID, cli Cliente) (Sesion, error) {
+	return s.abrirSesionTras(ctx, tenantID, userID, familia, sid, cli, nil)
+}
+
+// abrirSesionTras ejecuta antes (p. ej. revocar la sesión que se rota) en la MISMA
+// transacción que crea la nueva: nunca existe un instante en que la familia no tenga una
+// sesión viva, así una renovación simultánea siempre encuentra la continuación.
+func (s *Service) abrirSesionTras(ctx context.Context, tenantID, userID, familia, sid ids.ID, cli Cliente, antes func(db.Tx) error) (Sesion, error) {
 	var out Sesion
 	refresh, hash := NewOpaqueToken()
 	now := s.Clock.Now()
 	err := s.DB.InTenant(ctx, tenantID, func(tx db.Tx) error {
+		if antes != nil {
+			if err := antes(tx); err != nil {
+				return err
+			}
+		}
 		u, err := cargarUsuario(ctx, tx, userID)
 		if err != nil {
 			return err
@@ -175,12 +187,18 @@ func (s *Service) Refresh(ctx context.Context, refresh string, cli Cliente) (Ses
 		slog.WarnContext(ctx, "auth: refresh reutilizado, familia revocada", "tenant_id", tenantID, "user_id", userID)
 		return Sesion{}, errSesion
 	}
-	// Revocar la actual (anotando su reemplazo) y abrir la siguiente de la misma familia.
-	var activo bool
-	err = s.DB.InTenant(ctx, tenantID, func(tx db.Tx) error {
+	// Revocar la actual (anotando su reemplazo) y abrir la siguiente de la misma familia,
+	// en una sola transacción.
+	out, err := s.abrirSesionTras(ctx, tenantID, userID, familia, nueva, cli, func(tx db.Tx) error {
+		var activo bool
 		if err := tx.QueryRow(ctx, `SELECT activo FROM usuarios WHERE id = $1`, userID).Scan(&activo); err != nil {
 			return err
 		}
+		if !activo {
+			return errSesion
+		}
+		// Si otra renovación ya rotó este token, el UPDATE espera a que confirme (bloqueo
+		// de fila) y luego no afecta filas: su sesión nueva ya está visible.
 		tag, err := tx.Exec(ctx, `UPDATE sesiones SET revocada_at = $2, reemplazada_por = $3 WHERE id = $1 AND revocada_at IS NULL`, sid, now, nueva)
 		if err == nil && tag.RowsAffected() == 0 {
 			return errRotadaEnParalelo
@@ -190,15 +208,9 @@ func (s *Service) Refresh(ctx context.Context, refresh string, cli Cliente) (Ses
 	if errors.Is(err, errRotadaEnParalelo) {
 		// Dos renovaciones simultáneas con el mismo token (recarga durante una renovación):
 		// la otra ya rotó hace instantes, así que es la misma carrera benigna.
-		return s.reabrirEnGracia(ctx, tenantID, userID, familia, nueva, cli)
+		return s.reabrirEnGracia(ctx, tenantID, userID, familia, ids.New(), cli)
 	}
-	if err != nil {
-		return Sesion{}, err
-	}
-	if !activo {
-		return Sesion{}, errSesion
-	}
-	return s.abrirSesion(ctx, tenantID, userID, familia, nueva, cli)
+	return out, err
 }
 
 var errRotadaEnParalelo = errors.New("auth: sesión rotada por otra petición")
