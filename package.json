@@ -1,0 +1,6 @@
+{
+  "name": "restpos",
+  "private": true,
+  "workspaces": ["packages/ts/ui", "apps/backoffice-web"],
+  "engines": { "node": ">=22" }
+}
