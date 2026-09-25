@@ -34,6 +34,16 @@ export function estacionDeCategoria(c: Pick<Categoria, "estacionId">, produccion
 
 const espera = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+/** Espera el resultado de una orden al nodo (null si no respondió a tiempo). */
+async function esperarComando(id: string, segundos = 25): Promise<{ ok: boolean; texto: string } | null> {
+  for (let n = 0; n < segundos; n++) {
+    await espera(1000);
+    const r = await api.comandoNodo(id);
+    if (r.ejecutadoAt) return { ok: !!r.resultado?.startsWith("OK"), texto: (r.resultado ?? "").replace(/^(OK|ERROR): /, "") };
+  }
+  return null;
+}
+
 function TarjetaImpresora({ i, onEditar }: { i: Impresora; onEditar: () => void }) {
   const { toast } = useFeedback();
   const [probando, setProbando] = useState(false);
@@ -42,16 +52,9 @@ function TarjetaImpresora({ i, onEditar }: { i: Impresora; onEditar: () => void 
     setProbando(true);
     try {
       const cmd = await api.probarImpresora(i.id);
-      for (let n = 0; n < 25; n++) {
-        await espera(1000);
-        const r = await api.comandoNodo(cmd.id);
-        if (r.ejecutadoAt) {
-          const ok = r.resultado?.startsWith("OK");
-          toast(ok ? `¡Listo! Revisa la hoja de prueba en «${i.nombre}».` : `No se pudo imprimir: ${r.resultado?.replace(/^ERROR: /, "")}`, ok ? "ok" : "error");
-          return;
-        }
-      }
-      toast("El nodo no respondió a tiempo. Revisa que la PC de caja tenga internet.", "error");
+      const r = await esperarComando(cmd.id);
+      if (!r) toast("El nodo no respondió a tiempo. Revisa que la PC de caja tenga internet.", "error");
+      else toast(r.ok ? `¡Listo! Revisa la hoja de prueba en «${i.nombre}».` : `No se pudo imprimir: ${r.texto}`, r.ok ? "ok" : "error");
     } catch (e) {
       toast(e instanceof ApiError ? e.message : "No se pudo pedir la prueba.", "error");
     } finally {
@@ -206,6 +209,7 @@ export function Impresoras() {
   const qc = useQueryClient();
   const { toast } = useFeedback();
   const [editar, setEditar] = useState<Impresora | "nueva" | null>(null);
+  const [buscando, setBuscando] = useState(false);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }), useSensor(TouchSensor, { activationConstraint: { delay: 180, tolerance: 6 } }), useSensor(KeyboardSensor));
 
   if (impresoras.isLoading || estaciones.isLoading || categorias.isLoading) return <Spinner />;
@@ -234,6 +238,21 @@ export function Impresoras() {
       toast(e instanceof ApiError ? e.message : "No se pudo asignar.", "error");
     }
   }
+  async function buscar() {
+    const local = locales.data?.[0];
+    if (!local) return;
+    setBuscando(true);
+    try {
+      const cmd = await api.buscarImpresoras(local.id);
+      const r = await esperarComando(cmd.id, 40);
+      await qc.invalidateQueries({ queryKey: ["impresoras"] });
+      toast(r ? r.texto : "El nodo no respondió a tiempo.", r?.ok ? "ok" : "error");
+    } catch (e) {
+      toast(e instanceof ApiError ? e.message : "No se pudo buscar.", "error");
+    } finally {
+      setBuscando(false);
+    }
+  }
   function onDragEnd(ev: DragEndEvent) {
     const cat = String(ev.active.id), est = ev.over ? String(ev.over.id) : null;
     const c = cats.find((x) => x.id === cat);
@@ -249,6 +268,10 @@ export function Impresoras() {
           <p>Arrastra cada categoría a su estación: el plato sale solo en la impresora correcta.</p>
         </div>
         <div className="page-actions">
+          <button type="button" className="rp-btn rp-btn--gray" disabled={buscando || !nodoEnLinea} onClick={() => void buscar()}
+            title={nodoEnLinea ? "El Nodo Local recorre tu red" : "Necesitas el Nodo Local en línea"}>
+            {buscando ? <><span className="spinner-sm" /> Buscando en tu red…</> : <><Icon name="magia" size={18} /> Buscar impresoras</>}
+          </button>
           <button type="button" className="rp-btn rp-btn--primary" onClick={() => setEditar("nueva")}><Icon name="agregar" size={18} /> Agregar impresora</button>
         </div>
       </header>

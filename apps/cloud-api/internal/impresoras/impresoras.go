@@ -318,7 +318,7 @@ var errSinNodo = apperr.New(apperr.Conflict, "NODO_SIN_CONEXION", "El Nodo Local
 
 // ImprimirPrueba pide al nodo imprimir una hoja de prueba en la impresora.
 func (s *Service) ImprimirPrueba(ctx context.Context, p auth.Principal, id ids.ID) (Comando, error) {
-	c := Comando{ID: ids.New(), Tipo: "IMPRIMIR_PRUEBA", CreatedAt: s.Clock.Now()}
+	var c Comando
 	err := s.DB.InTenant(ctx, p.TenantID, func(tx db.Tx) error {
 		var local ids.ID
 		err := tx.QueryRow(ctx, `SELECT local_id FROM impresoras WHERE id = $1 AND deleted_at IS NULL`, id).Scan(&local)
@@ -328,20 +328,44 @@ func (s *Service) ImprimirPrueba(ctx context.Context, p auth.Principal, id ids.I
 		if err != nil {
 			return err
 		}
-		var enLinea bool
-		if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM nodos WHERE local_id = $1 AND estado = 'ACTIVO' AND ultimo_heartbeat_at > $2)`,
-			local, c.CreatedAt.Add(-3*time.Minute)).Scan(&enLinea); err != nil {
-			return err
-		}
-		if !enLinea {
-			return errSinNodo
-		}
-		datos, _ := json.Marshal(map[string]ids.ID{"impresoraId": id})
-		_, err = tx.Exec(ctx, `INSERT INTO comandos_nodo (id, tenant_id, local_id, tipo, datos, creado_por, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-			c.ID, p.TenantID, local, c.Tipo, datos, p.UserID, c.CreatedAt)
+		c, err = s.ordenar(ctx, tx, p, local, "IMPRIMIR_PRUEBA", map[string]ids.ID{"impresoraId": id})
 		return err
 	})
 	return c, err
+}
+
+// BuscarImpresoras pide al nodo del local recorrer la red ahora (F2-08).
+func (s *Service) BuscarImpresoras(ctx context.Context, p auth.Principal, in struct {
+	LocalID ids.ID `json:"localId"`
+},
+) (Comando, error) {
+	var c Comando
+	err := s.DB.InTenant(ctx, p.TenantID, func(tx db.Tx) error {
+		var err error
+		c, err = s.ordenar(ctx, tx, p, in.LocalID, "BUSCAR_IMPRESORAS", map[string]any{})
+		return err
+	})
+	return c, err
+}
+
+// ordenar deja una orden para el nodo del local, si está en línea.
+func (s *Service) ordenar(ctx context.Context, tx db.Tx, p auth.Principal, local ids.ID, tipo string, datos any) (Comando, error) {
+	c := Comando{ID: ids.New(), Tipo: tipo, CreatedAt: s.Clock.Now()}
+	var enLinea bool
+	if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM nodos WHERE local_id = $1 AND estado = 'ACTIVO' AND ultimo_heartbeat_at > $2)`,
+		local, c.CreatedAt.Add(-3*time.Minute)).Scan(&enLinea); err != nil {
+		return c, err
+	}
+	if !enLinea {
+		return c, errSinNodo
+	}
+	raw, err := json.Marshal(datos)
+	if err != nil {
+		return c, err
+	}
+	_, err = tx.Exec(ctx, `INSERT INTO comandos_nodo (id, tenant_id, local_id, tipo, datos, creado_por, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+		c.ID, p.TenantID, local, c.Tipo, raw, p.UserID, c.CreatedAt)
+	return c, db.Translate(err, "", "", "")
 }
 
 func (s *Service) Comando(ctx context.Context, p auth.Principal, id ids.ID) (Comando, error) {

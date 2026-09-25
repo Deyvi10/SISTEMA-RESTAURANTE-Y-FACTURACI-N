@@ -66,6 +66,7 @@ export const api = {
   borrarImpresora: (id: string) => del(`/v1/impresoras/${id}`),
   probarImpresora: (id: string) => post<ComandoNodo>(`/v1/impresoras/${id}/prueba`, {}),
   comandoNodo: (id: string) => get<ComandoNodo>(`/v1/comandos-nodo/${id}`),
+  buscarImpresoras: (localId: string) => post<ComandoNodo>("/v1/impresoras/buscar", { localId }),
   asignarImpresoras: (estacionId: string, impresoras: string[]) => put<void>(`/v1/estaciones/${estacionId}/impresoras`, { impresoras }),
   rutearCategoria: (categoriaId: string, estacionId: string | null) => put<void>(`/v1/categorias/${categoriaId}/estacion`, { estacionId }),
   generarCodigoNodo: (localId: string) => post<CodigoNodo>("/v1/nodos/codigos", { localId }),

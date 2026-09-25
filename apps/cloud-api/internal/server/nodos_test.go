@@ -432,4 +432,11 @@ func TestImpresorasRuteoYPrueba(t *testing.T) {
 		}
 	}
 	dueno.do("DELETE", "/v1/impresoras/"+imp.ID.String(), nil, 204, nil)
+
+	// «Buscar impresoras» deja una orden para el nodo.
+	var busca impresoras.Comando
+	dueno.do("POST", "/v1/impresoras/buscar", map[string]any{"localId": local}, 201, &busca)
+	if busca.Tipo != "BUSCAR_IMPRESORAS" {
+		t.Fatalf("orden: %+v", busca)
+	}
 }

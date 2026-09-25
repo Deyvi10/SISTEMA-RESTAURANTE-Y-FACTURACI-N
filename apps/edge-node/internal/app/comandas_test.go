@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/edge-node/internal/descubrir"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/edge-node/internal/impresion/termica"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/edge-node/internal/store"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/escpos"
@@ -289,5 +290,52 @@ func TestSoloDesdeEstaPC(t *testing.T) {
 		if rec.Code != want {
 			t.Errorf("%s → %d, quiero %d", addr, rec.Code, want)
 		}
+	}
+}
+
+// F2-08: lo nuevo se informa a la nube; lo conocido no; una IP cambiada se reubica por MAC.
+func TestBusquedaDeImpresoras(t *testing.T) {
+	r := nuevoRestaurante(t)
+	host, port, _ := net.SplitHostPort(r.bar.Addr())
+	p, _ := strconv.Atoi(port)
+	if err := r.a.Store.Write(context.Background(), func(tx *store.Tx) error {
+		_, err := tx.Exec(`UPDATE impresoras SET mac = '00:11:62:aa:bb:cc' WHERE id = ?`, r.impBar.String())
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	r.a.buscar = func(context.Context) []descubrir.Encontrada {
+		// Ya conocida y sin cambios: no se informa.
+		return []descubrir.Encontrada{{Host: host, Puerto: p, MAC: "00:11:62:aa:bb:cc"}}
+	}
+	if n := r.a.BuscarImpresoras(context.Background()); n != 1 {
+		t.Fatalf("encontradas = %d", n)
+	}
+	contar := func() int {
+		var n int
+		_ = r.a.Store.Read().QueryRow(`SELECT count(*) FROM outbox WHERE tipo = 'impresora.detectada'`).Scan(&n)
+		return n
+	}
+	if contar() != 0 {
+		t.Fatal("informó una impresora que no cambió")
+	}
+	// La barra cambió de IP (DHCP) y apareció una nueva.
+	r.a.buscar = func(context.Context) []descubrir.Encontrada {
+		return []descubrir.Encontrada{
+			{Host: "192.168.1.99", Puerto: 9100, MAC: "00:11:62:aa:bb:cc"},
+			{Host: "192.168.1.120", Puerto: 9100, MAC: "b8:27:eb:00:00:01", Modelo: "TM-T20III"},
+		}
+	}
+	r.a.BuscarImpresoras(context.Background())
+	if contar() != 2 {
+		t.Fatalf("eventos = %d", contar())
+	}
+	var reubicada string
+	_ = r.a.Store.Read().QueryRow(`SELECT json_extract(payload, '$.id') FROM outbox WHERE tipo = 'impresora.detectada' AND json_extract(payload, '$.host') = '192.168.1.99'`).Scan(&reubicada)
+	if reubicada != r.impBar.String() {
+		t.Fatalf("la reubicación no usó el id de la barra: %s", reubicada)
+	}
+	if !strings.Contains(resumenBusqueda(2), "2 impresoras") {
+		t.Fatal(resumenBusqueda(2))
 	}
 }

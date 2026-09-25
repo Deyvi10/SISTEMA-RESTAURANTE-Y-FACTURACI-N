@@ -36,6 +36,7 @@ La documentación vive en `documentacion-proyecto/`: toda referencia a `docs/…
 | F2-02 | ✅ Activación por código (nube + nodo + pantalla en el backoffice y en el nodo), ADR-0014 |
 | F2-03 | ✅ Nube → Nodo: feed de cambios por tenant, long-poll con NOTIFY (33 ms medido), volcado consistente, réplica tolerante a columnas nuevas (ADR-0015) |
 | F2-06 | ✅ Hub WebSocket (`/v1/ws`): 60 dispositivos con p95 de 6 ms, cliente lento aislado, contratos de 16 eventos → Go/TS/Dart (`make contracts`), mDNS `_restpos._tcp`, semáforo `/v1/conectividad`. Por ahora solo acepta conexiones locales (loopback): los teléfonos entran con el emparejamiento de F3-02 |
+| F2-08 | ✅ Descubrimiento: mDNS `_pdl-datastream._tcp` + barrido TCP 9100 de la subred (hasta /22) + tabla ARP; informa lo nuevo y reubica por MAC al cambiar la IP; cada 30 min, tras una caída o con «Buscar impresoras». USB (spooler de Windows) queda pendiente |
 | F2-09 | ✅ Plantillas ESC/POS (comanda, ANULACIÓN, REIMPRESIÓN, 58/80 mm) desde F0-09 |
 | F2-10 | ✅ Impresoras en la nube (manual por IP o detectadas por el nodo), asignación N:M a estaciones, ruteo de categorías/productos; pantalla «Impresoras» con arrastrar y soltar e «Imprimir prueba» vía el nodo |
 | F2-11 | ✅ `POST /v1/comandas` en el nodo: idempotente, separa por estación, cola persistente por impresora, envío en paralelo (p95 49 ms en prueba; 23 ms contra printer-sim) |

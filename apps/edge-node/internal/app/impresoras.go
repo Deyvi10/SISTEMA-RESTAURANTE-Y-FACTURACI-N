@@ -29,6 +29,13 @@ func (a *App) nuevoMotor(t impresion.Transporte) *impresion.Motor {
 		DB: a.Store, T: t, Log: a.Log, Now: a.Clock.Now,
 		AlCambiarEstado: func(e impresion.Estado) {
 			a.pedirHeartbeat()
+			// ¿Le cambiaron la IP? Se la busca por su MAC (como mucho cada 5 min).
+			if e.Estado == impresion.EstadoSinConexion {
+				now, prev := a.Clock.Now().UnixNano(), a.ultimaCaida.Load()
+				if now-prev > int64(BuscarTrasCaida) && a.ultimaCaida.CompareAndSwap(prev, now) {
+					a.pedirBusqueda()
+				}
+			}
 			_ = a.hub.Difundir(eventos.PrinterStatus{PrinterID: e.ID, Name: e.Nombre, Status: e.Estado, Queue: int64(e.Cola), StationIDs: a.estacionesDeImpresora(e.ID)})
 		},
 		AlImprimir: func(t impresion.Trabajo) {
@@ -95,6 +102,7 @@ func (a *App) ejecutarComandos(ctx context.Context) {
 	_ = rows.Close()
 	now := a.Clock.Now()
 	var despertar []ids.ID
+	var buscar []string
 	for _, c := range lista {
 		creado, _ := time.Parse(time.RFC3339Nano, c.creado)
 		resultado := ""
@@ -118,6 +126,8 @@ func (a *App) ejecutarComandos(ctx context.Context) {
 					return err
 				}
 				despertar = append(despertar, imp.ID)
+			case c.tipo == "BUSCAR_IMPRESORAS":
+				buscar = append(buscar, c.id)
 			default:
 				resultado = "Orden no soportada por esta versión del nodo."
 			}
@@ -134,6 +144,14 @@ func (a *App) ejecutarComandos(ctx context.Context) {
 		}
 	}
 	a.motor.Despertar(despertar...)
+	if len(buscar) > 0 {
+		go func() {
+			n := a.BuscarImpresoras(context.WithoutCancel(ctx))
+			for _, id := range buscar {
+				a.informarComando(id, true, resumenBusqueda(n))
+			}
+		}()
+	}
 }
 
 // informarComando envía a la nube el resultado de una orden.

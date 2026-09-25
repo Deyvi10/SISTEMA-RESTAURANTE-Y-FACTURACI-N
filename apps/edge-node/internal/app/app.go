@@ -10,8 +10,10 @@ import (
 	"net/http"
 	"os"
 	"sync"
+	"sync/atomic"
 	"time"
 
+	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/edge-node/internal/descubrir"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/edge-node/internal/hub"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/edge-node/internal/impresion"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/edge-node/internal/nube"
@@ -49,7 +51,11 @@ type App struct {
 	hub         *hub.Hub
 	motor       *impresion.Motor
 	heartbeatYa chan struct{}
-	sinMDNS     bool // pruebas: no anunciar en la red
+	buscarYa    chan struct{}
+	busqueda    Busqueda
+	buscar      func(context.Context) []descubrir.Encontrada // las pruebas lo reemplazan
+	ultimaCaida atomic.Int64                                 // unix nano de la última búsqueda por caída
+	sinMDNS     bool                                         // pruebas: no anunciar en la red
 }
 
 // New abre la base (migrando) y prepara las rutas. No escucha todavía.
@@ -78,6 +84,8 @@ func New(ctx context.Context, cfg Config, log *slog.Logger) (*App, error) {
 	a := &App{Cfg: cfg, Store: st, Clock: clk, Log: log, Inicio: inicio, mux: http.NewServeMux(), replica: rep}
 	a.hub = hub.New(log, clk.Now)
 	a.heartbeatYa = make(chan struct{}, 1)
+	a.buscarYa = make(chan struct{}, 1)
+	a.buscar = func(ctx context.Context) []descubrir.Encontrada { return descubrir.Buscar(ctx, nil) }
 	if a.outbox, err = edgesync.NewOutbox(ctx, st.Writer()); err != nil {
 		_ = st.Close()
 		return nil, err
