@@ -138,6 +138,7 @@ func (a *App) pullLoop(ctx context.Context) {
 			}
 		default:
 			fallos = 0
+			a.salud.cambiar(func(e *EstadoNube) { e.UltimaNube, e.UltimoError = a.Clock.Now(), "" })
 			_ = mas // si hay más, el siguiente ciclo pide de inmediato
 		}
 	}

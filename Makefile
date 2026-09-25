@@ -72,6 +72,12 @@ tokens: ## Regenera los tokens de diseño (CSS, TS, Tailwind, Dart) y verifica c
 tokens-check: ## Falla si los tokens generados están desactualizados o el contraste no cumple AA
 	$(GO) run ./tools/design-tokens -check
 
+contracts: ## Regenera los tipos Go, TS y Dart de los eventos desde contracts/events
+	$(GO) run ./tools/contracts-gen
+
+contracts-check: ## Falla si los tipos generados de los eventos están desactualizados
+	$(GO) run ./tools/contracts-gen -check
+
 ui-test: ## Tipos y pruebas del paquete @restpos/ui
 	cd packages/ts/ui && npx -y -p typescript@5.9 tsc --noEmit -p . && node --experimental-strip-types --test src/*.test.ts
 

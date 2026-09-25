@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://restpos/contracts/events/table.state_changed.json",
+  "title": "table.state_changed",
+  "description": "Cambió el estado visible de una mesa en el mapa.",
+  "x-event-version": 1,
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "table_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "state": {
+      "type": "string",
+      "enum": [
+        "LIBRE",
+        "OCUPADA",
+        "POR_PAGAR",
+        "DEMORADA",
+        "BLOQUEADA"
+      ]
+    },
+    "order_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "guests": {
+      "type": "integer"
+    }
+  },
+  "required": [
+    "table_id",
+    "state"
+  ]
+}

@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/edge-node/internal/hub"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/edge-node/internal/nube"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/edge-node/internal/replica"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/edge-node/internal/store"
@@ -42,7 +43,9 @@ type App struct {
 	outbox     *edgesync.Outbox
 	pusher     *edgesync.Pusher
 	replica    *replica.Replica
-	alAplicar  func(CambiosAplicados) // hub de tiempo real (F2-06)
+	alAplicar  func(CambiosAplicados) // por defecto difunde por el hub (F2-06)
+	hub        *hub.Hub
+	sinMDNS    bool // pruebas: no anunciar en la red
 }
 
 // New abre la base (migrando) y prepara las rutas. No escucha todavía.
@@ -69,6 +72,8 @@ func New(ctx context.Context, cfg Config, log *slog.Logger) (*App, error) {
 	}
 	clk := clock.Real{}
 	a := &App{Cfg: cfg, Store: st, Clock: clk, Log: log, Inicio: inicio, mux: http.NewServeMux(), replica: rep}
+	a.hub = hub.New(log, clk.Now)
+	a.alAplicar = a.difundirCambios
 	a.routes()
 	return a, nil
 }
@@ -81,7 +86,12 @@ func (a *App) routes() {
 	a.mux.HandleFunc("GET /{$}", a.inicio)
 	a.mux.HandleFunc("GET /activar", pagina("activar.html"))
 	a.mux.HandleFunc("POST /v1/activacion", a.handleActivar)
+	a.mux.HandleFunc("GET /v1/conectividad", a.handleConectividad)
+	a.mux.Handle("GET /v1/ws", a.hub.Handler(autenticarLAN))
 }
+
+// Hub expone el canal de tiempo real (para otros módulos del nodo).
+func (a *App) Hub() *hub.Hub { return a.hub }
 
 // Handler es el router completo (lo usan las pruebas con httptest).
 func (a *App) Handler() http.Handler { return withRecover(a.Log, a.mux) }
@@ -101,6 +111,11 @@ func (a *App) Run(ctx context.Context) error {
 	a.bg = bg
 	a.syncMu.Unlock()
 	a.wg.Go(func() { a.watchdog(bg) })
+	if !a.sinMDNS {
+		if tcp, ok := ln.Addr().(*net.TCPAddr); ok {
+			a.wg.Go(func() { a.anunciarMDNS(bg, tcp.Port) })
+		}
+	}
 	if id, err := a.Identidad(ctx); err != nil {
 		a.Log.Error("no se pudo leer la identidad del nodo", "err", err)
 	} else if id == nil {

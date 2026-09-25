@@ -92,6 +92,8 @@ jobs:
         run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
       - name: Tokens de diseño al día y contraste AA
         run: go run ./tools/design-tokens -check
+      - name: Contratos de eventos al día (Go, TS, Dart)
+        run: go run ./tools/contracts-gen -check
       - name: Golden de tickets sin cambios
         run: go test ./packages/go/escpos -update && git diff --exit-code packages/go/escpos/testdata
 

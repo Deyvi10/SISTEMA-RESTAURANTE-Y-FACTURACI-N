@@ -11,13 +11,17 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/edge-node/internal/store"
+	"github.com/coder/websocket"
+
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/edgesync"
+	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/eventos"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/ids"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/nodoauth"
 )
@@ -326,4 +330,62 @@ func TestPushAntesDePull(t *testing.T) {
 	if primeroPush < 0 || primeroPush > primerPull {
 		t.Fatalf("orden de llamadas: %v", f.llamadas)
 	}
+}
+
+func TestTiempoRealYConectividad(t *testing.T) {
+	f := newNubeFalsa()
+	f.codigos["ABCDEFGH"] = true
+	f.volcado = []edgesync.Cambio{{Tabla: "usuarios", Op: "U", Datos: []byte(`{"id":"01a0da6b-e870-74e7-984b-266e0803f192","tenant_id":"t","nombre_mostrar":"Rosa","rol":"MESERO","activo":true}`)}}
+	a, lan := nodoDePrueba(t, f)
+	conect := func() Conectividad {
+		res, err := http.Get(lan.URL + "/v1/conectividad")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _ = res.Body.Close() }()
+		var c Conectividad
+		_ = json.NewDecoder(res.Body).Decode(&c)
+		return c
+	}
+	if c := conect(); c.Nube != "SIN_ACTIVAR" || c.Indicador != "AMARILLO" {
+		t.Fatalf("sin activar: %+v", c)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	ws, _, err := websocket.Dial(ctx, "ws"+strings.TrimPrefix(lan.URL, "http")+"/v1/ws?tipo=POS", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = ws.CloseNow() }()
+	if st, _ := postJSON(t, lan.URL+"/v1/activacion", map[string]string{"codigo": "ABCDEFGH"}); st != 200 {
+		t.Fatal("activación")
+	}
+	leer := func() eventos.Sobre {
+		_, raw, err := ws.Read(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var s eventos.Sobre
+		_ = json.Unmarshal(raw, &s)
+		return s
+	}
+	if s := leer(); s.Type != eventos.TipoCatalogUpdated {
+		t.Fatalf("primer evento: %s", s.Type)
+	}
+	esperar(t, func() bool { return conect().Indicador == "VERDE" })
+	if c := conect(); c.Dispositivos != 1 {
+		t.Fatalf("dispositivos = %d", c.Dispositivos)
+	}
+	// La nube desactiva a Rosa: todos los dispositivos lo saben al instante.
+	f.mu.Lock()
+	f.feed = []edgesync.Cambio{{Seq: 1, Tabla: "usuarios", Op: "U", Datos: []byte(`{"id":"01a0da6b-e870-74e7-984b-266e0803f192","tenant_id":"t","nombre_mostrar":"Rosa","rol":"MESERO","activo":false}`)}}
+	f.mu.Unlock()
+	var tipos []string
+	for len(tipos) < 2 {
+		tipos = append(tipos, leer().Type)
+	}
+	if !slices.Contains(tipos, eventos.TipoUserDeactivated) {
+		t.Fatalf("eventos: %v", tipos)
+	}
+	_ = a
 }

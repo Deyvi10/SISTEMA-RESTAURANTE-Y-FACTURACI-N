@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://restpos/contracts/events/kitchen.ticket_ready.json",
+  "title": "kitchen.ticket_ready",
+  "description": "Cocina marcó una comanda como lista.",
+  "x-event-version": 1,
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "order_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "comanda_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "station_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "table_id": {
+      "type": "string",
+      "format": "uuid"
+    }
+  },
+  "required": [
+    "order_id",
+    "comanda_id",
+    "station_id"
+  ]
+}

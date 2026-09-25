@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://restpos/contracts/events/table.unlocked.json",
+  "title": "table.unlocked",
+  "description": "La mesa se liberó (por el mesero, por vencimiento o por un supervisor).",
+  "x-event-version": 1,
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "table_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "reason": {
+      "type": "string",
+      "enum": [
+        "RELEASED",
+        "EXPIRED",
+        "FORCED"
+      ]
+    }
+  },
+  "required": [
+    "table_id",
+    "reason"
+  ]
+}

@@ -29,6 +29,7 @@ func TestArranqueYApagado(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	a.sinMDNS = true
 	done := make(chan error, 1)
 	go func() { done <- a.Run(ctx) }()
 	deadline := time.Now().Add(10 * time.Second)

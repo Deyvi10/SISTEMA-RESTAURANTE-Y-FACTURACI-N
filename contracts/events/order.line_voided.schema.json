@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://restpos/contracts/events/order.line_voided.json",
+  "title": "order.line_voided",
+  "description": "Se anuló una línea ya enviada (imprime ticket de ANULACIÓN).",
+  "x-event-version": 1,
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "order_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "line_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "station_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "by_user_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "authorized_by": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "reason": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "order_id",
+    "line_id",
+    "by_user_id",
+    "reason"
+  ]
+}

@@ -1,6 +1,12 @@
 {
   "name": "restpos",
   "private": true,
-  "workspaces": ["packages/ts/ui", "apps/backoffice-web"],
-  "engines": { "node": ">=22" }
+  "workspaces": [
+    "packages/ts/ui",
+    "packages/ts/contracts",
+    "apps/backoffice-web"
+  ],
+  "engines": {
+    "node": ">=22"
+  }
 }

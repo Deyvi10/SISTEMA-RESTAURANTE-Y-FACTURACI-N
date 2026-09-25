@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://restpos/contracts/events/catalog.updated.json",
+  "title": "catalog.updated",
+  "description": "Cambió el catálogo, el salón o el personal; los clientes recargan lo afectado.",
+  "x-event-version": 1,
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "tables": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Tablas que cambiaron"
+    },
+    "full": {
+      "type": "boolean",
+      "description": "Fue un volcado completo"
+    }
+  },
+  "required": [
+    "tables",
+    "full"
+  ]
+}

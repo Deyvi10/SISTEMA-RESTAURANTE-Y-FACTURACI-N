@@ -35,6 +35,7 @@ La documentación vive en `documentacion-proyecto/`: toda referencia a `docs/…
 | F2-01 | ✅ Nodo Local (`apps/edge-node`): servicio de Windows/systemd, SQLite con un solo escritor, watchdog, prueba kill -9 |
 | F2-02 | ✅ Activación por código (nube + nodo + pantalla en el backoffice y en el nodo), ADR-0014 |
 | F2-03 | ✅ Nube → Nodo: feed de cambios por tenant, long-poll con NOTIFY (33 ms medido), volcado consistente, réplica tolerante a columnas nuevas (ADR-0015) |
+| F2-06 | ✅ Hub WebSocket (`/v1/ws`): 60 dispositivos con p95 de 6 ms, cliente lento aislado, contratos de 16 eventos → Go/TS/Dart (`make contracts`), mDNS `_restpos._tcp`, semáforo `/v1/conectividad`. Por ahora solo acepta conexiones locales (loopback): los teléfonos entran con el emparejamiento de F3-02 |
 | F2-04 | ✅ Push del outbox con tenant/RLS, heartbeat con telemetría y alerta de reloj |
 | F1-14 | 🟡 Imagen Docker lista (`deploy/docker/cloud-api.Dockerfile`, `-tags nodynamic`). Falta IaC (Terraform en `deploy/azure/`, ADR-0013) y despliegue a `dev` |
 

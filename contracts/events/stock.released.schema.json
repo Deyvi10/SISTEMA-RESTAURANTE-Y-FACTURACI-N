@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://restpos/contracts/events/stock.released.json",
+  "title": "stock.released",
+  "description": "Se liberó una reserva de cupo.",
+  "x-event-version": 1,
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "product_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "line_id": {
+      "type": "string",
+      "format": "uuid"
+    }
+  },
+  "required": [
+    "product_id",
+    "line_id"
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://restpos/contracts/events/stock.reserve.json",
+  "title": "stock.reserve",
+  "description": "Reserva de cupo diario de un producto para una línea.",
+  "x-event-version": 1,
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "product_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "line_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "quantity": {
+      "type": "string",
+      "x-decimal": true,
+      "description": "Cantidad exacta en texto decimal"
+    }
+  },
+  "required": [
+    "product_id",
+    "line_id",
+    "quantity"
+  ]
+}

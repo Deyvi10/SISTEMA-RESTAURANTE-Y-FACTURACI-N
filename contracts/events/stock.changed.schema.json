@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://restpos/contracts/events/stock.changed.json",
+  "title": "stock.changed",
+  "description": "Cambió el disponible de un producto con cupo.",
+  "x-event-version": 1,
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "product_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "available": {
+      "type": "string",
+      "x-decimal": true
+    },
+    "sold_out": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "product_id",
+    "available",
+    "sold_out"
+  ]
+}

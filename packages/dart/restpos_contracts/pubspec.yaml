@@ -1,0 +1,7 @@
+name: restpos_contracts
+description: Tipos de los eventos de tiempo real del Nodo Local, generados desde contracts/events.
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: ">=3.5.0 <4.0.0"
