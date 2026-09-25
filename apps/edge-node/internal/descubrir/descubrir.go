@@ -43,7 +43,7 @@ func Hosts() []netip.Addr {
 	var out []netip.Addr
 	vistos := map[netip.Addr]bool{}
 	for _, it := range ifs {
-		if it.Flags&net.FlagUp == 0 || it.Flags&net.FlagLoopback != 0 {
+		if it.Flags&net.FlagUp == 0 || it.Flags&net.FlagLoopback != 0 || Virtual(it.Name) {
 			continue
 		}
 		addrs, _ := it.Addrs()
@@ -65,6 +65,18 @@ func Hosts() []netip.Addr {
 		}
 	}
 	return out
+}
+
+// Virtual indica interfaces de máquinas virtuales o contenedores (Docker, WSL, Hyper-V,
+// VirtualBox, VMware): ahí no hay impresoras del local y barrerlas solo tarda.
+func Virtual(nombre string) bool {
+	n := strings.ToLower(nombre)
+	for _, p := range []string{"docker", "br-", "veth", "virbr", "vmnet", "vboxnet", "vethernet", "wsl", "hyper-v", "virtualbox", "vmware", "tailscale", "zt", "utun"} {
+		if strings.HasPrefix(n, p) || strings.Contains(n, "("+p) {
+			return true
+		}
+	}
+	return false
 }
 
 // Expandir lista los hosts de una subred IPv4 (sin red ni broadcast), como mucho MaxHosts.

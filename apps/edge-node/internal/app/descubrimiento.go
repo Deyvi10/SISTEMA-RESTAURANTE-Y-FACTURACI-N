@@ -3,8 +3,6 @@ package app
 import (
 	"context"
 	"fmt"
-	"net"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -149,11 +147,6 @@ func (a *App) impresorasConocidas(ctx context.Context) ([]impresoraConocida, err
 		out = append(out, k)
 	}
 	return out, rows.Err()
-}
-
-// direccion arma «host:puerto» para mostrar.
-func direccion(e descubrir.Encontrada) string {
-	return net.JoinHostPort(e.Host, strconv.Itoa(e.Puerto))
 }
 
 func resumenBusqueda(n int) string {

@@ -55,3 +55,31 @@ h1 { font-family: var(--rp-font-display); font-size: var(--rp-text-title1-size);
 .boton:focus-visible { outline: 3px solid var(--rp-color-accent-soft); outline-offset: 2px; }
 [hidden] { display: none !important; }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } .check path { stroke-dashoffset: 0; } }
+
+/* ---------- Página de estado (F2-05): «Ajustes › General › Información» ---------- */
+.estado main { max-width: 640px; padding-top: 28px; }
+.estado h1 { text-align: left; margin: 8px 16px 4px; font-size: var(--rp-text-large-title-size); }
+.estado .sub { text-align: left; margin: 0 16px 20px; }
+.cabecera { display: flex; align-items: center; gap: 14px; margin: 0 16px 8px; }
+.cabecera .app-icon { width: 60px; height: 60px; border-radius: 15px; margin: 0; }
+.cabecera .app-icon svg { width: 32px; height: 32px; }
+.semaforo { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px; font-weight: 600; font-size: 15px; }
+.semaforo::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: currentColor; }
+.semaforo[data-color="verde"] { color: var(--rp-color-success-text); background: var(--rp-color-success-soft); }
+.semaforo[data-color="amarillo"] { color: var(--rp-color-warning-text); background: var(--rp-color-warning-soft); }
+.semaforo[data-color="rojo"] { color: var(--rp-color-danger-text); background: var(--rp-color-danger-soft); }
+.seccion-titulo { margin: 26px 32px 8px; font-size: 13px; text-transform: uppercase; letter-spacing: .02em; color: var(--rp-color-label-secondary); }
+.grupo { margin: 0 16px; border-radius: var(--rp-radius-lg); background: var(--rp-color-surface); overflow: hidden; }
+.fila { display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 10px 16px; }
+.fila + .fila { border-top: 0.5px solid var(--rp-color-separator); margin-left: 16px; padding-left: 0; }
+.fila .etiqueta { flex: 1; min-width: 0; }
+.fila .etiqueta small { display: block; color: var(--rp-color-label-secondary); font-size: 13px; }
+.fila .valor { color: var(--rp-color-label-secondary); text-align: right; font-variant-numeric: tabular-nums; }
+.punto { width: 12px; height: 12px; border-radius: 50%; flex: none; }
+.punto[data-color="verde"] { background: var(--rp-tint-green); }
+.punto[data-color="amarillo"] { background: var(--rp-tint-orange); }
+.punto[data-color="rojo"] { background: var(--rp-tint-red); }
+.punto[data-color="gris"] { background: var(--rp-tint-gray); }
+.pie { margin: 8px 32px 0; font-size: 13px; color: var(--rp-color-label-secondary); }
+.accion { display: block; width: calc(100% - 32px); margin: 0 16px; min-height: 48px; border: 0; border-radius: var(--rp-radius-lg); background: var(--rp-color-surface); color: var(--rp-color-accent); font: inherit; font-weight: 600; cursor: pointer; }
+.accion:disabled { color: var(--rp-color-label-tertiary); cursor: default; }

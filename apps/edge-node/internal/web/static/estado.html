@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Estado del Nodo</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23FF9F0A'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/static/tokens.css">
+<link rel="stylesheet" href="/static/nodo.css">
+</head>
+<body class="estado">
+<main>
+  <div class="cabecera">
+    <div class="app-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><path d="M6 6h.01M6 18h.01"/></svg>
+    </div>
+    <span class="semaforo" id="semaforo" data-color="amarillo">Cargando…</span>
+  </div>
+  <h1 id="titulo">Nodo Local</h1>
+  <p class="sub" id="subtitulo">Estado de este equipo.</p>
+
+  <div class="seccion-titulo">Conexión</div>
+  <div class="grupo" id="g-conexion"></div>
+
+  <div class="seccion-titulo">Impresoras</div>
+  <div class="grupo" id="g-impresoras"></div>
+  <p class="pie" id="pie-busqueda"></p>
+  <div style="margin-top:12px"><button class="accion" id="btn-buscar" type="button">Buscar impresoras ahora</button></div>
+
+  <div class="seccion-titulo">Equipo</div>
+  <div class="grupo" id="g-equipo"></div>
+  <p class="pie">Esta página se actualiza sola. No muestra datos de clientes ni del personal.</p>
+</main>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const fila = (etiqueta, valor, color, detalle) => {
+    const d = document.createElement('div'); d.className = 'fila';
+    if (color) { const p = document.createElement('span'); p.className = 'punto'; p.dataset.color = color; d.append(p); }
+    const e = document.createElement('span'); e.className = 'etiqueta'; e.textContent = etiqueta;
+    if (detalle) { const s = document.createElement('small'); s.textContent = detalle; e.append(s); }
+    const v = document.createElement('span'); v.className = 'valor'; v.textContent = valor;
+    d.append(e, v); return d;
+  };
+  const hace = (iso) => {
+    if (!iso) return 'nunca';
+    const s = Math.max(0, Math.round((Date.now() - new Date(iso)) / 1000));
+    if (s < 60) return 'hace un momento'; if (s < 3600) return `hace ${Math.round(s / 60)} min`;
+    if (s < 86400) return `hace ${Math.round(s / 3600)} h`; return `hace ${Math.round(s / 86400)} d`;
+  };
+  const duracion = (desde) => {
+    const s = Math.round((Date.now() - new Date(desde)) / 1000);
+    const d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60);
+    return d ? `${d} d ${h} h` : h ? `${h} h ${m} min` : `${m} min`;
+  };
+  const IMP = { OK: ['Lista', 'verde'], POCO_PAPEL: ['Poco papel', 'amarillo'], SIN_PAPEL: ['Sin papel', 'rojo'], TAPA_ABIERTA: ['Tapa abierta', 'rojo'],
+    SIN_CONEXION: ['Sin conexión', 'rojo'], ERROR: ['Error', 'rojo'], DESCONOCIDO: ['Revisando…', 'gris'] };
+  const NUBE = { EN_LINEA: ['En línea', 'verde'], SIN_INTERNET: ['Sin internet (operando local)', 'amarillo'], SIN_ACTIVAR: ['Sin activar', 'amarillo'], REVOCADO: ['Revocado', 'rojo'] };
+
+  function pintar(e) {
+    const [txtNube, colNube] = NUBE[e.conectividad.nube] || ['Desconocido', 'gris'];
+    const malImp = e.impresoras.some((i) => IMP[i.estado]?.[1] === 'rojo');
+    const semaforo = e.conectividad.nube === 'REVOCADO' || malImp ? 'rojo' : colNube;
+    $('semaforo').dataset.color = semaforo;
+    $('semaforo').textContent = semaforo === 'verde' ? 'Todo en orden' : semaforo === 'rojo' ? 'Requiere atención' : 'Funcionando sin nube';
+    $('titulo').textContent = e.restaurante || 'Nodo Local';
+    $('subtitulo').textContent = e.activado ? (e.local && e.local !== e.restaurante ? `${e.local} · versión ${e.version}` : `Nodo Local · versión ${e.version}`) : e.revocado ? 'Este nodo fue revocado: actívalo con un código nuevo.' : 'Este nodo aún no está activado.';
+
+    const g1 = $('g-conexion'); g1.replaceChildren(
+      fila('Nube', txtNube, colNube, e.conectividad.ultimaNube ? `Último contacto ${hace(e.conectividad.ultimaNube)}` : ''),
+      fila('Por sincronizar', `${e.outboxPendientes} cambios`, e.outboxPendientes === 0 ? 'verde' : e.outboxAntiguedadSeg > 600 ? 'rojo' : 'amarillo',
+        e.outboxPendientes ? `El más antiguo espera ${Math.round(e.outboxAntiguedadSeg / 60)} min` : ''),
+      fila('Reloj de la PC', e.alertaReloj ? `Desfasado ${Math.abs(e.derivaSegundos)} s` : 'Correcto', e.alertaReloj ? 'rojo' : 'verde',
+        e.alertaReloj ? 'Corrígelo en Windows: la fecha va en cada factura' : ''),
+      fila('Dispositivos conectados', String(e.conectividad.dispositivos)),
+      fila('Comprobantes pendientes', String(e.comprobantesPendientes), e.comprobantesPendientes ? 'amarillo' : 'verde'),
+    );
+    const g2 = $('g-impresoras');
+    g2.replaceChildren(...(e.impresoras.length ? e.impresoras.map((i) => {
+      const [t, c] = IMP[i.estado] || ['?', 'gris'];
+      return fila(i.nombre, i.cola ? `${t} · ${i.cola} en cola` : t, c, i.motivo || '');
+    }) : [fila('Sin impresoras configuradas', '', 'gris', 'Agrégalas en el backoffice o usa «Buscar impresoras».')]));
+    $('pie-busqueda').textContent = e.buscando ? 'Buscando impresoras en la red…'
+      : e.ultimaBusqueda ? `Última búsqueda ${hace(e.ultimaBusqueda)}: ${e.encontradas} en la red.` : '';
+    $('btn-buscar').disabled = e.buscando || !e.activado;
+    const g3 = $('g-equipo'); g3.replaceChildren(
+      fila('Versión', e.version), fila('Encendido', duracion(e.arranque)),
+      fila('Disco libre', e.discoLibreMb >= 0 ? `${(e.discoLibreMb / 1024).toFixed(1)} GB` : '—', e.discoLibreMb >= 0 && e.discoLibreMb < 2048 ? 'amarillo' : undefined),
+      fila('Base de datos', `${e.baseMb} MB`),
+    );
+  }
+  async function cargar() {
+    try {
+      const r = await fetch('/v1/estado', { cache: 'no-store' });
+      pintar(await r.json());
+    } catch {
+      $('semaforo').dataset.color = 'rojo'; $('semaforo').textContent = 'Sin conexión con el nodo';
+    }
+  }
+  $('btn-buscar').addEventListener('click', async () => {
+    const r = await fetch('/v1/impresoras/buscar', { method: 'POST' });
+    if (r.status === 403) { $('pie-busqueda').textContent = 'Solo se puede buscar desde la PC del nodo.'; return; }
+    cargar();
+  });
+  cargar(); setInterval(cargar, 3000);
+})();
+</script>
+</body>
+</html>

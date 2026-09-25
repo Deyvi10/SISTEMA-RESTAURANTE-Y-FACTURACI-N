@@ -60,3 +60,12 @@ func TestBarrerEncuentraPuertoAbierto(t *testing.T) {
 		t.Fatalf("abiertos = %v", got)
 	}
 }
+
+func TestVirtual(t *testing.T) {
+	for n, want := range map[string]bool{"docker0": true, "br-30046f5cc307": true, "vEthernet (WSL)": true, "VirtualBox Host-Only Network": true,
+		"wlo1": false, "eth0": false, "Ethernet": false, "Wi-Fi": false, "enp3s0": false} {
+		if Virtual(n) != want {
+			t.Errorf("Virtual(%q) = %v", n, !want)
+		}
+	}
+}

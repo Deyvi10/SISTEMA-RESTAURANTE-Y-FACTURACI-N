@@ -339,3 +339,39 @@ func TestBusquedaDeImpresoras(t *testing.T) {
 		t.Fatal(resumenBusqueda(2))
 	}
 }
+
+// F2-05: la página de estado resume el nodo sin datos personales.
+func TestPaginaDeEstado(t *testing.T) {
+	r := nuevoRestaurante(t)
+	r.bar.Fijar(escpos.Status{PaperOut: true})
+	esperar(t, func() bool { return r.a.motor.Estado(r.impBar).Estado == "SIN_PAPEL" })
+	res, err := http.Get(r.lan.URL + "/v1/estado")
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, _ := io.ReadAll(res.Body)
+	_ = res.Body.Close()
+	var e EstadoNodo
+	if err := json.Unmarshal(raw, &e); err != nil {
+		t.Fatal(err)
+	}
+	if e.Activado || e.Conectividad.Nube != "SIN_ACTIVAR" || len(e.Impresoras) != 2 || e.Version == "" {
+		t.Fatalf("estado: %+v", e)
+	}
+	for _, x := range e.Impresoras {
+		if x.ID == r.impBar && x.Estado != "SIN_PAPEL" {
+			t.Fatalf("barra: %+v", x)
+		}
+	}
+	for _, prohibido := range []string{"Carlos", "pin", "email", "llave"} {
+		if strings.Contains(strings.ToLower(string(raw)), strings.ToLower(prohibido)) {
+			t.Errorf("la página de estado expone %q", prohibido)
+		}
+	}
+	res, _ = http.Get(r.lan.URL + "/estado")
+	body, _ := io.ReadAll(res.Body)
+	_ = res.Body.Close()
+	if res.StatusCode != 200 || !strings.Contains(string(body), "Estado del Nodo") {
+		t.Fatalf("/estado = %d", res.StatusCode)
+	}
+}
