@@ -80,7 +80,19 @@ ui-docs: ## Sirve la guía de estilo viva en http://localhost:8095/docs/
 flutter-ui: ## Analiza y prueba el paquete Flutter restpos_ui con Docker (no requiere Flutter instalado)
 	docker run --rm -v "$$PWD/packages/dart/restpos_ui":/pkg -w /pkg ghcr.io/cirruslabs/flutter:stable sh -c "flutter pub get && flutter analyze && flutter test; s=$$?; chown -R $$(id -u):$$(id -g) /pkg; exit $$s"
 
+api: ## Corre la API en :8080 (migra y siembra la galería en local; requiere `make dev`)
+	$(GO) run ./apps/cloud-api/cmd/cloud-api serve
+
+demo: ## Crea el restaurante de demostración «Cevichería Don Pepe» con fotos (demo@donpepe.ec / DonPepe2026)
+	$(GO) run ./apps/cloud-api/cmd/cloud-api demo
+
+bo: ## Corre el backoffice en http://localhost:5173 (con `make api` en otra terminal)
+	npm install --no-audit --no-fund && npm run dev -w @restpos/backoffice-web
+
+bo-test: ## Tipos, pruebas y build del backoffice
+	npm run typecheck -w @restpos/backoffice-web && npm test -w @restpos/backoffice-web && npm run build -w @restpos/backoffice-web
+
 backlog: ## Regenera docs/12-backlog-tickets.md desde el JSON
 	python3 documentacion-proyecto/docs/backlog/generar.py
 
-.PHONY: help hooks dev down reset logs test test-long cover fmt lint check-float golden printer-sim sri-stub tokens tokens-check ui-test ui-docs flutter-ui backlog
+.PHONY: help hooks dev down reset logs test test-long cover fmt lint check-float golden printer-sim sri-stub tokens tokens-check ui-test ui-docs flutter-ui api demo bo bo-test backlog

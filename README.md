@@ -24,6 +24,15 @@ make help    # todos los comandos
 | PostgreSQL | `localhost:5442` (cambia con `PG_PORT` en `.env`) |
 | S3 con Object Lock (VersityGW) | http://localhost:7171 (cambia con `S3_PORT`) |
 
+### Ver el panel del restaurante (Fase 1)
+
+```bash
+make dev    # terminal 1: servicios locales
+make demo   # una vez: crea «Cevichería Don Pepe» con 22 platos fotografiados, 18 mesas y equipo
+make api    # terminal 2: API en :8080
+make bo     # terminal 3: panel en http://localhost:5173  →  demo@donpepe.ec / DonPepe2026
+```
+
 Prueba rápida de impresión, sin código: `printf 'Hola cocina\n\x1dVA\x03' | nc localhost 9100` y mira el panel.
 
 ## Estructura
@@ -40,4 +49,4 @@ deploy/       docker · local
 
 ## Estado
 
-**Fase 0 en curso** (rama `feat/F0-fundaciones`). Ver el avance en la sección *Estado* de [`CLAUDE.md`](CLAUDE.md).
+**Fase 1 en curso** (rama `feat/F0-fundaciones`). Ver el avance en la sección *Estado* de [`CLAUDE.md`](CLAUDE.md).

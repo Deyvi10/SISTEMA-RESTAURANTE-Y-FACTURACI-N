@@ -19,6 +19,7 @@ jobs:
     outputs:
       go: ${{ steps.f.outputs.go }}
       ui: ${{ steps.f.outputs.ui }}
+      web: ${{ steps.f.outputs.web }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -37,6 +38,11 @@ jobs:
               - 'contracts/**'
               - '.golangci.yml'
               - 'packages/design/**'
+            web:
+              - 'apps/backoffice-web/**'
+              - 'packages/ts/**'
+              - 'package.json'
+              - 'package-lock.json'
             ui:
               - 'packages/design/**'
               - 'packages/ts/**'
@@ -102,6 +108,24 @@ jobs:
       - name: Análisis y pruebas de restpos_ui (Flutter)
         working-directory: packages/dart/restpos_ui
         run: flutter pub get && flutter analyze && flutter test
+
+  backoffice:
+    needs: cambios
+    if: needs.cambios.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Tipos
+        run: npm run typecheck -w @restpos/backoffice-web
+      - name: Pruebas
+        run: npm test -w @restpos/backoffice-web
+      - name: Build
+        run: npm run build -w @restpos/backoffice-web
 
   secretos:
     runs-on: ubuntu-latest

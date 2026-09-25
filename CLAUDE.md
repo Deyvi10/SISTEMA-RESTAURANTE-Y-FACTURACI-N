@@ -30,3 +30,10 @@ La documentación vive en `documentacion-proyecto/`: toda referencia a `docs/…
 | F0-10 Spike sync | ✅ 10 000 eventos con caos: 0 pérdidas, 0 duplicados (ADR-0012, `packages/go/edgesync`) |
 | F0-12 Sistema de diseño | ✅ Tokens únicos → CSS, Tailwind v4, TS y Flutter; contraste AA verificado en CI; componentes CSS; guía viva (`make ui-docs`) |
 | F0-01, F0-13, F0-14 | ⏳ Requieren decisiones, usuarios reales o descargar la ficha del SRI |
+| F1-01…F1-09, F1-13 | ✅ API Go (`apps/cloud-api`): RLS forzado + QA-06 en 16 tablas, QA-11, auth completa, catálogo, salón, personal, imágenes WebP + galería de 24 fotos CC0 |
+| F1-10…F1-12 | ✅ Backoffice React (`apps/backoffice-web`): login promocional, guía de 5 pasos, menú con fotos, salón, personal con PIN, ajustes |
+| F1-14 | 🟡 Imagen Docker lista (`deploy/docker/cloud-api.Dockerfile`, `-tags nodynamic`). Falta IaC y despliegue a `dev`: depende de DP-01 (nube) |
+
+Notas para seguir:
+- El cliente TS del backoffice está escrito a mano (`src/api/types.ts`); generarlo desde OpenAPI queda pendiente (contrato en `contracts/openapi/`).
+- Refresh con periodo de gracia de 30 s para carreras benignas (recarga durante la renovación, peticiones simultáneas); fuera de la gracia es robo y revoca la familia.
