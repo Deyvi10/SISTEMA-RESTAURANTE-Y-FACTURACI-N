@@ -50,7 +50,7 @@ flowchart LR
 | **API Cloud** | Go (`net/http` + chi), pgx, sqlc | API REST del backoffice, sincronización con nodos, auth, entitlements, SSE para el dashboard | Contenedor en la nube |
 | **Workers** | Go, cola sobre PostgreSQL (River) | Motor fiscal (XML, firma, envío, autorización), RIDE PDF, correos, procesos programados | Contenedor en la nube |
 | **PostgreSQL** | PostgreSQL 16+ | Fuente de verdad central, RLS por tenant | Servicio administrado |
-| **Almacenamiento de objetos** | S3 o compatible | XML/PDF (con Object Lock), imágenes, respaldos cifrados | Nube |
+| **Almacenamiento de objetos** | Azure Blob Storage (ADR-0013) | XML autorizados (inmutables, comprimidos), imágenes, respaldos cifrados | Nube |
 | **Nodo Local** | Go (binario único), SQLite (WAL) | Servidor LAN: API + WebSocket, bloqueos, secuenciales, impresión, cola de sincronización, respaldos, KDS estático | PC de caja (servicio del SO) |
 | **App Meseros** | Flutter (Cupertino), drift (SQLite), Riverpod | Toma de pedidos offline-first | Android / iOS |
 | **Caja POS** | React + TS + Vite (PWA) | Cobro, división de cuentas, turnos | Navegador en la PC de caja (servida por el Nodo Local) |
@@ -190,15 +190,19 @@ El Nodo Local es crítico. Mitigaciones:
 
 | Dato | Dónde | Retención |
 |---|---|---|
-| XML autorizados | Objetos, con **Object Lock** (compliance) | ≥ 7 años (verificar) |
-| RIDE PDF | Objetos (regenerable desde el XML) | 7 años |
+| XML autorizados | Blob `comprobantes` (GRS, inmutable/WORM): un blob por emisor por día, cada factura comprimida con diccionario zstd, índice en PostgreSQL (ADR-0013) | ≥ 7 años (verificar). Hot 30 d → Cool → Cold |
+| XML reciente | PostgreSQL | 90 días |
+| RIDE PDF | **No se guarda**: se genera desde el XML al pedirlo | — |
+| Copia local de comprobantes | Nodo Local (SQLite) | 90 días |
 | PDFs temporales en el nodo | Disco local | Se borran tras confirmar la subida |
 | Datos operativos en el nodo | SQLite | 60 días (solo si ya están sincronizados) |
-| Respaldo cifrado del nodo | Objetos `/backups/<tenant>/<local>/` | 7 diarios + 4 semanales |
-| Respaldo de PostgreSQL | *Point-in-time recovery* del proveedor | 30 días de PITR + mensuales por 12 meses |
-| Imágenes del menú | Objetos + CDN (WebP, varias resoluciones) | Mientras exista el producto |
-| Logs de aplicación | Plataforma de logs | 30 días |
+| Respaldo cifrado del nodo | Blob `respaldos/<tenant>/<local>/` (LRS, Cool) + USB/segundo disco opcional | 7 diarios + 4 semanales (USB: últimos 7) |
+| Respaldo de PostgreSQL | PITR de Azure PostgreSQL Flexible | 7 días de PITR (hasta 35) + exportación mensual por 12 meses |
+| Imágenes del menú | Blob `media` (LRS) + caché en el Nodo Local (WebP, varias resoluciones) | Mientras exista el producto |
+| Logs de aplicación | Log Analytics | 30 días |
 | Auditoría | PostgreSQL (append-only) | ≥ 7 años |
+
+Costos y volúmenes medidos: [`13-almacenamiento-y-costos-azure.md`](13-almacenamiento-y-costos-azure.md).
 
 ## 10. Observabilidad
 

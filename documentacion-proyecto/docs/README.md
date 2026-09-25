@@ -17,6 +17,7 @@
 | 10 | [Decisiones pendientes](10-decisiones-pendientes.md) | **Preguntas para el Product Owner** antes de empezar |
 | 11 | [Convenciones de código](11-convenciones-de-codigo.md) | Reglas de código, Git y documentación |
 | 12 | [Backlog por fases](12-backlog-tickets.md) | **Tickets** de cada fase con criterios de aceptación, notas técnicas y de diseño iOS, dependencias y trazabilidad (fuente: `backlog/*.json`) |
+| 13 | [Almacenamiento y costos en Azure](13-almacenamiento-y-costos-azure.md) | Tamaño medido de las facturas, qué se guarda en local y en la nube, y costo mensual para 10 restaurantes |
 | ADR | [Decisiones de arquitectura](adr/README.md) | Registro de decisiones técnicas |
 | — | [Fuentes](fuentes/) | Documento original (`.docx` + transcripción), normativa SRI descargada |
 

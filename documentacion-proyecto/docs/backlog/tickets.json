@@ -759,15 +759,17 @@
   "prio": "M",
   "req": [
    "08 §3",
-   "DP-01"
+   "DP-01",
+   "ADR-0013"
   ],
   "talla": "M",
   "que": "Cada merge a main despliega la API, los workers y el backoffice al entorno dev sin intervención.",
   "ac": [
-   "Dockerfile multi-stage de cloud-api; imagen en el registro de contenedores.",
-   "IaC mínima en `deploy/` para la nube elegida en DP-01 (PostgreSQL administrado, bucket, secretos).",
+   "Dockerfile multi-stage de cloud-api; imagen en GitHub Container Registry.",
+   "Terraform en `deploy/azure/`: PostgreSQL Flexible, Container Apps (API + worker fiscal), Storage Account con contenedores `comprobantes` (GRS, inmutable), `media` y `respaldos` (LRS) y reglas de ciclo de vida, Key Vault con identidad administrada, Static Web Apps.",
    "Migraciones ejecutadas antes del despliegue (patrón expand/contract).",
-   "Backoffice publicado en CDN."
+   "Backoffice publicado en Static Web Apps.",
+   "Alerta de presupuesto de Azure al 80 % y al 100 % del costo mensual previsto en `13`."
   ],
   "tec": [],
   "dep": [
@@ -1165,6 +1167,33 @@
   "dep": [
    "F2-01",
    "F0-01"
+  ]
+ },
+ {
+  "id": "F2-15",
+  "t": "Caché local de fotos del menú",
+  "tipo": "Técnica",
+  "area": [
+   "edge"
+  ],
+  "prio": "S",
+  "req": [
+   "ADR-0013",
+   "RF-02-01"
+  ],
+  "talla": "S",
+  "que": "La caja y la app de meseros muestran las fotos de los platos aunque no haya internet, sin descargar cada foto de la nube una y otra vez.",
+  "ac": [
+   "El nodo descarga las WebP sm y md de los productos activos al recibir cambios de catálogo (F2-03) y las sirve en `/media/...` en la LAN.",
+   "Descarga en segundo plano con límite de ancho de banda; nunca bloquea la operación.",
+   "Las fotos de productos eliminados se borran de la caché; el tamaño total se muestra en la página de estado.",
+   "Sin internet y sin foto en caché, se muestra el icono de la categoría."
+  ],
+  "tec": [
+   "Las claves de imagen son inmutables (hash en la ruta), así que no hace falta invalidar la caché."
+  ],
+  "dep": [
+   "F2-03"
   ]
  },
  {
@@ -2325,7 +2354,7 @@
  },
  {
   "id": "F5-11",
-  "t": "RIDE PDF, correo y bóveda con Object Lock",
+  "t": "RIDE PDF al vuelo, correo y archivo inmutable comprimido",
   "tipo": "Historia",
   "area": [
    "cloud",
@@ -2335,17 +2364,23 @@
   "req": [
    "RF-05-02.6",
    "RF-05-07.3",
-   "L-13"
+   "L-13",
+   "ADR-0013"
   ],
   "talla": "M",
-  "que": "Al autorizarse, el cliente recibe su PDF y XML por correo, y el XML queda guardado 7 años sin posibilidad de borrarse.",
+  "que": "Al autorizarse, el cliente recibe su PDF y XML por correo, y el XML queda guardado 7 años sin posibilidad de borrarse, ocupando lo mínimo.",
   "ac": [
-   "RIDE A4 con número y fecha de autorización.",
+   "RIDE A4 con número y fecha de autorización, generado de forma determinista desde el XML; el PDF no se almacena.",
    "Correo al comprador (si tiene) con XML + PDF.",
-   "XML autorizado en bucket con versionado y Object Lock en modo compliance ≥ 7 años 🔎; sin reglas de ciclo de vida.",
+   "XML autorizado en PostgreSQL 90 días y archivado cada noche en Blob `comprobantes`: un blob por emisor por día, cada factura comprimida con el diccionario zstd del emisor, índice (clave → offset, largo, sha256) en PostgreSQL.",
+   "Antes de indexar se descomprime y se verifica el SHA-256 contra el original; si falla, no se borra nada y se reintenta.",
+   "Contenedor con política de inmutabilidad ≥ 7 años 🔎, GRS y ciclo de vida Hot 30 d → Cool → Cold; diccionarios inmutables y versionados.",
    "El nodo recibe `fiscal.status_changed` y actualiza el estado."
   ],
-  "tec": [],
+  "tec": [
+   "Diccionario de 64 KB entrenado con las primeras ~1 000 facturas del emisor (antes, zstd sin diccionario); medición en `13` §1.",
+   "Lectura de una factura por rango HTTP (`x-ms-range`)."
+  ],
   "dep": [
    "F5-10"
   ]
@@ -2366,7 +2401,7 @@
   "que": "El dueño encuentra cualquier factura en segundos y ve cuáles están pendientes o requieren atención.",
   "ac": [
    "Lista filtrable por fecha, estado, cliente, tipo y punto de emisión.",
-   "Acciones: Descargar XML, Descargar PDF, Reenviar correo, Reintentar.",
+   "Acciones: Descargar XML (PostgreSQL o archivo Blob por rango), Descargar PDF (regenerado al vuelo), Reenviar correo, Reintentar.",
    "Estados: Emitido local · Enviado · Autorizado · No autorizado · Requiere atención · Anulado por NC."
   ],
   "tec": [],
@@ -2509,8 +2544,35 @@
   ]
  },
  {
+  "id": "F5-18",
+  "t": "Copia local de comprobantes autorizados (90 días)",
+  "tipo": "Historia",
+  "area": [
+   "edge",
+   "pos"
+  ],
+  "prio": "M",
+  "req": [
+   "ADR-0013",
+   "RF-05-07"
+  ],
+  "talla": "S",
+  "que": "Desde la caja se puede buscar y reimprimir cualquier factura de los últimos 3 meses aunque no haya internet.",
+  "ac": [
+   "Al recibir `fiscal.status_changed` = AUTORIZADO, el nodo guarda el XML autorizado comprimido y el número y la fecha de autorización.",
+   "Búsqueda en la caja por número, cliente o fecha; reimpresión del RIDE ticket con la leyenda de autorizado (auditada, F2-13).",
+   "Retención local de 90 días; la purga (F6-04) no toca lo que no esté confirmado en la nube.",
+   "Tamaño esperado: ~2,5 MB por restaurante al mes con zstd."
+  ],
+  "tec": [],
+  "dep": [
+   "F5-11",
+   "F2-13"
+  ]
+ },
+ {
   "id": "F6-01",
-  "t": "Respaldos cifrados del Nodo Local",
+  "t": "Respaldos cifrados del Nodo Local (nube + USB)",
   "tipo": "Historia",
   "area": [
    "edge",
@@ -2522,11 +2584,13 @@
    "X-13"
   ],
   "talla": "M",
-  "que": "Cada noche el nodo copia su base sin detener la operación, la cifra y la sube a la nube.",
+  "que": "Cada noche el nodo copia su base sin detener la operación, la cifra y la sube a la nube; si hay un USB o un segundo disco, deja ahí también una copia (3-2-1).",
   "ac": [
    "Respaldo diario (03:30 hora local) con la Online Backup API / `VACUUM INTO`.",
    "Comprimido y cifrado AES-256-GCM antes de subir a `/backups/<tenant>/<local>/`.",
-   "Retención: 7 diarios + 4 semanales."
+   "Retención: 7 diarios + 4 semanales.",
+   "Copia opcional en USB o segundo disco configurado desde la página de estado del nodo; se conservan los últimos 7 y se avisa si el medio falta o está lleno.",
+   "Blob `respaldos` en LRS con nivel Cool y regla de ciclo de vida que borra lo que excede la retención."
   ],
   "tec": [],
   "dep": [
@@ -2605,6 +2669,7 @@
   "que": "El nodo se mantiene liviano borrando lo antiguo que ya está a salvo en la nube.",
   "ac": [
    "Purga de datos operativos > 60 días ya sincronizados y confirmados.",
+   "Los comprobantes autorizados se conservan 90 días en local (F5-18) antes de purgarse.",
    "Nunca se purga lo no sincronizado.",
    "PDFs temporales borrados tras confirmar la subida."
   ],

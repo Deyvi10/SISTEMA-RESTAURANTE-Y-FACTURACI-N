@@ -19,3 +19,4 @@ Registro de decisiones de arquitectura significativas, en formato [MADR](https:/
 | [0010](0010-modulo-go-unico.md) | Un solo módulo Go en la raíz del monorepo | Aceptado |
 | [0011](0011-s3-local-versitygw.md) | VersityGW como S3 local de desarrollo | Aceptado |
 | [0012](0012-resultado-spike-sync.md) | Resultado del spike de sincronización (F0-10) | Aceptado |
+| [0013](0013-nube-azure-y-almacenamiento.md) | Azure como nube principal y almacenamiento optimizado de comprobantes | Aceptado |

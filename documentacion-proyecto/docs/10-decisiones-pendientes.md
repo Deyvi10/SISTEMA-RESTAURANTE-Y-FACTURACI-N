@@ -4,7 +4,7 @@ Cada decisión tiene una **recomendación**. Al responderlas, se actualiza la co
 
 | ID | Pregunta | Opciones | Recomendación | Bloquea | Decisión |
 |---|---|---|---|---|---|
-| **DP-01** | ¿Proveedor de nube principal? | AWS · Render + S3 · Azure · Proveedor ecuatoriano | **AWS** (RDS PostgreSQL, S3 con Object Lock, KMS, SES) en una sola región. Render es más simple al inicio, pero no ofrece KMS ni Object Lock, así que igual se dependería de AWS. Evaluar la residencia de datos (LOPDP) | F0 | ⏳ |
+| **DP-01** | ¿Proveedor de nube principal? | AWS · Render + S3 · Azure · Proveedor ecuatoriano | **AWS** (RDS PostgreSQL, S3 con Object Lock, KMS, SES) en una sola región. Render es más simple al inicio, pero no ofrece KMS ni Object Lock, así que igual se dependería de AWS. Evaluar la residencia de datos (LOPDP) | F0 | ✅ **Azure** (2026-09-24, Product Owner): PostgreSQL Flexible, Container Apps, Blob con inmutabilidad, Key Vault. Ver ADR-0013 y `13` |
 | **DP-02** | ¿Tamaño y composición del equipo? | 1 dev · 2-3 devs · agencia | Define el calendario (`07` §4). Con 1 dev, priorizar sin concesiones el alcance del MVP | Planificación | ⏳ |
 | **DP-03** | ¿Sistemas operativos del Nodo Local en el MVP? | Solo Windows · Windows + Linux | **Solo Windows 10/11** en el MVP (es lo que tienen los restaurantes) | F2 | ⏳ |
 | **DP-04** | ¿Hardware y credenciales para los spikes? | — | Conseguir: 1 impresora térmica de red (Epson TM-T20 o Xprinter), 1 cajón de dinero, 1 certificado `.p12` de pruebas + RUC habilitado en el ambiente de pruebas del SRI | F0 | ⏳ |

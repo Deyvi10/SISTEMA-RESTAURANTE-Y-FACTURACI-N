@@ -9,10 +9,10 @@
 |---|---|---|---|---|---|
 | F0 | Fundaciones y spikes de riesgo | 14 | 4-6 sem | 3-4 sem | ✅ |
 | F1 | Núcleo Cloud y Backoffice base | 14 | 5-7 sem | 3-4 sem | ✅ |
-| F2 | Nodo Local e impresión | 14 | 5-7 sem | 3-5 sem | ✅ |
+| F2 | Nodo Local e impresión | 15 | 5-7 sem | 3-5 sem | ✅ |
 | F3 | App de meseros | 15 | 6-8 sem | 4-5 sem | ✅ |
 | F4 | Caja POS | 16 | 6-8 sem | 4-5 sem | ✅ |
-| F5 | Facturación electrónica SRI | 17 | 6-9 sem | 4-6 sem | ✅ |
+| F5 | Facturación electrónica SRI | 18 | 6-9 sem | 4-6 sem | ✅ |
 | F6 | Hardening y piloto | 11 | 4-6 sem | 3-4 sem | ✅ |
 | F7 | Inventario y stock diario | 11 | 9-12 sem | 6-8 sem |  |
 | F8 | Reportes, analítica y auditoría | 7 | 6-9 sem | 4-6 sem |  |
@@ -20,7 +20,7 @@
 | F10 | SaaS comercial | 10 | 6-11 sem | 4-7 sem |  |
 | F11 | Expansión (backlog priorizable) | 11 | — | — |  |
 
-**Total:** 147 tickets. Las semanas de F0-F6 vienen de `07` §4; las de F7-F10 reparten entre fases el total que da ese mismo documento (+6-9 meses con 1 dev, +4-6 meses con 3).
+**Total:** 149 tickets. Las semanas de F0-F6 vienen de `07` §4; las de F7-F10 reparten entre fases el total que da ese mismo documento (+6-9 meses con 1 dev, +4-6 meses con 3).
 
 ## F0 · Fundaciones y spikes de riesgo
 
@@ -614,16 +614,17 @@
 
 **Tipo:** Operación · **Prioridad:** Must · **Talla:** M · **Área:** `ci`
 
-**Trazabilidad:** 08 §3, DP-01
+**Trazabilidad:** 08 §3, DP-01, ADR-0013
 
 **Qué se quiere:** Cada merge a main despliega la API, los workers y el backoffice al entorno dev sin intervención.
 
 **Criterios de aceptación:**
 
-- [ ] Dockerfile multi-stage de cloud-api; imagen en el registro de contenedores.
-- [ ] IaC mínima en `deploy/` para la nube elegida en DP-01 (PostgreSQL administrado, bucket, secretos).
+- [ ] Dockerfile multi-stage de cloud-api; imagen en GitHub Container Registry.
+- [ ] Terraform en `deploy/azure/`: PostgreSQL Flexible, Container Apps (API + worker fiscal), Storage Account con contenedores `comprobantes` (GRS, inmutable), `media` y `respaldos` (LRS) y reglas de ciclo de vida, Key Vault con identidad administrada, Static Web Apps.
 - [ ] Migraciones ejecutadas antes del despliegue (patrón expand/contract).
-- [ ] Backoffice publicado en CDN.
+- [ ] Backoffice publicado en Static Web Apps.
+- [ ] Alerta de presupuesto de Azure al 80 % y al 100 % del costo mensual previsto en `13`.
 
 **Depende de:** F0-04, F0-01
 
@@ -914,6 +915,27 @@
 - [ ] Asistente con el nombre comercial (DP-10) y enlace a la guía de instalación.
 
 **Depende de:** F2-01, F0-01
+
+### F2-15 · Caché local de fotos del menú
+
+**Tipo:** Técnica · **Prioridad:** Should · **Talla:** S · **Área:** `edge`
+
+**Trazabilidad:** ADR-0013, RF-02-01
+
+**Qué se quiere:** La caja y la app de meseros muestran las fotos de los platos aunque no haya internet, sin descargar cada foto de la nube una y otra vez.
+
+**Criterios de aceptación:**
+
+- [ ] El nodo descarga las WebP sm y md de los productos activos al recibir cambios de catálogo (F2-03) y las sirve en `/media/...` en la LAN.
+- [ ] Descarga en segundo plano con límite de ancho de banda; nunca bloquea la operación.
+- [ ] Las fotos de productos eliminados se borran de la caché; el tamaño total se muestra en la página de estado.
+- [ ] Sin internet y sin foto en caché, se muestra el icono de la categoría.
+
+**Notas técnicas:**
+
+- Las claves de imagen son inmutables (hash en la ruta), así que no hace falta invalidar la caché.
+
+**Depende de:** F2-03
 
 ## F3 · App de meseros
 
@@ -1749,20 +1771,27 @@
 
 **Depende de:** F5-09, F0-07
 
-### F5-11 · RIDE PDF, correo y bóveda con Object Lock
+### F5-11 · RIDE PDF al vuelo, correo y archivo inmutable comprimido
 
 **Tipo:** Historia · **Prioridad:** Must · **Talla:** M · **Área:** `cloud`, `sri`
 
-**Trazabilidad:** RF-05-02.6, RF-05-07.3, L-13
+**Trazabilidad:** RF-05-02.6, RF-05-07.3, L-13, ADR-0013
 
-**Qué se quiere:** Al autorizarse, el cliente recibe su PDF y XML por correo, y el XML queda guardado 7 años sin posibilidad de borrarse.
+**Qué se quiere:** Al autorizarse, el cliente recibe su PDF y XML por correo, y el XML queda guardado 7 años sin posibilidad de borrarse, ocupando lo mínimo.
 
 **Criterios de aceptación:**
 
-- [ ] RIDE A4 con número y fecha de autorización.
+- [ ] RIDE A4 con número y fecha de autorización, generado de forma determinista desde el XML; el PDF no se almacena.
 - [ ] Correo al comprador (si tiene) con XML + PDF.
-- [ ] XML autorizado en bucket con versionado y Object Lock en modo compliance ≥ 7 años 🔎; sin reglas de ciclo de vida.
+- [ ] XML autorizado en PostgreSQL 90 días y archivado cada noche en Blob `comprobantes`: un blob por emisor por día, cada factura comprimida con el diccionario zstd del emisor, índice (clave → offset, largo, sha256) en PostgreSQL.
+- [ ] Antes de indexar se descomprime y se verifica el SHA-256 contra el original; si falla, no se borra nada y se reintenta.
+- [ ] Contenedor con política de inmutabilidad ≥ 7 años 🔎, GRS y ciclo de vida Hot 30 d → Cool → Cold; diccionarios inmutables y versionados.
 - [ ] El nodo recibe `fiscal.status_changed` y actualiza el estado.
+
+**Notas técnicas:**
+
+- Diccionario de 64 KB entrenado con las primeras ~1 000 facturas del emisor (antes, zstd sin diccionario); medición en `13` §1.
+- Lectura de una factura por rango HTTP (`x-ms-range`).
 
 **Depende de:** F5-10
 
@@ -1777,7 +1806,7 @@
 **Criterios de aceptación:**
 
 - [ ] Lista filtrable por fecha, estado, cliente, tipo y punto de emisión.
-- [ ] Acciones: Descargar XML, Descargar PDF, Reenviar correo, Reintentar.
+- [ ] Acciones: Descargar XML (PostgreSQL o archivo Blob por rango), Descargar PDF (regenerado al vuelo), Reenviar correo, Reintentar.
 - [ ] Estados: Emitido local · Enviado · Autorizado · No autorizado · Requiere atención · Anulado por NC.
 
 **Diseño (estilo iOS):** Filas con píldora de estado de color (verde autorizado, gris emitido, naranja requiere atención) y barra de búsqueda tipo iOS con tokens de filtro.
@@ -1865,6 +1894,23 @@
 
 **Depende de:** F5-13, F5-14, F5-15
 
+### F5-18 · Copia local de comprobantes autorizados (90 días)
+
+**Tipo:** Historia · **Prioridad:** Must · **Talla:** S · **Área:** `edge`, `pos`
+
+**Trazabilidad:** ADR-0013, RF-05-07
+
+**Qué se quiere:** Desde la caja se puede buscar y reimprimir cualquier factura de los últimos 3 meses aunque no haya internet.
+
+**Criterios de aceptación:**
+
+- [ ] Al recibir `fiscal.status_changed` = AUTORIZADO, el nodo guarda el XML autorizado comprimido y el número y la fecha de autorización.
+- [ ] Búsqueda en la caja por número, cliente o fecha; reimpresión del RIDE ticket con la leyenda de autorizado (auditada, F2-13).
+- [ ] Retención local de 90 días; la purga (F6-04) no toca lo que no esté confirmado en la nube.
+- [ ] Tamaño esperado: ~2,5 MB por restaurante al mes con zstd.
+
+**Depende de:** F5-11, F2-13
+
 ## F6 · Hardening y piloto
 
 **Objetivo:** Blindar el sistema para producción (respaldos, auto-update, observabilidad, carga, seguridad, LOPDP) y operar un restaurante piloto real en paralelo 14 días.
@@ -1878,19 +1924,21 @@
 - [ ] ≥ 99 % de autorizaciones en menos de 1 h (fuera de caídas del SRI).
 - [ ] Feedback registrado y priorizado. 🚀 = MVP.
 
-### F6-01 · Respaldos cifrados del Nodo Local
+### F6-01 · Respaldos cifrados del Nodo Local (nube + USB)
 
 **Tipo:** Historia · **Prioridad:** Must · **Talla:** M · **Área:** `edge`, `cloud`
 
 **Trazabilidad:** RF-02-10.1-2, X-13
 
-**Qué se quiere:** Cada noche el nodo copia su base sin detener la operación, la cifra y la sube a la nube.
+**Qué se quiere:** Cada noche el nodo copia su base sin detener la operación, la cifra y la sube a la nube; si hay un USB o un segundo disco, deja ahí también una copia (3-2-1).
 
 **Criterios de aceptación:**
 
 - [ ] Respaldo diario (03:30 hora local) con la Online Backup API / `VACUUM INTO`.
 - [ ] Comprimido y cifrado AES-256-GCM antes de subir a `/backups/<tenant>/<local>/`.
 - [ ] Retención: 7 diarios + 4 semanales.
+- [ ] Copia opcional en USB o segundo disco configurado desde la página de estado del nodo; se conservan los últimos 7 y se avisa si el medio falta o está lleno.
+- [ ] Blob `respaldos` en LRS con nivel Cool y regla de ciclo de vida que borra lo que excede la retención.
 
 **Depende de:** F2-04
 
@@ -1941,6 +1989,7 @@
 **Criterios de aceptación:**
 
 - [ ] Purga de datos operativos > 60 días ya sincronizados y confirmados.
+- [ ] Los comprobantes autorizados se conservan 90 días en local (F5-18) antes de purgarse.
 - [ ] Nunca se purga lo no sincronizado.
 - [ ] PDFs temporales borrados tras confirmar la subida.
 
