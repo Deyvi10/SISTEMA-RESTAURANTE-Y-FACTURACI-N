@@ -36,3 +36,7 @@ Thumbs.db
 # Paquetes Dart: el lockfile solo se versiona en apps
 packages/dart/**/pubspec.lock
 .nodo-data/
+
+# Caja web compilada que embebe el nodo (`make pos`); .gitkeep permite compilar el nodo sin ella
+/apps/edge-node/internal/web/pos/*
+!/apps/edge-node/internal/web/pos/.gitkeep

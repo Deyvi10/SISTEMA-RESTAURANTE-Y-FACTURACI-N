@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io/fs"
 	"log/slog"
 	"net"
 	"net/http"
@@ -47,6 +48,33 @@ func pagina(nombre string) http.HandlerFunc {
 		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; frame-ancestors 'none'")
 		http.ServeFileFS(w, r, web.Static(), nombre)
 	}
+}
+
+// caja sirve la caja web (F4-01): archivos con hash en el nombre se guardan para siempre en el
+// navegador; cualquier otra ruta de /pos/ devuelve index.html para que la navegue React.
+func caja(archivos fs.FS) http.Handler {
+	return http.StripPrefix("/pos/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		nombre := strings.TrimPrefix(r.URL.Path, "/")
+		if nombre != "" && nombre != "index.html" {
+			if st, err := fs.Stat(archivos, nombre); err == nil && !st.IsDir() {
+				if strings.HasPrefix(nombre, "assets/") {
+					w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+				} else {
+					w.Header().Set("Cache-Control", "no-cache")
+				}
+				http.ServeFileFS(w, r, archivos, nombre)
+				return
+			}
+		}
+		if _, err := fs.Stat(archivos, "index.html"); err != nil {
+			writeProblem(w, http.StatusServiceUnavailable, "CAJA_SIN_COMPILAR", "Este nodo se compiló sin la caja web. Ejecuta «make pos» y vuelve a compilar el nodo.")
+			return
+		}
+		w.Header().Set("Cache-Control", "no-cache")
+		w.Header().Set("Content-Security-Policy", "default-src 'self'; connect-src 'self' ws: wss:; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'")
+		http.ServeFileFS(w, r, archivos, "index.html")
+	}))
 }
 
 // inicio lleva a la activación si el nodo aún no tiene dueño, o al estado si ya lo tiene.

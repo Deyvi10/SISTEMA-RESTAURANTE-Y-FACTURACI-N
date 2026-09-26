@@ -124,6 +124,8 @@ func (a *App) routes() {
 	})
 	a.mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServerFS(web.Static())))
 	a.mux.HandleFunc("GET /{$}", a.inicio)
+	a.mux.Handle("GET /pos", http.RedirectHandler("/pos/", http.StatusMovedPermanently))
+	a.mux.Handle("GET /pos/", caja(web.Pos()))
 	a.mux.HandleFunc("GET /activar", pagina("activar.html"))
 	a.mux.HandleFunc("GET /estado", pagina("estado.html"))
 	a.mux.HandleFunc("GET /v1/estado", a.handleEstado)

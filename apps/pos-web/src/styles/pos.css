@@ -1,0 +1,91 @@
+/* Estilos de la caja. Todo sale de los tokens de @restpos/ui; pensada para 1280×720 en adelante. */
+
+html, body, #root { height: 100%; }
+body { overscroll-behavior: none; min-width: 1024px; }
+h1, h2, h3 { margin: 0; text-wrap: balance; }
+button { font: inherit; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+.spinner { width: 28px; height: 28px; border-radius: 50%; border: 3px solid var(--rp-color-fill); border-top-color: var(--rp-color-accent); animation: girar 0.8s linear infinite; }
+@keyframes girar { to { transform: rotate(360deg); } }
+
+.centrado { min-height: 100%; display: grid; place-items: center; padding: 24px; }
+.aviso-error { color: var(--rp-color-danger-text); margin: 8px 0; }
+
+/* Teclas de atajo */
+.tecla {
+  display: inline-grid; place-items: center; min-width: 26px; height: 24px; padding: 0 6px; border-radius: 6px;
+  font: 600 12px/1 var(--rp-font-text); color: var(--rp-color-label-secondary);
+  background: var(--rp-color-surface); border: 0.5px solid var(--rp-color-separator); box-shadow: 0 1px 0 var(--rp-color-separator);
+}
+.tecla--esquina { position: absolute; top: 10px; right: 10px; }
+
+/* ---------- Emparejar ---------- */
+.tarjeta-acceso {
+  width: min(420px, 100%); display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center;
+  padding: 32px; border-radius: var(--rp-radius-xl, 22px); background: var(--rp-color-surface);
+}
+.tarjeta-acceso .rp-field { width: 100%; text-align: left; }
+.tarjeta-acceso p { margin: 0; }
+
+/* ---------- ¿Quién cobra? ---------- */
+.acceso { min-height: 100%; display: flex; flex-direction: column; }
+.acceso__barra { display: flex; align-items: center; justify-content: space-between; padding: 16px 28px; }
+.acceso__gente { flex: 1; padding: 12px 28px 40px; max-width: 1100px; width: 100%; margin: 0 auto; }
+.acceso__gente h1 { margin-bottom: 24px; }
+.gente { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 16px; }
+.persona {
+  position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 22px 12px 18px;
+  border: 0; border-radius: 18px; background: var(--rp-color-surface); color: var(--rp-color-label); cursor: pointer;
+  transition: transform var(--rp-duration-fast) var(--rp-ease-standard);
+}
+.persona:hover { background: var(--rp-color-surface-raised); }
+.persona:active { transform: scale(0.97); }
+.persona:focus-visible { outline: 3px solid color-mix(in srgb, var(--rp-color-accent) 60%, transparent); }
+.persona b { font-size: 17px; margin-top: 6px; }
+.persona small { color: var(--rp-color-label-secondary); }
+.acceso__pin { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding-bottom: 40px; }
+
+.avatar {
+  display: inline-grid; place-items: center; flex: none; border-radius: 50%; object-fit: cover; color: #fff; font-weight: 700;
+  background: linear-gradient(160deg, color-mix(in srgb, var(--tint) 75%, white), var(--tint));
+}
+
+.teclado-pin { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.teclado-pin__error { min-height: 22px; margin: 0; color: var(--rp-color-danger-text); font-size: 15px; }
+
+/* ---------- Estructura de la caja ---------- */
+.caja { height: 100%; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; }
+.barra {
+  display: flex; align-items: center; gap: 16px; padding: 10px 20px;
+  background: var(--rp-color-surface); border-bottom: 0.5px solid var(--rp-color-separator);
+}
+.barra__marca { margin-right: 8px; }
+.barra__nav { display: flex; gap: 4px; flex: 1; }
+.barra__tab { padding: 6px 14px; border-radius: 10px; font-weight: 600; color: var(--rp-color-label-secondary); }
+.barra__tab[aria-current="page"] { background: var(--rp-color-accent-soft); color: var(--rp-color-accent); }
+.barra__usuario { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; }
+.barra .rp-btn svg { width: 16px; height: 16px; }
+.contenido { overflow: auto; padding: 18px 20px; }
+.pie { padding: 6px 20px; font-size: 12px; color: var(--rp-color-label-secondary); border-top: 0.5px solid var(--rp-color-separator); }
+
+/* ---------- Mesas ---------- */
+.mesas__barra { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.buscador { flex: 1; min-width: 280px; max-width: 460px; }
+.zonas { min-width: 280px; }
+.leyenda { display: flex; gap: 18px; margin: 14px 0; color: var(--rp-color-label-secondary); font-size: 14px; }
+.leyenda span::before { content: ""; display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; background: var(--rp-mesa-libre-bg); }
+.leyenda [data-estado="ocupada"]::before { background: var(--rp-mesa-ocupada-bg); }
+.leyenda [data-estado="porPagar"]::before { background: var(--rp-mesa-por-pagar-bg); }
+.rejilla-mesas { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; }
+.mesa { position: relative; min-height: 118px; width: 100%; font-size: inherit; text-align: left; justify-content: space-between; }
+.mesa:focus-visible { outline: 4px solid var(--rp-color-accent); outline-offset: 2px; }
+.mesa__nombre { font: 700 22px/1.1 var(--rp-font-display, inherit); }
+.mesa__total { font: 700 18px/1.2 var(--rp-font-text); }
+.mesa__bloqueo { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; }
+.mesa__bloqueo svg { width: 12px; height: 12px; }
+
+/* ---------- Ayuda de atajos ---------- */
+.rp-scrim:has(.ayuda-atajos) { opacity: 1; display: grid; place-items: center; }
+.ayuda-atajos .rp-sheet__header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.ayuda-atajos { position: static; transform: none; width: min(560px, 92vw); max-height: 80vh; overflow: auto; border-radius: 18px; }

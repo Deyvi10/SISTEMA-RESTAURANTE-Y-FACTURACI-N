@@ -50,6 +50,7 @@ La documentación vive en `documentacion-proyecto/`: toda referencia a `docs/…
 | F2-01…F2-06, F2-08…F2-13, F2-15 | ✅ Nodo Local (`apps/edge-node`): SQLite WAL de un escritor, activación, réplica por long-poll, outbox, página de estado, hub WebSocket, impresoras de red (mDNS/barrido/ARP) y las ya instaladas en Windows (spooler RAW), colas ESC/POS por estación con redirección y reimpresión, caché de fotos |
 | F2-07, F2-14 | ⏳ TLS en la LAN (DP-10) e instalador MSI firmado. Falta probar el spooler en un Windows real |
 | F3-01…F3-15 | ✅ App de meseros Flutter (`apps/waiter-app`) + backend en el nodo: QR/código, PIN con pepper por restaurante, salón en vivo, bloqueos con latido, pedido con modificadores, cola sin conexión, pre-cuenta, mover/unir/transferir, anular con supervisor. E2E en emulador; prueba Go de 8 teléfonos sin internet; flujo completo en CI (`make waiter`). Falta: cámara/QR y arranque ≤ 2 s en un teléfono real |
+| F4-01 | ✅ Caja web React (`apps/pos-web`) embebida en el nodo (`go:embed`, `/pos/`, `make pos`): PIN por teclado, mesas en vivo con navegación por flechas, atajos con `?`, semáforo 🟢🟡🔴. Otras PCs se emparejan con WebCrypto, que exige el TLS del nodo (F2-07) |
 
 Notas para seguir:
 - Detrás de un proxy (VM con Caddy/Nginx) el bloqueo por IP de login y de activación de nodos debe leer la IP real desde un proxy de confianza (pendiente del despliegue).

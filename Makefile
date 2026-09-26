@@ -103,6 +103,12 @@ nodo: ## Corre el Nodo Local en primer plano en http://localhost:7080 (datos en 
 nodo-win: ## Compila el Nodo Local para Windows x64 en dist/restpos-nodo.exe
 	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 $(GO) build -trimpath -ldflags "-s -w" -o dist/restpos-nodo.exe ./apps/edge-node/cmd/restpos-nodo
 
+pos: ## Compila la caja web dentro del nodo (apps/pos-web → go:embed); luego compila el nodo
+	npm install --no-audit --no-fund && npm run typecheck -w @restpos/pos-web && npm test -w @restpos/pos-web && npm run build -w @restpos/pos-web
+
+pos-dev: ## Caja web con recarga en caliente en http://localhost:5174 (con `make nodo` en otra terminal)
+	npm install --no-audit --no-fund && npm run dev -w @restpos/pos-web
+
 bo: ## Corre el backoffice en http://localhost:5173 (con `make api` en otra terminal)
 	npm install --no-audit --no-fund && npm run dev -w @restpos/backoffice-web
 
@@ -112,4 +118,4 @@ bo-test: ## Tipos, pruebas y build del backoffice
 backlog: ## Regenera docs/12-backlog-tickets.md desde el JSON
 	python3 documentacion-proyecto/docs/backlog/generar.py
 
-.PHONY: help hooks dev down reset logs test test-long cover fmt lint check-float golden printer-sim sri-stub tokens tokens-check ui-test ui-docs flutter-ui waiter api demo bo bo-test backlog
+.PHONY: help hooks dev down reset logs test test-long cover fmt lint check-float golden printer-sim sri-stub tokens tokens-check ui-test ui-docs flutter-ui waiter api demo pos pos-dev bo bo-test backlog

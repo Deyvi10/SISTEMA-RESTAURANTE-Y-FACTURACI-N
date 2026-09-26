@@ -4,7 +4,8 @@
   "workspaces": [
     "packages/ts/ui",
     "packages/ts/contracts",
-    "apps/backoffice-web"
+    "apps/backoffice-web",
+    "apps/pos-web"
   ],
   "engines": {
     "node": ">=22"

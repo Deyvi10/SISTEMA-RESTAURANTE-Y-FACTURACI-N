@@ -41,6 +41,7 @@ jobs:
               - 'packages/design/**'
             web:
               - 'apps/backoffice-web/**'
+              - 'apps/pos-web/**'
               - 'packages/ts/**'
               - 'package.json'
               - 'package-lock.json'
@@ -151,6 +152,8 @@ jobs:
         run: npm test -w @restpos/backoffice-web
       - name: Build
         run: npm run build -w @restpos/backoffice-web
+      - name: Caja web (tipos, pruebas y build dentro del nodo)
+        run: npm run typecheck -w @restpos/pos-web && npm test -w @restpos/pos-web && npm run build -w @restpos/pos-web
 
   secretos:
     runs-on: ubuntu-latest

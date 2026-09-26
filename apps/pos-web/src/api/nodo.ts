@@ -1,0 +1,165 @@
+// Cliente HTTP del Nodo Local. Los tokens viven solo en memoria: al recargar, la caja vuelve a
+// pedir el PIN (la llave del dispositivo sí persiste, en IndexedDB y sin poder exportarse).
+
+export interface FieldError {
+  campo: string;
+  mensaje: string;
+}
+
+/** Error del nodo con el mensaje para el usuario (RFC 9457). */
+export class ApiError extends Error {
+  readonly status: number;
+  readonly code: string;
+  readonly fields: Record<string, string>;
+  constructor(status: number, code: string, message: string, fields: FieldError[] = []) {
+    super(message);
+    this.status = status;
+    this.code = code;
+    this.fields = Object.fromEntries(fields.map((f) => [f.campo, f.mensaje]));
+  }
+  get esRed() {
+    return this.status === 0;
+  }
+}
+
+const tokens: { dispositivo: string | null; usuario: string | null } = { dispositivo: null, usuario: null };
+let alPerderSesion: (code: string) => void = () => {};
+
+export function setTokenDispositivo(t: string | null) {
+  tokens.dispositivo = t;
+}
+export function setTokenUsuario(t: string | null) {
+  tokens.usuario = t;
+}
+export function tokenUsuario() {
+  return tokens.usuario;
+}
+export function tokenDispositivo() {
+  return tokens.dispositivo;
+}
+/** Se llama cuando el nodo rechaza la sesión del usuario (vencida o cerrada en otro lado). */
+export function setAlPerderSesion(fn: (code: string) => void) {
+  alPerderSesion = fn;
+}
+
+/** La PC del nodo no necesita emparejarse: el nodo confía en las peticiones de loopback. */
+export function esPCDelNodo(hostname = location.hostname): boolean {
+  return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]" || hostname === "::1";
+}
+
+function credenciales(): string | undefined {
+  const c: string[] = [];
+  if (tokens.dispositivo) c.push(`Dispositivo ${tokens.dispositivo}`);
+  if (tokens.usuario) c.push(`Usuario ${tokens.usuario}`);
+  return c.length ? c.join(", ") : undefined;
+}
+
+export async function api<T>(method: string, path: string, body?: unknown): Promise<T> {
+  const headers: Record<string, string> = {};
+  if (body !== undefined) headers["Content-Type"] = "application/json";
+  const auth = credenciales();
+  if (auth) headers.Authorization = auth;
+  let r: Response;
+  try {
+    r = await fetch(path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
+  } catch {
+    throw new ApiError(0, "SIN_NODO", "No hay conexión con el Nodo Local. Revisa el cable de red o el WiFi de la caja.");
+  }
+  if (r.status === 204) return undefined as T;
+  let datos: unknown = null;
+  try {
+    datos = await r.json();
+  } catch {
+    // respuesta sin cuerpo
+  }
+  if (!r.ok) {
+    const p = (datos ?? {}) as { code?: string; detail?: string; errors?: FieldError[] };
+    const e = new ApiError(r.status, p.code ?? "ERROR", p.detail ?? (r.status >= 500 ? "El nodo tuvo un problema. Intenta de nuevo." : "No se pudo completar la acción."), p.errors ?? []);
+    if (r.status === 401 && tokens.usuario && !path.startsWith("/v1/sesiones")) alPerderSesion(e.code);
+    throw e;
+  }
+  return datos as T;
+}
+
+// ---------- Tipos que devuelve el nodo ----------
+
+export interface Persona {
+  id: string;
+  nombre: string;
+  rol: string;
+  avatarUrl: string | null;
+  permisos: string[];
+}
+
+export interface Usuario {
+  id: string;
+  nombre: string;
+  rol: string;
+  permisos: string[];
+}
+
+export interface SesionUsuario {
+  token: string;
+  expiraAt: string;
+  usuario: Usuario;
+}
+
+export interface Conectividad {
+  indicador: "VERDE" | "AMARILLO";
+  nube: "EN_LINEA" | "SIN_INTERNET" | "SIN_ACTIVAR" | "REVOCADO";
+  ultimaNube?: string;
+  dispositivos: number;
+  version: string;
+}
+
+export interface Bloqueo {
+  usuarioId: string;
+  usuarioNombre: string;
+  dispositivoId: string;
+  expiraAt: string;
+}
+
+export interface Zona {
+  id: string;
+  nombre: string;
+  orden: number;
+}
+
+export type EstadoMesa = "LIBRE" | "OCUPADA" | "POR_PAGAR" | "DEMORADA";
+
+export interface Mesa {
+  id: string;
+  zonaId: string;
+  nombre: string;
+  capacidad: number;
+  estado: EstadoMesa;
+  ordenId: string | null;
+  numeroOrden: number | null;
+  meseroNombre: string | null;
+  abiertaAt: string | null;
+  precuentaAt: string | null;
+  comensales: number | null;
+  platos: number;
+  total: string;
+  bloqueo: Bloqueo | null;
+}
+
+export interface Salon {
+  zonas: Zona[];
+  mesas: Mesa[];
+}
+
+// ---------- Llamadas ----------
+
+export const nodo = {
+  salud: () => api<{ estado: string; version: string }>("GET", "/health"),
+  conectividad: () => api<Conectividad>("GET", "/v1/conectividad"),
+  emparejar: (b: { codigo: string; dispositivoId: string; llavePublica: string; nombre: string; plataforma: string }) =>
+    api<{ restaurante: string; local: string }>("POST", "/v1/dispositivos/emparejar", { ...b, tipo: "POS", versionApp: "0.1.0" }),
+  desafio: (dispositivoId: string) => api<{ nonce: string }>("GET", `/v1/dispositivos/desafio?dispositivoId=${encodeURIComponent(dispositivoId)}`),
+  sesionDispositivo: (b: { dispositivoId: string; nonce: string; firma: string }) => api<{ token: string }>("POST", "/v1/dispositivos/sesion", b),
+  personal: () => api<Persona[]>("GET", "/v1/personal"),
+  entrar: (usuarioId: string, pin: string) => api<SesionUsuario>("POST", "/v1/sesiones", { usuarioId, pin }),
+  salir: () => api<void>("DELETE", "/v1/sesiones"),
+  salon: () => api<Salon>("GET", "/v1/salon"),
+};
