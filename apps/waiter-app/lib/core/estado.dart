@@ -16,6 +16,7 @@ import 'tiempo_real.dart';
 final almacenProvider = Provider<Almacen>((ref) => AlmacenSeguro());
 final baseLocalProvider = Provider<BaseLocal>((ref) => throw UnimplementedError('Se define en main()'));
 final descubridorProvider = Provider<Descubridor>((ref) => Descubridor());
+final camaraProvider = Provider<bool>((ref) => true); // las pruebas no tienen cámara
 final apiFabricaProvider = Provider<NodoApi Function(String base)>(
   (ref) =>
       (base) => NodoApi(base: base),

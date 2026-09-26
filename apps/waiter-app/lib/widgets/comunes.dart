@@ -23,12 +23,23 @@ class BotonPrincipal extends StatelessWidget {
         onPressed: cargando ? null : onPressed,
         child: cargando
             ? const CupertinoActivityIndicator(color: Color(0xFFFFFFFF))
-            : Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (icono != null) ...[Icon(icono, color: c.onAccent, size: 20), const SizedBox(width: 8)],
-                  Text(texto, style: RpText.headline.copyWith(color: c.onAccent)),
-                ],
+            : Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (icono != null) ...[Icon(icono, color: c.onAccent, size: 20), const SizedBox(width: 8)],
+                    // Con letra grande (accesibilidad) el texto se recorta en vez de desbordar.
+                    Flexible(
+                      child: Text(
+                        texto,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: RpText.headline.copyWith(color: c.onAccent),
+                      ),
+                    ),
+                  ],
+                ),
               ),
       ),
     );

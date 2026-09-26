@@ -88,6 +88,9 @@ ui-docs: ## Sirve la guía de estilo viva en http://localhost:8095/docs/
 flutter-ui: ## Analiza y prueba el paquete Flutter restpos_ui con Docker (no requiere Flutter instalado)
 	docker run --rm -v "$$PWD/packages/dart/restpos_ui":/pkg -w /pkg ghcr.io/cirruslabs/flutter:stable sh -c "flutter pub get && flutter analyze && flutter test; s=$$?; chown -R $$(id -u):$$(id -g) /pkg; exit $$s"
 
+waiter: ## Analiza y prueba la app de meseros con Docker (tools/flutter.sh)
+	tools/flutter.sh apps/waiter-app "flutter pub get && flutter analyze && flutter test"
+
 api: ## Corre la API en :8080 (migra y siembra la galería en local; requiere `make dev`)
 	$(GO) run ./apps/cloud-api/cmd/cloud-api serve
 
@@ -109,4 +112,4 @@ bo-test: ## Tipos, pruebas y build del backoffice
 backlog: ## Regenera docs/12-backlog-tickets.md desde el JSON
 	python3 documentacion-proyecto/docs/backlog/generar.py
 
-.PHONY: help hooks dev down reset logs test test-long cover fmt lint check-float golden printer-sim sri-stub tokens tokens-check ui-test ui-docs flutter-ui api demo bo bo-test backlog
+.PHONY: help hooks dev down reset logs test test-long cover fmt lint check-float golden printer-sim sri-stub tokens tokens-check ui-test ui-docs flutter-ui waiter api demo bo bo-test backlog

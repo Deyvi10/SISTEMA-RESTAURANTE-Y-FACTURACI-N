@@ -158,7 +158,8 @@ func (p *telefono) req(method, path string, body any) (int, map[string]any) {
 	}
 	res, err := http.DefaultClient.Do(r)
 	if err != nil {
-		p.t.Fatal(err)
+		p.t.Error(err) // Error y no Fatal: también se llama desde goroutines
+		return 0, map[string]any{}
 	}
 	defer func() { _ = res.Body.Close() }()
 	raw, _ := io.ReadAll(res.Body)

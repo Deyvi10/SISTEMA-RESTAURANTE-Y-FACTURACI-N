@@ -35,7 +35,10 @@ final routerProvider = Provider<GoRouter>((ref) {
     },
     routes: [
       GoRoute(path: '/conectando', builder: (_, _) => const ConectandoPage()),
-      GoRoute(path: '/emparejar', builder: (_, _) => const EmparejarPage()),
+      GoRoute(
+        path: '/emparejar',
+        builder: (_, _) => EmparejarPage(camara: ref.read(camaraProvider)),
+      ),
       GoRoute(path: '/personal', builder: (_, _) => const PersonalPage()),
       StatefulShellRoute.indexedStack(
         builder: (_, _, nav) => Shell(navegacion: nav),
