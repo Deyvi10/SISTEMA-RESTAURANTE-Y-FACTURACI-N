@@ -47,9 +47,14 @@ La documentación vive en `documentacion-proyecto/`: toda referencia a `docs/…
 | F2-07, F2-14 | ⏳ TLS en la LAN depende del dominio (DP-10); el MSI firmado necesita certificado de firma de código (F0-01) |
 | F2-04 | ✅ Push del outbox con tenant/RLS, heartbeat con telemetría y alerta de reloj |
 | F1-14 | 🟡 Imagen Docker lista (`deploy/docker/cloud-api.Dockerfile`, `-tags nodynamic`). Falta IaC (Terraform en `deploy/azure/`, ADR-0013) y despliegue a `dev` |
+| F2-01…F2-06, F2-08…F2-13, F2-15 | ✅ Nodo Local (`apps/edge-node`): SQLite WAL de un escritor, activación, réplica por long-poll, outbox, página de estado, hub WebSocket, impresoras de red (mDNS/barrido/ARP) y las ya instaladas en Windows (spooler RAW), colas ESC/POS por estación con redirección y reimpresión, caché de fotos |
+| F2-07, F2-14 | ⏳ TLS en la LAN (DP-10) e instalador MSI firmado. Falta probar el spooler en un Windows real |
+| F3-01…F3-15 | ✅ App de meseros Flutter (`apps/waiter-app`) + backend en el nodo: QR/código, PIN con pepper por restaurante, salón en vivo, bloqueos con latido, pedido con modificadores, cola sin conexión, pre-cuenta, mover/unir/transferir, anular con supervisor. E2E en emulador; prueba Go de 8 teléfonos sin internet; flujo completo en CI (`make waiter`). Falta: cámara/QR y arranque ≤ 2 s en un teléfono real |
 
 Notas para seguir:
 - Detrás de un proxy (VM con Caddy/Nginx) el bloqueo por IP de login y de activación de nodos debe leer la IP real desde un proxy de confianza (pendiente del despliegue).
 - `make nodo` corre un Nodo Local en http://localhost:7080 contra la API local.
 - El cliente TS del backoffice está escrito a mano (`src/api/types.ts`); generarlo desde OpenAPI queda pendiente (contrato en `contracts/openapi/`).
+- Flutter corre en Docker: `tools/flutter.sh <dir> "<cmd>"` (volúmenes de pub, Gradle y llave de debug). El código de la app se formatea con `dart format -l 160 lib`.
+- Demo: el dueño (demo@donpepe.ec) también entra con PIN 4826 en los teléfonos y autoriza anulaciones; `cloud-api demo -pines` repone los PIN.
 - Refresh con periodo de gracia de 30 s para carreras benignas (recarga durante la renovación, peticiones simultáneas); fuera de la gracia es robo y revoca la familia.
