@@ -399,11 +399,15 @@ func (a *App) dispositivoDe(r *http.Request) (Dispositivo, error) {
 	return d, err
 }
 
-// tokenDe lee «Authorization: <esquema> <token>» o, para WebSocket, ?<esquema>=token.
+// tokenDe lee «Authorization: <esquema> <token>» (se admite más de una credencial en la
+// misma cabecera separadas por coma, como envían los clientes HTTP móviles) o, para
+// WebSocket, ?<esquema>=token.
 func tokenDe(r *http.Request, esquema string) string {
 	for _, h := range r.Header.Values("Authorization") {
-		if t, ok := strings.CutPrefix(h, esquema+" "); ok {
-			return strings.TrimSpace(t)
+		for _, parte := range strings.Split(h, ",") {
+			if t, ok := strings.CutPrefix(strings.TrimSpace(parte), esquema+" "); ok {
+				return strings.TrimSpace(t)
+			}
 		}
 	}
 	return r.URL.Query().Get(strings.ToLower(esquema))

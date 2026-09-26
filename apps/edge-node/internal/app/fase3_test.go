@@ -143,11 +143,16 @@ func (p *telefono) req(method, path string, body any) (int, map[string]any) {
 	}
 	r, _ := http.NewRequest(method, p.s.lan.URL+path, rdr)
 	r.Header.Set("Content-Type", "application/json")
+	// Como la app: ambas credenciales en una sola cabecera.
+	var cred []string
 	if p.disp != "" {
-		r.Header.Add("Authorization", "Dispositivo "+p.disp)
+		cred = append(cred, "Dispositivo "+p.disp)
 	}
 	if p.usuario != "" {
-		r.Header.Add("Authorization", "Usuario "+p.usuario)
+		cred = append(cred, "Usuario "+p.usuario)
+	}
+	if len(cred) > 0 {
+		r.Header.Set("Authorization", strings.Join(cred, ", "))
 	}
 	res, err := http.DefaultClient.Do(r)
 	if err != nil {
