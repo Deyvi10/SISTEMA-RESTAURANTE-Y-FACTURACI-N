@@ -688,17 +688,7 @@ func (a *App) Precuenta(ctx context.Context, u Usuario, orden ids.ID, in Precuen
 		var local string
 		_ = tx.QueryRowContext(ctx, `SELECT nombre FROM locales LIMIT 1`).Scan(&local)
 		pc := escpos.PreCuenta{Local: local, Mesa: o.Mesa, Mesero: o.MeseroNombre, Hora: now.In(loc), Subtotal: base, IVA: iva, Propina: propina, Total: total, Personas: in.Personas}
-		for _, l := range o.Lineas {
-			if l.Estado == "ANULADA" {
-				continue
-			}
-			t, _ := money.Parse(l.Total)
-			nombre := l.Producto
-			for _, m := range l.Modificadores {
-				nombre += " + " + m.Nombre
-			}
-			pc.Lineas = append(pc.Lineas, escpos.LineaCuenta{Cantidad: l.Cantidad, Producto: nombre, Total: t})
-		}
+		pc.Lineas = lineasCuenta(o.Lineas)
 		// Estación de caja: sus impresoras; si no tiene, la primera impresora activa.
 		var cajaID string
 		err = tx.QueryRowContext(ctx, `SELECT id FROM estaciones WHERE tipo = 'CAJA' AND deleted_at IS NULL ORDER BY orden LIMIT 1`).Scan(&cajaID)
@@ -748,6 +738,39 @@ func (a *App) Precuenta(ctx context.Context, u Usuario, orden ids.ID, in Precuen
 	}
 	out.Orden, _ = leerOrden(ctx, a.Store.Read(), orden)
 	return out, nil
+}
+
+// lineasCuenta arma el detalle para el cliente: sin anuladas y juntando el mismo plato
+// (mismos modificadores y precio unitario) aunque haya salido en comandas distintas.
+func lineasCuenta(lineas []LineaOrden) []escpos.LineaCuenta {
+	var out []escpos.LineaCuenta
+	pos := map[string]int{}
+	cant := map[string]decimal.Decimal{}
+	for _, l := range lineas {
+		if l.Estado == "ANULADA" {
+			continue
+		}
+		t, _ := money.Parse(l.Total)
+		c, err := decimal.NewFromString(l.Cantidad)
+		nombre := l.Producto
+		for _, m := range l.Modificadores {
+			nombre += " + " + m.Nombre
+		}
+		if err != nil || c.IsZero() {
+			out = append(out, escpos.LineaCuenta{Cantidad: l.Cantidad, Producto: nombre, Total: t})
+			continue
+		}
+		clave := nombre + "|" + t.Decimal().Div(c).StringFixed(money.UnitPriceScale)
+		if i, ok := pos[clave]; ok {
+			cant[clave] = cant[clave].Add(c)
+			out[i].Cantidad = cant[clave].String()
+			out[i].Total = out[i].Total.Add(t)
+			continue
+		}
+		pos[clave], cant[clave] = len(out), c
+		out = append(out, escpos.LineaCuenta{Cantidad: l.Cantidad, Producto: nombre, Total: t})
+	}
+	return out
 }
 
 // TotalesDe calcula los totales de una orden sin imprimir (para la pantalla de la mesa).

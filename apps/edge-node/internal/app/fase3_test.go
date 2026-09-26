@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -21,6 +22,7 @@ import (
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/edgesync"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/eventos"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/ids"
+	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/rbac"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/secreto"
 )
 
@@ -198,6 +200,10 @@ func TestEmparejarYEntrarConPIN(t *testing.T) {
 	_ = rr.Body.Close()
 	if len(gente) != 3 || gente[0].Rol != "MESERO" {
 		t.Fatalf("cuadrícula: %+v", gente)
+	}
+	// Cada persona trae sus permisos: el mesero toma pedidos pero no anula sin supervisor.
+	if !slices.Contains(gente[0].Permisos, rbac.TomarPedido) || slices.Contains(gente[0].Permisos, rbac.AnularItemEnviado) {
+		t.Fatalf("permisos del mesero: %v", gente[0].Permisos)
 	}
 
 	// Sin sesión de usuario no se ve el salón.

@@ -102,11 +102,17 @@ class Catalogo {
 }
 
 class Persona {
-  const Persona({required this.id, required this.nombre, required this.rol, this.avatarUrl});
-  factory Persona.fromJson(Map<String, dynamic> j) =>
-      Persona(id: j['id'] as String, nombre: j['nombre'] as String, rol: j['rol'] as String, avatarUrl: j['avatarUrl'] as String?);
+  const Persona({required this.id, required this.nombre, required this.rol, this.avatarUrl, this.permisos = const {}});
+  factory Persona.fromJson(Map<String, dynamic> j) => Persona(
+    id: j['id'] as String,
+    nombre: j['nombre'] as String,
+    rol: j['rol'] as String,
+    avatarUrl: j['avatarUrl'] as String?,
+    permisos: {...?(j['permisos'] as List?)?.cast<String>()},
+  );
   final String id, nombre, rol;
   final String? avatarUrl;
+  final Set<String> permisos;
 
   String get iniciales {
     final p = nombre.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();

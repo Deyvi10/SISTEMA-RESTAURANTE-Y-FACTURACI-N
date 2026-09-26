@@ -11,6 +11,13 @@ import '../../widgets/teclado_pin.dart';
 
 final personalProvider = FutureProvider.autoDispose<List<Persona>>((ref) async {
   final api = ref.watch(sesionProvider.select((s) => s.api));
+  // Alta, baja o PIN nuevo desde el panel: la cuadrícula se actualiza sola.
+  ref.listen(eventosProvider, (_, e) {
+    final ev = e.value;
+    if (ev?.tipo == 'catalog.updated' && (ev!.datos['full'] == true || ((ev.datos['tables'] as List?)?.contains('usuarios') ?? false))) {
+      ref.invalidateSelf();
+    }
+  });
   return api == null ? const [] : api.personal();
 });
 

@@ -298,17 +298,23 @@ Future<(String, bool)?> _pedirMotivo(BuildContext context) async {
 
 /// Un supervisor elige su foto y escribe su PIN en este teléfono: autoriza UNA acción.
 Future<String?> pedirSupervisor(BuildContext context, WidgetRef ref, String accion, String referencia) async {
-  final gente = await ref.read(personalProvider.future);
+  final yo = ref.read(sesionProvider).usuario?.id;
+  final gente = (await ref.read(personalProvider.future)).where((p) => p.id != yo && p.permisos.contains(accion)).toList();
   if (!context.mounted) return null;
+  if (gente.isEmpty) {
+    await mostrarError(
+      context,
+      'Nadie en este local tiene permiso para autorizarlo. El administrador puede darlo en el panel, en Personal.',
+      titulo: 'Sin supervisor',
+    );
+    return null;
+  }
   final quien = await showCupertinoModalPopup<Persona>(
     context: context,
     builder: (ctx) => CupertinoActionSheet(
       title: const Text('Autorización de supervisor'),
-      message: const Text('Quien tenga permiso para anular elige su nombre y escribe su PIN.'),
-      actions: [
-        for (final p in gente.where((p) => p.rol != 'MESERO')) CupertinoActionSheetAction(onPressed: () => Navigator.pop(ctx, p), child: Text(p.nombre)),
-        for (final p in gente.where((p) => p.rol == 'MESERO')) CupertinoActionSheetAction(onPressed: () => Navigator.pop(ctx, p), child: Text(p.nombre)),
-      ],
+      message: const Text('Quien autoriza elige su nombre y escribe su PIN.'),
+      actions: [for (final p in gente) CupertinoActionSheetAction(onPressed: () => Navigator.pop(ctx, p), child: Text(p.nombre))],
       cancelButton: CupertinoActionSheetAction(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
     ),
   );

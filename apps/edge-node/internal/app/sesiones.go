@@ -37,6 +37,8 @@ type Persona struct {
 	Nombre    string  `json:"nombre"`
 	Rol       string  `json:"rol"`
 	AvatarURL *string `json:"avatarUrl"`
+	// Permisos efectivos: la app ofrece como supervisor solo a quien puede autorizar la acción.
+	Permisos []rbac.Permiso `json:"permisos"`
 }
 
 // Personal lista a quienes pueden entrar con PIN en este local (cuadrícula de la app).
@@ -73,7 +75,21 @@ func (a *App) Personal(ctx context.Context) ([]Persona, error) {
 		}
 		out = append(out, p)
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	_ = rows.Close()
+	for i := range out {
+		u, _, err := a.cargarUsuario(ctx, a.Store.Read(), out[i].ID)
+		if err != nil {
+			return nil, err
+		}
+		out[i].Permisos = u.Permisos
+		if out[i].Permisos == nil {
+			out[i].Permisos = []rbac.Permiso{}
+		}
+	}
+	return out, nil
 }
 
 // Usuario es quien está usando el dispositivo tras su PIN.

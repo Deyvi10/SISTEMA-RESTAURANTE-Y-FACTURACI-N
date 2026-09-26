@@ -127,4 +127,10 @@ void main() {
     expect(TiempoReal.esperaPara(2).inMilliseconds, 1000);
     expect(TiempoReal.esperaPara(20).inMilliseconds, 30000);
   });
+
+  test('persona trae sus permisos (nodos viejos sin el campo: ninguno)', () {
+    final p = Persona.fromJson({'id': 'a', 'nombre': 'Pepe Andrade', 'rol': 'ADMIN', 'permisos': ['ANULAR_ITEM_ENVIADO']});
+    expect(p.permisos.contains('ANULAR_ITEM_ENVIADO'), isTrue);
+    expect(Persona.fromJson({'id': 'b', 'nombre': 'Ana R.', 'rol': 'MESERO'}).permisos, isEmpty);
+  });
 }

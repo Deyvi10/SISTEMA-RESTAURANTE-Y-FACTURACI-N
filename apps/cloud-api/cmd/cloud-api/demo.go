@@ -170,6 +170,10 @@ func demo(ctx context.Context, args []string) error {
 			return fmt.Errorf("%s: %w", u.NombreMostrar, err)
 		}
 	}
+	// El dueño también entra con PIN en los teléfonos: autoriza anulaciones como supervisor.
+	if err := app.Personal.CambiarPIN(ctx, p, p.UserID, pinDuenoDemo); err != nil {
+		return fmt.Errorf("PIN del dueño: %w", err)
+	}
 
 	fmt.Printf(`✓ Restaurante demo listo: Cevichería Don Pepe
   Panel:      %s/login
@@ -177,9 +181,12 @@ func demo(ctx context.Context, args []string) error {
   Contraseña: %s
   Menú:       %d platos con foto · 18 mesas en Salón y Terraza
   Equipo:     Carlos 8899 · Ana 1024 · Luis (caja) 7391 · María (cocina) 5821
-`, app.Cfg.BackofficeURL, *email, clave, len(platos))
+  Supervisor: el dueño entra con PIN %s en los teléfonos
+`, app.Cfg.BackofficeURL, *email, clave, len(platos), pinDuenoDemo)
 	return nil
 }
+
+const pinDuenoDemo = "4826"
 
 var equipoDemo = []personal.UsuarioInput{
 	{NombreMostrar: "Carlos M.", Rol: "MESERO", PIN: "8899"},
@@ -212,6 +219,9 @@ func reponerPinesDemo(ctx context.Context, app *App, email string) error {
 			}
 		}
 	}
-	fmt.Printf("✓ %d PIN del equipo demo actualizados (Carlos 8899 · Ana 1024 · Luis 7391 · María 5821)\n", n)
+	if err := app.Personal.CambiarPIN(ctx, p, usuario, pinDuenoDemo); err != nil {
+		return fmt.Errorf("PIN del dueño: %w", err)
+	}
+	fmt.Printf("✓ %d PIN del equipo demo actualizados (Carlos 8899 · Ana 1024 · Luis 7391 · María 5821 · dueño %s)\n", n, pinDuenoDemo)
 	return nil
 }
