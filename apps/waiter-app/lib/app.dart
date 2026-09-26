@@ -40,14 +40,22 @@ final routerProvider = Provider<GoRouter>((ref) {
       StatefulShellRoute.indexedStack(
         builder: (_, _, nav) => Shell(navegacion: nav),
         branches: [
-          StatefulShellBranch(routes: [GoRoute(path: '/salon', builder: (_, _) => const SalonPage())]),
-          StatefulShellBranch(routes: [GoRoute(path: '/mis-mesas', builder: (_, _) => const MisMesasPage())]),
-          StatefulShellBranch(routes: [GoRoute(path: '/avisos', builder: (_, _) => const AvisosPage())]),
+          StatefulShellBranch(
+            routes: [GoRoute(path: '/salon', builder: (_, _) => const SalonPage())],
+          ),
+          StatefulShellBranch(
+            routes: [GoRoute(path: '/mis-mesas', builder: (_, _) => const MisMesasPage())],
+          ),
+          StatefulShellBranch(
+            routes: [GoRoute(path: '/avisos', builder: (_, _) => const AvisosPage())],
+          ),
         ],
       ),
       GoRoute(
         path: '/mesa/:id',
-        pageBuilder: (_, st) => CupertinoPage(child: OrdenPage(mesaId: st.pathParameters['id']!, mesaNombre: st.extra as String? ?? 'Mesa')),
+        pageBuilder: (_, st) => CupertinoPage(
+          child: OrdenPage(mesaId: st.pathParameters['id']!, mesaNombre: st.extra as String? ?? 'Mesa'),
+        ),
       ),
     ],
   );

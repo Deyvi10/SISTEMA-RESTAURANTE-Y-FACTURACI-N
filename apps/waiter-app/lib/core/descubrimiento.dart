@@ -27,9 +27,11 @@ class Descubridor {
     final out = <String>[];
     try {
       await cliente.start();
-      await for (final ptr in cliente.lookup<PtrResourceRecord>(ResourceRecordQuery.serverPointer('_restpos._tcp.local')).timeout(espera, onTimeout: (s) => s.close())) {
+      await for (final ptr
+          in cliente.lookup<PtrResourceRecord>(ResourceRecordQuery.serverPointer('_restpos._tcp.local')).timeout(espera, onTimeout: (s) => s.close())) {
         await for (final srv in cliente.lookup<SrvResourceRecord>(ResourceRecordQuery.service(ptr.domainName)).timeout(espera, onTimeout: (s) => s.close())) {
-          await for (final ip in cliente.lookup<IPAddressResourceRecord>(ResourceRecordQuery.addressIPv4(srv.target)).timeout(espera, onTimeout: (s) => s.close())) {
+          await for (final ip
+              in cliente.lookup<IPAddressResourceRecord>(ResourceRecordQuery.addressIPv4(srv.target)).timeout(espera, onTimeout: (s) => s.close())) {
             out.add('http://${ip.address.address}:${srv.port}');
           }
         }

@@ -10,33 +10,13 @@ class $CacheTable extends Cache with TableInfo<$CacheTable, CacheData> {
   $CacheTable(this.attachedDatabase, [this._alias]);
   static const VerificationMeta _claveMeta = const VerificationMeta('clave');
   @override
-  late final GeneratedColumn<String> clave = GeneratedColumn<String>(
-    'clave',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-  );
+  late final GeneratedColumn<String> clave = GeneratedColumn<String>('clave', aliasedName, false, type: DriftSqlType.string, requiredDuringInsert: true);
   static const VerificationMeta _valorMeta = const VerificationMeta('valor');
   @override
-  late final GeneratedColumn<String> valor = GeneratedColumn<String>(
-    'valor',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-  );
-  static const VerificationMeta _actualizadoMeta = const VerificationMeta(
-    'actualizado',
-  );
+  late final GeneratedColumn<String> valor = GeneratedColumn<String>('valor', aliasedName, false, type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _actualizadoMeta = const VerificationMeta('actualizado');
   @override
-  late final GeneratedColumn<int> actualizado = GeneratedColumn<int>(
-    'actualizado',
-    aliasedName,
-    false,
-    type: DriftSqlType.int,
-    requiredDuringInsert: true,
-  );
+  late final GeneratedColumn<int> actualizado = GeneratedColumn<int>('actualizado', aliasedName, false, type: DriftSqlType.int, requiredDuringInsert: true);
   @override
   List<GeneratedColumn> get $columns => [clave, valor, actualizado];
   @override
@@ -45,36 +25,21 @@ class $CacheTable extends Cache with TableInfo<$CacheTable, CacheData> {
   String get actualTableName => $name;
   static const String $name = 'cache';
   @override
-  VerificationContext validateIntegrity(
-    Insertable<CacheData> instance, {
-    bool isInserting = false,
-  }) {
+  VerificationContext validateIntegrity(Insertable<CacheData> instance, {bool isInserting = false}) {
     final context = VerificationContext();
     final data = instance.toColumns(true);
     if (data.containsKey('clave')) {
-      context.handle(
-        _claveMeta,
-        clave.isAcceptableOrUnknown(data['clave']!, _claveMeta),
-      );
+      context.handle(_claveMeta, clave.isAcceptableOrUnknown(data['clave']!, _claveMeta));
     } else if (isInserting) {
       context.missing(_claveMeta);
     }
     if (data.containsKey('valor')) {
-      context.handle(
-        _valorMeta,
-        valor.isAcceptableOrUnknown(data['valor']!, _valorMeta),
-      );
+      context.handle(_valorMeta, valor.isAcceptableOrUnknown(data['valor']!, _valorMeta));
     } else if (isInserting) {
       context.missing(_valorMeta);
     }
     if (data.containsKey('actualizado')) {
-      context.handle(
-        _actualizadoMeta,
-        actualizado.isAcceptableOrUnknown(
-          data['actualizado']!,
-          _actualizadoMeta,
-        ),
-      );
+      context.handle(_actualizadoMeta, actualizado.isAcceptableOrUnknown(data['actualizado']!, _actualizadoMeta));
     } else if (isInserting) {
       context.missing(_actualizadoMeta);
     }
@@ -87,18 +52,9 @@ class $CacheTable extends Cache with TableInfo<$CacheTable, CacheData> {
   CacheData map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
     return CacheData(
-      clave: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}clave'],
-      )!,
-      valor: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}valor'],
-      )!,
-      actualizado: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
-        data['${effectivePrefix}actualizado'],
-      )!,
+      clave: attachedDatabase.typeMapping.read(DriftSqlType.string, data['${effectivePrefix}clave'])!,
+      valor: attachedDatabase.typeMapping.read(DriftSqlType.string, data['${effectivePrefix}valor'])!,
+      actualizado: attachedDatabase.typeMapping.read(DriftSqlType.int, data['${effectivePrefix}actualizado'])!,
     );
   }
 
@@ -112,11 +68,7 @@ class CacheData extends DataClass implements Insertable<CacheData> {
   final String clave;
   final String valor;
   final int actualizado;
-  const CacheData({
-    required this.clave,
-    required this.valor,
-    required this.actualizado,
-  });
+  const CacheData({required this.clave, required this.valor, required this.actualizado});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -127,17 +79,10 @@ class CacheData extends DataClass implements Insertable<CacheData> {
   }
 
   CacheCompanion toCompanion(bool nullToAbsent) {
-    return CacheCompanion(
-      clave: Value(clave),
-      valor: Value(valor),
-      actualizado: Value(actualizado),
-    );
+    return CacheCompanion(clave: Value(clave), valor: Value(valor), actualizado: Value(actualizado));
   }
 
-  factory CacheData.fromJson(
-    Map<String, dynamic> json, {
-    ValueSerializer? serializer,
-  }) {
+  factory CacheData.fromJson(Map<String, dynamic> json, {ValueSerializer? serializer}) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return CacheData(
       clave: serializer.fromJson<String>(json['clave']),
@@ -156,18 +101,12 @@ class CacheData extends DataClass implements Insertable<CacheData> {
   }
 
   CacheData copyWith({String? clave, String? valor, int? actualizado}) =>
-      CacheData(
-        clave: clave ?? this.clave,
-        valor: valor ?? this.valor,
-        actualizado: actualizado ?? this.actualizado,
-      );
+      CacheData(clave: clave ?? this.clave, valor: valor ?? this.valor, actualizado: actualizado ?? this.actualizado);
   CacheData copyWithCompanion(CacheCompanion data) {
     return CacheData(
       clave: data.clave.present ? data.clave.value : this.clave,
       valor: data.valor.present ? data.valor.value : this.valor,
-      actualizado: data.actualizado.present
-          ? data.actualizado.value
-          : this.actualizado,
+      actualizado: data.actualizado.present ? data.actualizado.value : this.actualizado,
     );
   }
 
@@ -185,11 +124,7 @@ class CacheData extends DataClass implements Insertable<CacheData> {
   int get hashCode => Object.hash(clave, valor, actualizado);
   @override
   bool operator ==(Object other) =>
-      identical(this, other) ||
-      (other is CacheData &&
-          other.clave == this.clave &&
-          other.valor == this.valor &&
-          other.actualizado == this.actualizado);
+      identical(this, other) || (other is CacheData && other.clave == this.clave && other.valor == this.valor && other.actualizado == this.actualizado);
 }
 
 class CacheCompanion extends UpdateCompanion<CacheData> {
@@ -203,20 +138,11 @@ class CacheCompanion extends UpdateCompanion<CacheData> {
     this.actualizado = const Value.absent(),
     this.rowid = const Value.absent(),
   });
-  CacheCompanion.insert({
-    required String clave,
-    required String valor,
-    required int actualizado,
-    this.rowid = const Value.absent(),
-  }) : clave = Value(clave),
-       valor = Value(valor),
-       actualizado = Value(actualizado);
-  static Insertable<CacheData> custom({
-    Expression<String>? clave,
-    Expression<String>? valor,
-    Expression<int>? actualizado,
-    Expression<int>? rowid,
-  }) {
+  CacheCompanion.insert({required String clave, required String valor, required int actualizado, this.rowid = const Value.absent()})
+    : clave = Value(clave),
+      valor = Value(valor),
+      actualizado = Value(actualizado);
+  static Insertable<CacheData> custom({Expression<String>? clave, Expression<String>? valor, Expression<int>? actualizado, Expression<int>? rowid}) {
     return RawValuesInsertable({
       if (clave != null) 'clave': clave,
       if (valor != null) 'valor': valor,
@@ -225,18 +151,8 @@ class CacheCompanion extends UpdateCompanion<CacheData> {
     });
   }
 
-  CacheCompanion copyWith({
-    Value<String>? clave,
-    Value<String>? valor,
-    Value<int>? actualizado,
-    Value<int>? rowid,
-  }) {
-    return CacheCompanion(
-      clave: clave ?? this.clave,
-      valor: valor ?? this.valor,
-      actualizado: actualizado ?? this.actualizado,
-      rowid: rowid ?? this.rowid,
-    );
+  CacheCompanion copyWith({Value<String>? clave, Value<String>? valor, Value<int>? actualizado, Value<int>? rowid}) {
+    return CacheCompanion(clave: clave ?? this.clave, valor: valor ?? this.valor, actualizado: actualizado ?? this.actualizado, rowid: rowid ?? this.rowid);
   }
 
   @override
@@ -269,51 +185,24 @@ class CacheCompanion extends UpdateCompanion<CacheData> {
   }
 }
 
-class $PendientesTable extends Pendientes
-    with TableInfo<$PendientesTable, Pendiente> {
+class $PendientesTable extends Pendientes with TableInfo<$PendientesTable, Pendiente> {
   @override
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
   $PendientesTable(this.attachedDatabase, [this._alias]);
   static const VerificationMeta _claveMeta = const VerificationMeta('clave');
   @override
-  late final GeneratedColumn<String> clave = GeneratedColumn<String>(
-    'clave',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-  );
+  late final GeneratedColumn<String> clave = GeneratedColumn<String>('clave', aliasedName, false, type: DriftSqlType.string, requiredDuringInsert: true);
   static const VerificationMeta _mesaMeta = const VerificationMeta('mesa');
   @override
-  late final GeneratedColumn<String> mesa = GeneratedColumn<String>(
-    'mesa',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-  );
+  late final GeneratedColumn<String> mesa = GeneratedColumn<String>('mesa', aliasedName, false, type: DriftSqlType.string, requiredDuringInsert: true);
   static const VerificationMeta _cuerpoMeta = const VerificationMeta('cuerpo');
   @override
-  late final GeneratedColumn<String> cuerpo = GeneratedColumn<String>(
-    'cuerpo',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-  );
+  late final GeneratedColumn<String> cuerpo = GeneratedColumn<String>('cuerpo', aliasedName, false, type: DriftSqlType.string, requiredDuringInsert: true);
   static const VerificationMeta _creadoMeta = const VerificationMeta('creado');
   @override
-  late final GeneratedColumn<int> creado = GeneratedColumn<int>(
-    'creado',
-    aliasedName,
-    false,
-    type: DriftSqlType.int,
-    requiredDuringInsert: true,
-  );
-  static const VerificationMeta _intentosMeta = const VerificationMeta(
-    'intentos',
-  );
+  late final GeneratedColumn<int> creado = GeneratedColumn<int>('creado', aliasedName, false, type: DriftSqlType.int, requiredDuringInsert: true);
+  static const VerificationMeta _intentosMeta = const VerificationMeta('intentos');
   @override
   late final GeneratedColumn<int> intentos = GeneratedColumn<int>(
     'intentos',
@@ -323,9 +212,7 @@ class $PendientesTable extends Pendientes
     requiredDuringInsert: false,
     defaultValue: const Constant(0),
   );
-  static const VerificationMeta _ultimoErrorMeta = const VerificationMeta(
-    'ultimoError',
-  );
+  static const VerificationMeta _ultimoErrorMeta = const VerificationMeta('ultimoError');
   @override
   late final GeneratedColumn<String> ultimoError = GeneratedColumn<String>(
     'ultimo_error',
@@ -335,72 +222,41 @@ class $PendientesTable extends Pendientes
     requiredDuringInsert: false,
   );
   @override
-  List<GeneratedColumn> get $columns => [
-    clave,
-    mesa,
-    cuerpo,
-    creado,
-    intentos,
-    ultimoError,
-  ];
+  List<GeneratedColumn> get $columns => [clave, mesa, cuerpo, creado, intentos, ultimoError];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
   String get actualTableName => $name;
   static const String $name = 'pendientes';
   @override
-  VerificationContext validateIntegrity(
-    Insertable<Pendiente> instance, {
-    bool isInserting = false,
-  }) {
+  VerificationContext validateIntegrity(Insertable<Pendiente> instance, {bool isInserting = false}) {
     final context = VerificationContext();
     final data = instance.toColumns(true);
     if (data.containsKey('clave')) {
-      context.handle(
-        _claveMeta,
-        clave.isAcceptableOrUnknown(data['clave']!, _claveMeta),
-      );
+      context.handle(_claveMeta, clave.isAcceptableOrUnknown(data['clave']!, _claveMeta));
     } else if (isInserting) {
       context.missing(_claveMeta);
     }
     if (data.containsKey('mesa')) {
-      context.handle(
-        _mesaMeta,
-        mesa.isAcceptableOrUnknown(data['mesa']!, _mesaMeta),
-      );
+      context.handle(_mesaMeta, mesa.isAcceptableOrUnknown(data['mesa']!, _mesaMeta));
     } else if (isInserting) {
       context.missing(_mesaMeta);
     }
     if (data.containsKey('cuerpo')) {
-      context.handle(
-        _cuerpoMeta,
-        cuerpo.isAcceptableOrUnknown(data['cuerpo']!, _cuerpoMeta),
-      );
+      context.handle(_cuerpoMeta, cuerpo.isAcceptableOrUnknown(data['cuerpo']!, _cuerpoMeta));
     } else if (isInserting) {
       context.missing(_cuerpoMeta);
     }
     if (data.containsKey('creado')) {
-      context.handle(
-        _creadoMeta,
-        creado.isAcceptableOrUnknown(data['creado']!, _creadoMeta),
-      );
+      context.handle(_creadoMeta, creado.isAcceptableOrUnknown(data['creado']!, _creadoMeta));
     } else if (isInserting) {
       context.missing(_creadoMeta);
     }
     if (data.containsKey('intentos')) {
-      context.handle(
-        _intentosMeta,
-        intentos.isAcceptableOrUnknown(data['intentos']!, _intentosMeta),
-      );
+      context.handle(_intentosMeta, intentos.isAcceptableOrUnknown(data['intentos']!, _intentosMeta));
     }
     if (data.containsKey('ultimo_error')) {
-      context.handle(
-        _ultimoErrorMeta,
-        ultimoError.isAcceptableOrUnknown(
-          data['ultimo_error']!,
-          _ultimoErrorMeta,
-        ),
-      );
+      context.handle(_ultimoErrorMeta, ultimoError.isAcceptableOrUnknown(data['ultimo_error']!, _ultimoErrorMeta));
     }
     return context;
   }
@@ -411,30 +267,12 @@ class $PendientesTable extends Pendientes
   Pendiente map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
     return Pendiente(
-      clave: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}clave'],
-      )!,
-      mesa: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}mesa'],
-      )!,
-      cuerpo: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}cuerpo'],
-      )!,
-      creado: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
-        data['${effectivePrefix}creado'],
-      )!,
-      intentos: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
-        data['${effectivePrefix}intentos'],
-      )!,
-      ultimoError: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}ultimo_error'],
-      ),
+      clave: attachedDatabase.typeMapping.read(DriftSqlType.string, data['${effectivePrefix}clave'])!,
+      mesa: attachedDatabase.typeMapping.read(DriftSqlType.string, data['${effectivePrefix}mesa'])!,
+      cuerpo: attachedDatabase.typeMapping.read(DriftSqlType.string, data['${effectivePrefix}cuerpo'])!,
+      creado: attachedDatabase.typeMapping.read(DriftSqlType.int, data['${effectivePrefix}creado'])!,
+      intentos: attachedDatabase.typeMapping.read(DriftSqlType.int, data['${effectivePrefix}intentos'])!,
+      ultimoError: attachedDatabase.typeMapping.read(DriftSqlType.string, data['${effectivePrefix}ultimo_error']),
     );
   }
 
@@ -451,14 +289,7 @@ class Pendiente extends DataClass implements Insertable<Pendiente> {
   final int creado;
   final int intentos;
   final String? ultimoError;
-  const Pendiente({
-    required this.clave,
-    required this.mesa,
-    required this.cuerpo,
-    required this.creado,
-    required this.intentos,
-    this.ultimoError,
-  });
+  const Pendiente({required this.clave, required this.mesa, required this.cuerpo, required this.creado, required this.intentos, this.ultimoError});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -480,16 +311,11 @@ class Pendiente extends DataClass implements Insertable<Pendiente> {
       cuerpo: Value(cuerpo),
       creado: Value(creado),
       intentos: Value(intentos),
-      ultimoError: ultimoError == null && nullToAbsent
-          ? const Value.absent()
-          : Value(ultimoError),
+      ultimoError: ultimoError == null && nullToAbsent ? const Value.absent() : Value(ultimoError),
     );
   }
 
-  factory Pendiente.fromJson(
-    Map<String, dynamic> json, {
-    ValueSerializer? serializer,
-  }) {
+  factory Pendiente.fromJson(Map<String, dynamic> json, {ValueSerializer? serializer}) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return Pendiente(
       clave: serializer.fromJson<String>(json['clave']),
@@ -513,14 +339,7 @@ class Pendiente extends DataClass implements Insertable<Pendiente> {
     };
   }
 
-  Pendiente copyWith({
-    String? clave,
-    String? mesa,
-    String? cuerpo,
-    int? creado,
-    int? intentos,
-    Value<String?> ultimoError = const Value.absent(),
-  }) => Pendiente(
+  Pendiente copyWith({String? clave, String? mesa, String? cuerpo, int? creado, int? intentos, Value<String?> ultimoError = const Value.absent()}) => Pendiente(
     clave: clave ?? this.clave,
     mesa: mesa ?? this.mesa,
     cuerpo: cuerpo ?? this.cuerpo,
@@ -535,9 +354,7 @@ class Pendiente extends DataClass implements Insertable<Pendiente> {
       cuerpo: data.cuerpo.present ? data.cuerpo.value : this.cuerpo,
       creado: data.creado.present ? data.creado.value : this.creado,
       intentos: data.intentos.present ? data.intentos.value : this.intentos,
-      ultimoError: data.ultimoError.present
-          ? data.ultimoError.value
-          : this.ultimoError,
+      ultimoError: data.ultimoError.present ? data.ultimoError.value : this.ultimoError,
     );
   }
 
@@ -555,8 +372,7 @@ class Pendiente extends DataClass implements Insertable<Pendiente> {
   }
 
   @override
-  int get hashCode =>
-      Object.hash(clave, mesa, cuerpo, creado, intentos, ultimoError);
+  int get hashCode => Object.hash(clave, mesa, cuerpo, creado, intentos, ultimoError);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -686,26 +502,14 @@ abstract class _$BaseLocal extends GeneratedDatabase {
   late final $CacheTable cache = $CacheTable(this);
   late final $PendientesTable pendientes = $PendientesTable(this);
   @override
-  Iterable<TableInfo<Table, Object?>> get allTables =>
-      allSchemaEntities.whereType<TableInfo<Table, Object?>>();
+  Iterable<TableInfo<Table, Object?>> get allTables => allSchemaEntities.whereType<TableInfo<Table, Object?>>();
   @override
   List<DatabaseSchemaEntity> get allSchemaEntities => [cache, pendientes];
 }
 
 typedef $$CacheTableCreateCompanionBuilder =
-    CacheCompanion Function({
-      required String clave,
-      required String valor,
-      required int actualizado,
-      Value<int> rowid,
-    });
-typedef $$CacheTableUpdateCompanionBuilder =
-    CacheCompanion Function({
-      Value<String> clave,
-      Value<String> valor,
-      Value<int> actualizado,
-      Value<int> rowid,
-    });
+    CacheCompanion Function({required String clave, required String valor, required int actualizado, Value<int> rowid});
+typedef $$CacheTableUpdateCompanionBuilder = CacheCompanion Function({Value<String> clave, Value<String> valor, Value<int> actualizado, Value<int> rowid});
 
 class $$CacheTableFilterComposer extends Composer<_$BaseLocal, $CacheTable> {
   $$CacheTableFilterComposer({
@@ -715,20 +519,11 @@ class $$CacheTableFilterComposer extends Composer<_$BaseLocal, $CacheTable> {
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
-  ColumnFilters<String> get clave => $composableBuilder(
-    column: $table.clave,
-    builder: (column) => ColumnFilters(column),
-  );
+  ColumnFilters<String> get clave => $composableBuilder(column: $table.clave, builder: (column) => ColumnFilters(column));
 
-  ColumnFilters<String> get valor => $composableBuilder(
-    column: $table.valor,
-    builder: (column) => ColumnFilters(column),
-  );
+  ColumnFilters<String> get valor => $composableBuilder(column: $table.valor, builder: (column) => ColumnFilters(column));
 
-  ColumnFilters<int> get actualizado => $composableBuilder(
-    column: $table.actualizado,
-    builder: (column) => ColumnFilters(column),
-  );
+  ColumnFilters<int> get actualizado => $composableBuilder(column: $table.actualizado, builder: (column) => ColumnFilters(column));
 }
 
 class $$CacheTableOrderingComposer extends Composer<_$BaseLocal, $CacheTable> {
@@ -739,24 +534,14 @@ class $$CacheTableOrderingComposer extends Composer<_$BaseLocal, $CacheTable> {
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
-  ColumnOrderings<String> get clave => $composableBuilder(
-    column: $table.clave,
-    builder: (column) => ColumnOrderings(column),
-  );
+  ColumnOrderings<String> get clave => $composableBuilder(column: $table.clave, builder: (column) => ColumnOrderings(column));
 
-  ColumnOrderings<String> get valor => $composableBuilder(
-    column: $table.valor,
-    builder: (column) => ColumnOrderings(column),
-  );
+  ColumnOrderings<String> get valor => $composableBuilder(column: $table.valor, builder: (column) => ColumnOrderings(column));
 
-  ColumnOrderings<int> get actualizado => $composableBuilder(
-    column: $table.actualizado,
-    builder: (column) => ColumnOrderings(column),
-  );
+  ColumnOrderings<int> get actualizado => $composableBuilder(column: $table.actualizado, builder: (column) => ColumnOrderings(column));
 }
 
-class $$CacheTableAnnotationComposer
-    extends Composer<_$BaseLocal, $CacheTable> {
+class $$CacheTableAnnotationComposer extends Composer<_$BaseLocal, $CacheTable> {
   $$CacheTableAnnotationComposer({
     required super.$db,
     required super.$table,
@@ -764,16 +549,11 @@ class $$CacheTableAnnotationComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
-  GeneratedColumn<String> get clave =>
-      $composableBuilder(column: $table.clave, builder: (column) => column);
+  GeneratedColumn<String> get clave => $composableBuilder(column: $table.clave, builder: (column) => column);
 
-  GeneratedColumn<String> get valor =>
-      $composableBuilder(column: $table.valor, builder: (column) => column);
+  GeneratedColumn<String> get valor => $composableBuilder(column: $table.valor, builder: (column) => column);
 
-  GeneratedColumn<int> get actualizado => $composableBuilder(
-    column: $table.actualizado,
-    builder: (column) => column,
-  );
+  GeneratedColumn<int> get actualizado => $composableBuilder(column: $table.actualizado, builder: (column) => column);
 }
 
 class $$CacheTableTableManager
@@ -796,48 +576,20 @@ class $$CacheTableTableManager
         TableManagerState(
           db: db,
           table: table,
-          createFilteringComposer: () =>
-              $$CacheTableFilterComposer($db: db, $table: table),
-          createOrderingComposer: () =>
-              $$CacheTableOrderingComposer($db: db, $table: table),
-          createComputedFieldComposer: () =>
-              $$CacheTableAnnotationComposer($db: db, $table: table),
+          createFilteringComposer: () => $$CacheTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () => $$CacheTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () => $$CacheTableAnnotationComposer($db: db, $table: table),
           updateCompanionCallback:
               ({
                 Value<String> clave = const Value.absent(),
                 Value<String> valor = const Value.absent(),
                 Value<int> actualizado = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
-              }) => CacheCompanion(
-                clave: clave,
-                valor: valor,
-                actualizado: actualizado,
-                rowid: rowid,
-              ),
-          createCompanionCallback:
-              ({
-                required String clave,
-                required String valor,
-                required int actualizado,
-                Value<int> rowid = const Value.absent(),
-              }) => CacheCompanion.insert(
-                clave: clave,
-                valor: valor,
-                actualizado: actualizado,
-                rowid: rowid,
-              ),
-          withReferenceMapper: (p0) => p0
-              .map(
-                (e) => (
-                  e.readTable<$CacheTable, CacheData>(table),
-                  BaseReferences<_$BaseLocal, $CacheTable, CacheData>(
-                    db,
-                    table,
-                    e,
-                  ),
-                ),
-              )
-              .toList(),
+              }) => CacheCompanion(clave: clave, valor: valor, actualizado: actualizado, rowid: rowid),
+          createCompanionCallback: ({required String clave, required String valor, required int actualizado, Value<int> rowid = const Value.absent()}) =>
+              CacheCompanion.insert(clave: clave, valor: valor, actualizado: actualizado, rowid: rowid),
+          withReferenceMapper: (p0) =>
+              p0.map((e) => (e.readTable<$CacheTable, CacheData>(table), BaseReferences<_$BaseLocal, $CacheTable, CacheData>(db, table, e))).toList(),
           prefetchHooksCallback: null,
         ),
       );
@@ -878,8 +630,7 @@ typedef $$PendientesTableUpdateCompanionBuilder =
       Value<int> rowid,
     });
 
-class $$PendientesTableFilterComposer
-    extends Composer<_$BaseLocal, $PendientesTable> {
+class $$PendientesTableFilterComposer extends Composer<_$BaseLocal, $PendientesTable> {
   $$PendientesTableFilterComposer({
     required super.$db,
     required super.$table,
@@ -887,39 +638,20 @@ class $$PendientesTableFilterComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
-  ColumnFilters<String> get clave => $composableBuilder(
-    column: $table.clave,
-    builder: (column) => ColumnFilters(column),
-  );
+  ColumnFilters<String> get clave => $composableBuilder(column: $table.clave, builder: (column) => ColumnFilters(column));
 
-  ColumnFilters<String> get mesa => $composableBuilder(
-    column: $table.mesa,
-    builder: (column) => ColumnFilters(column),
-  );
+  ColumnFilters<String> get mesa => $composableBuilder(column: $table.mesa, builder: (column) => ColumnFilters(column));
 
-  ColumnFilters<String> get cuerpo => $composableBuilder(
-    column: $table.cuerpo,
-    builder: (column) => ColumnFilters(column),
-  );
+  ColumnFilters<String> get cuerpo => $composableBuilder(column: $table.cuerpo, builder: (column) => ColumnFilters(column));
 
-  ColumnFilters<int> get creado => $composableBuilder(
-    column: $table.creado,
-    builder: (column) => ColumnFilters(column),
-  );
+  ColumnFilters<int> get creado => $composableBuilder(column: $table.creado, builder: (column) => ColumnFilters(column));
 
-  ColumnFilters<int> get intentos => $composableBuilder(
-    column: $table.intentos,
-    builder: (column) => ColumnFilters(column),
-  );
+  ColumnFilters<int> get intentos => $composableBuilder(column: $table.intentos, builder: (column) => ColumnFilters(column));
 
-  ColumnFilters<String> get ultimoError => $composableBuilder(
-    column: $table.ultimoError,
-    builder: (column) => ColumnFilters(column),
-  );
+  ColumnFilters<String> get ultimoError => $composableBuilder(column: $table.ultimoError, builder: (column) => ColumnFilters(column));
 }
 
-class $$PendientesTableOrderingComposer
-    extends Composer<_$BaseLocal, $PendientesTable> {
+class $$PendientesTableOrderingComposer extends Composer<_$BaseLocal, $PendientesTable> {
   $$PendientesTableOrderingComposer({
     required super.$db,
     required super.$table,
@@ -927,39 +659,20 @@ class $$PendientesTableOrderingComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
-  ColumnOrderings<String> get clave => $composableBuilder(
-    column: $table.clave,
-    builder: (column) => ColumnOrderings(column),
-  );
+  ColumnOrderings<String> get clave => $composableBuilder(column: $table.clave, builder: (column) => ColumnOrderings(column));
 
-  ColumnOrderings<String> get mesa => $composableBuilder(
-    column: $table.mesa,
-    builder: (column) => ColumnOrderings(column),
-  );
+  ColumnOrderings<String> get mesa => $composableBuilder(column: $table.mesa, builder: (column) => ColumnOrderings(column));
 
-  ColumnOrderings<String> get cuerpo => $composableBuilder(
-    column: $table.cuerpo,
-    builder: (column) => ColumnOrderings(column),
-  );
+  ColumnOrderings<String> get cuerpo => $composableBuilder(column: $table.cuerpo, builder: (column) => ColumnOrderings(column));
 
-  ColumnOrderings<int> get creado => $composableBuilder(
-    column: $table.creado,
-    builder: (column) => ColumnOrderings(column),
-  );
+  ColumnOrderings<int> get creado => $composableBuilder(column: $table.creado, builder: (column) => ColumnOrderings(column));
 
-  ColumnOrderings<int> get intentos => $composableBuilder(
-    column: $table.intentos,
-    builder: (column) => ColumnOrderings(column),
-  );
+  ColumnOrderings<int> get intentos => $composableBuilder(column: $table.intentos, builder: (column) => ColumnOrderings(column));
 
-  ColumnOrderings<String> get ultimoError => $composableBuilder(
-    column: $table.ultimoError,
-    builder: (column) => ColumnOrderings(column),
-  );
+  ColumnOrderings<String> get ultimoError => $composableBuilder(column: $table.ultimoError, builder: (column) => ColumnOrderings(column));
 }
 
-class $$PendientesTableAnnotationComposer
-    extends Composer<_$BaseLocal, $PendientesTable> {
+class $$PendientesTableAnnotationComposer extends Composer<_$BaseLocal, $PendientesTable> {
   $$PendientesTableAnnotationComposer({
     required super.$db,
     required super.$table,
@@ -967,25 +680,17 @@ class $$PendientesTableAnnotationComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
-  GeneratedColumn<String> get clave =>
-      $composableBuilder(column: $table.clave, builder: (column) => column);
+  GeneratedColumn<String> get clave => $composableBuilder(column: $table.clave, builder: (column) => column);
 
-  GeneratedColumn<String> get mesa =>
-      $composableBuilder(column: $table.mesa, builder: (column) => column);
+  GeneratedColumn<String> get mesa => $composableBuilder(column: $table.mesa, builder: (column) => column);
 
-  GeneratedColumn<String> get cuerpo =>
-      $composableBuilder(column: $table.cuerpo, builder: (column) => column);
+  GeneratedColumn<String> get cuerpo => $composableBuilder(column: $table.cuerpo, builder: (column) => column);
 
-  GeneratedColumn<int> get creado =>
-      $composableBuilder(column: $table.creado, builder: (column) => column);
+  GeneratedColumn<int> get creado => $composableBuilder(column: $table.creado, builder: (column) => column);
 
-  GeneratedColumn<int> get intentos =>
-      $composableBuilder(column: $table.intentos, builder: (column) => column);
+  GeneratedColumn<int> get intentos => $composableBuilder(column: $table.intentos, builder: (column) => column);
 
-  GeneratedColumn<String> get ultimoError => $composableBuilder(
-    column: $table.ultimoError,
-    builder: (column) => column,
-  );
+  GeneratedColumn<String> get ultimoError => $composableBuilder(column: $table.ultimoError, builder: (column) => column);
 }
 
 class $$PendientesTableTableManager
@@ -1008,12 +713,9 @@ class $$PendientesTableTableManager
         TableManagerState(
           db: db,
           table: table,
-          createFilteringComposer: () =>
-              $$PendientesTableFilterComposer($db: db, $table: table),
-          createOrderingComposer: () =>
-              $$PendientesTableOrderingComposer($db: db, $table: table),
-          createComputedFieldComposer: () =>
-              $$PendientesTableAnnotationComposer($db: db, $table: table),
+          createFilteringComposer: () => $$PendientesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () => $$PendientesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () => $$PendientesTableAnnotationComposer($db: db, $table: table),
           updateCompanionCallback:
               ({
                 Value<String> clave = const Value.absent(),
@@ -1023,15 +725,7 @@ class $$PendientesTableTableManager
                 Value<int> intentos = const Value.absent(),
                 Value<String?> ultimoError = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
-              }) => PendientesCompanion(
-                clave: clave,
-                mesa: mesa,
-                cuerpo: cuerpo,
-                creado: creado,
-                intentos: intentos,
-                ultimoError: ultimoError,
-                rowid: rowid,
-              ),
+              }) => PendientesCompanion(clave: clave, mesa: mesa, cuerpo: cuerpo, creado: creado, intentos: intentos, ultimoError: ultimoError, rowid: rowid),
           createCompanionCallback:
               ({
                 required String clave,
@@ -1050,18 +744,8 @@ class $$PendientesTableTableManager
                 ultimoError: ultimoError,
                 rowid: rowid,
               ),
-          withReferenceMapper: (p0) => p0
-              .map(
-                (e) => (
-                  e.readTable<$PendientesTable, Pendiente>(table),
-                  BaseReferences<_$BaseLocal, $PendientesTable, Pendiente>(
-                    db,
-                    table,
-                    e,
-                  ),
-                ),
-              )
-              .toList(),
+          withReferenceMapper: (p0) =>
+              p0.map((e) => (e.readTable<$PendientesTable, Pendiente>(table), BaseReferences<_$BaseLocal, $PendientesTable, Pendiente>(db, table, e))).toList(),
           prefetchHooksCallback: null,
         ),
       );
@@ -1085,8 +769,6 @@ typedef $$PendientesTableProcessedTableManager =
 class $BaseLocalManager {
   final _$BaseLocal _db;
   $BaseLocalManager(this._db);
-  $$CacheTableTableManager get cache =>
-      $$CacheTableTableManager(_db, _db.cache);
-  $$PendientesTableTableManager get pendientes =>
-      $$PendientesTableTableManager(_db, _db.pendientes);
+  $$CacheTableTableManager get cache => $$CacheTableTableManager(_db, _db.cache);
+  $$PendientesTableTableManager get pendientes => $$PendientesTableTableManager(_db, _db.pendientes);
 }

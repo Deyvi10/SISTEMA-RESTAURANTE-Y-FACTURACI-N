@@ -25,44 +25,54 @@ class PersonalPage extends ConsumerWidget {
     final gente = ref.watch(personalProvider);
     return CupertinoPageScaffold(
       child: SafeArea(
-        child: CustomScrollView(slivers: [
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(RpSpace.s5, RpSpace.s4, RpSpace.s5, 0),
-              child: Row(children: [
-                Expanded(child: Text(sesion.identidad?.restaurante ?? '', style: RpText.subhead.copyWith(color: c.labelSecondary), overflow: TextOverflow.ellipsis)),
-                const PildoraConexion(),
-              ]),
-            ),
-          ),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(RpSpace.s5, RpSpace.s3, RpSpace.s5, RpSpace.s2),
-              child: Text('¿Quién eres?', style: RpText.largeTitle.copyWith(color: c.label)),
-            ),
-          ),
-          if (sesion.error != null)
+        child: CustomScrollView(
+          slivers: [
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: RpSpace.s5),
-                child: Text(sesion.error!, style: RpText.footnote.copyWith(color: c.dangerText)),
+                padding: const EdgeInsets.fromLTRB(RpSpace.s5, RpSpace.s4, RpSpace.s5, 0),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        sesion.identidad?.restaurante ?? '',
+                        style: RpText.subhead.copyWith(color: c.labelSecondary),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const PildoraConexion(),
+                  ],
+                ),
               ),
             ),
-          gente.when(
-            loading: () => const SliverFillRemaining(child: Center(child: CupertinoActivityIndicator())),
-            error: (e, _) => SliverFillRemaining(
-              child: Center(child: Text(e is ApiError ? e.detalle : 'No se pudo cargar el personal.', textAlign: TextAlign.center)),
-            ),
-            data: (lista) => SliverPadding(
-              padding: const EdgeInsets.all(RpSpace.s4),
-              sliver: SliverGrid.builder(
-                gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(maxCrossAxisExtent: 130, mainAxisSpacing: RpSpace.s4, childAspectRatio: .8),
-                itemCount: lista.length,
-                itemBuilder: (_, i) => _TarjetaPersona(p: lista[i]),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(RpSpace.s5, RpSpace.s3, RpSpace.s5, RpSpace.s2),
+                child: Text('¿Quién eres?', style: RpText.largeTitle.copyWith(color: c.label)),
               ),
             ),
-          ),
-        ]),
+            if (sesion.error != null)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: RpSpace.s5),
+                  child: Text(sesion.error!, style: RpText.footnote.copyWith(color: c.dangerText)),
+                ),
+              ),
+            gente.when(
+              loading: () => const SliverFillRemaining(child: Center(child: CupertinoActivityIndicator())),
+              error: (e, _) => SliverFillRemaining(
+                child: Center(child: Text(e is ApiError ? e.detalle : 'No se pudo cargar el personal.', textAlign: TextAlign.center)),
+              ),
+              data: (lista) => SliverPadding(
+                padding: const EdgeInsets.all(RpSpace.s4),
+                sliver: SliverGrid.builder(
+                  gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(maxCrossAxisExtent: 130, mainAxisSpacing: RpSpace.s4, childAspectRatio: .8),
+                  itemCount: lista.length,
+                  itemBuilder: (_, i) => _TarjetaPersona(p: lista[i]),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -81,12 +91,26 @@ class _TarjetaPersona extends ConsumerWidget {
       label: 'Entrar como ${p.nombre}',
       child: GestureDetector(
         onTap: () => pedirPIN(context, ref, p),
-        child: Column(children: [
-          Hero(tag: 'avatar-${p.id}', child: Avatar(nombre: p.nombre, iniciales: p.iniciales, foto: p.avatarUrl == null || api == null ? null : api.media(p.avatarUrl!))),
-          const SizedBox(height: RpSpace.s2),
-          Text(p.nombre, maxLines: 1, overflow: TextOverflow.ellipsis, style: RpText.subhead.copyWith(color: c.label, fontWeight: FontWeight.w600)),
-          Text(switch (p.rol) { 'CAJERO' => 'Caja', 'ADMIN' => 'Administración', _ => 'Mesero' }, style: RpText.caption1.copyWith(color: c.labelSecondary)),
-        ]),
+        child: Column(
+          children: [
+            Hero(
+              tag: 'avatar-${p.id}',
+              child: Avatar(nombre: p.nombre, iniciales: p.iniciales, foto: p.avatarUrl == null || api == null ? null : api.media(p.avatarUrl!)),
+            ),
+            const SizedBox(height: RpSpace.s2),
+            Text(
+              p.nombre,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: RpText.subhead.copyWith(color: c.label, fontWeight: FontWeight.w600),
+            ),
+            Text(switch (p.rol) {
+              'CAJERO' => 'Caja',
+              'ADMIN' => 'Administración',
+              _ => 'Mesero',
+            }, style: RpText.caption1.copyWith(color: c.labelSecondary)),
+          ],
+        ),
       ),
     );
   }
@@ -94,9 +118,9 @@ class _TarjetaPersona extends ConsumerWidget {
 
 /// Hoja con el teclado de PIN, que sube desde abajo como el desbloqueo del iPhone.
 Future<void> pedirPIN(BuildContext context, WidgetRef ref, Persona p) => showCupertinoModalPopup<void>(
-      context: context,
-      builder: (ctx) => _HojaPIN(p: p),
-    );
+  context: context,
+  builder: (ctx) => _HojaPIN(p: p),
+);
 
 class _HojaPIN extends ConsumerWidget {
   const _HojaPIN({required this.p});
@@ -114,24 +138,33 @@ class _HojaPIN extends ConsumerWidget {
       ),
       child: SafeArea(
         top: false,
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Hero(tag: 'avatar-${p.id}', child: Avatar(nombre: p.nombre, iniciales: p.iniciales, tamano: 64, foto: p.avatarUrl == null || api == null ? null : api.media(p.avatarUrl!))),
-          const SizedBox(height: RpSpace.s3),
-          TecladoPIN(
-            titulo: 'Hola, ${p.nombre.split(' ').first}',
-            claroSobreOscuro: true,
-            alCompletar: (pin) async {
-              try {
-                await ref.read(sesionProvider.notifier).entrar(p, pin);
-                if (context.mounted) Navigator.pop(context);
-                return null;
-              } on ApiError catch (e) {
-                return e.detalle;
-              }
-            },
-          ),
-          CupertinoButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar', style: TextStyle(color: Color(0xFFFFFFFF)))),
-        ]),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Hero(
+              tag: 'avatar-${p.id}',
+              child: Avatar(nombre: p.nombre, iniciales: p.iniciales, tamano: 64, foto: p.avatarUrl == null || api == null ? null : api.media(p.avatarUrl!)),
+            ),
+            const SizedBox(height: RpSpace.s3),
+            TecladoPIN(
+              titulo: 'Hola, ${p.nombre.split(' ').first}',
+              claroSobreOscuro: true,
+              alCompletar: (pin) async {
+                try {
+                  await ref.read(sesionProvider.notifier).entrar(p, pin);
+                  if (context.mounted) Navigator.pop(context);
+                  return null;
+                } on ApiError catch (e) {
+                  return e.detalle;
+                }
+              },
+            ),
+            CupertinoButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancelar', style: TextStyle(color: Color(0xFFFFFFFF))),
+            ),
+          ],
+        ),
       ),
     );
   }

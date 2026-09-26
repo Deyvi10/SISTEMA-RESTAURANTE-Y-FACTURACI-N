@@ -23,10 +23,13 @@ class BotonPrincipal extends StatelessWidget {
         onPressed: cargando ? null : onPressed,
         child: cargando
             ? const CupertinoActivityIndicator(color: Color(0xFFFFFFFF))
-            : Row(mainAxisSize: MainAxisSize.min, children: [
-                if (icono != null) ...[Icon(icono, color: c.onAccent, size: 20), const SizedBox(width: 8)],
-                Text(texto, style: RpText.headline.copyWith(color: c.onAccent)),
-              ]),
+            : Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (icono != null) ...[Icon(icono, color: c.onAccent, size: 20), const SizedBox(width: 8)],
+                  Text(texto, style: RpText.headline.copyWith(color: c.onAccent)),
+                ],
+              ),
       ),
     );
   }
@@ -41,37 +44,37 @@ class IconoApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        width: tamano,
-        height: tamano,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(tamano * .25),
-          gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color.lerp(color, const Color(0xFFFFFFFF), .25)!, color]),
-          boxShadow: [BoxShadow(color: color.withValues(alpha: .35), blurRadius: 24, offset: const Offset(0, 10))],
-        ),
-        child: Icon(icono, color: const Color(0xFFFFFFFF), size: tamano * .52),
-      );
+    width: tamano,
+    height: tamano,
+    decoration: BoxDecoration(
+      borderRadius: BorderRadius.circular(tamano * .25),
+      gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color.lerp(color, const Color(0xFFFFFFFF), .25)!, color]),
+      boxShadow: [BoxShadow(color: color.withValues(alpha: .35), blurRadius: 24, offset: const Offset(0, 10))],
+    ),
+    child: Icon(icono, color: const Color(0xFFFFFFFF), size: tamano * .52),
+  );
 }
 
 /// Muestra un error de forma amable (alerta iOS).
 Future<void> mostrarError(BuildContext context, String mensaje, {String titulo = 'No se pudo completar'}) => showCupertinoDialog<void>(
-      context: context,
-      builder: (ctx) => CupertinoAlertDialog(
-        title: Text(titulo),
-        content: Text(mensaje),
-        actions: [CupertinoDialogAction(isDefaultAction: true, onPressed: () => Navigator.pop(ctx), child: const Text('Entendido'))],
-      ),
-    );
+  context: context,
+  builder: (ctx) => CupertinoAlertDialog(
+    title: Text(titulo),
+    content: Text(mensaje),
+    actions: [CupertinoDialogAction(isDefaultAction: true, onPressed: () => Navigator.pop(ctx), child: const Text('Entendido'))],
+  ),
+);
 
 /// Mapa de iconos de categoría del backoffice (lucide) a íconos de iOS.
 IconData iconoCategoria(String nombre) => switch (nombre) {
-      'coffee' || 'milk' || 'cup-soda' => CupertinoIcons.cart_fill,
-      'beer' || 'wine' || 'martini' || 'glass-water' || 'citrus' => RpIcons.bar,
-      'fish' || 'soup' || 'salad' => CupertinoIcons.leaf_arrow_circlepath,
-      'cake-slice' || 'ice-cream-cone' || 'dessert' || 'donut' || 'cookie' || 'cherry' => CupertinoIcons.gift_fill,
-      'pizza' || 'sandwich' || 'beef' || 'drumstick' || 'ham' || 'flame' || 'cooking-pot' || 'chef-hat' => RpIcons.cocina,
-      'egg-fried' || 'croissant' => CupertinoIcons.sun_max_fill,
-      _ => CupertinoIcons.square_grid_2x2_fill,
-    };
+  'coffee' || 'milk' || 'cup-soda' => CupertinoIcons.cart_fill,
+  'beer' || 'wine' || 'martini' || 'glass-water' || 'citrus' => RpIcons.bar,
+  'fish' || 'soup' || 'salad' => CupertinoIcons.leaf_arrow_circlepath,
+  'cake-slice' || 'ice-cream-cone' || 'dessert' || 'donut' || 'cookie' || 'cherry' => CupertinoIcons.gift_fill,
+  'pizza' || 'sandwich' || 'beef' || 'drumstick' || 'ham' || 'flame' || 'cooking-pot' || 'chef-hat' => RpIcons.cocina,
+  'egg-fried' || 'croissant' => CupertinoIcons.sun_max_fill,
+  _ => CupertinoIcons.square_grid_2x2_fill,
+};
 
 /// Color de la paleta de tintes por nombre (el mismo que usa el backoffice).
 Color tintePorNombre(BuildContext context, String nombre) {
@@ -88,4 +91,17 @@ Color tintePorNombre(BuildContext context, String nombre) {
     'gray' => t.gray,
     _ => t.orange,
   };
+}
+
+/// Sube una hoja inferior por encima del teclado (si no, el teclado la tapa).
+class SobreTeclado extends StatelessWidget {
+  const SobreTeclado({super.key, required this.child});
+  final Widget child;
+  @override
+  Widget build(BuildContext context) => AnimatedPadding(
+    duration: RpMotion.fast,
+    curve: RpMotion.easeStandard,
+    padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+    child: child,
+  );
 }

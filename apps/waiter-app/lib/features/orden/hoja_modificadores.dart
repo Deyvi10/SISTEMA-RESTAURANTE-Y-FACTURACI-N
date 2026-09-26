@@ -15,12 +15,19 @@ class ResultadoMods {
 }
 
 /// Hoja inferior con asa: grupos con check azul, notas rápidas y «Agregar · $12.50» fijo abajo (F3-09).
-Future<ResultadoMods?> abrirModificadores(BuildContext context, Producto p, List<GrupoModificadores> grupos, List<String> notasRapidas,
-        {ResultadoMods? inicial, bool edicion = false}) =>
-    showCupertinoModalPopup<ResultadoMods>(
-      context: context,
-      builder: (_) => HojaModificadores(producto: p, grupos: grupos, notasRapidas: notasRapidas, inicial: inicial, edicion: edicion),
-    );
+Future<ResultadoMods?> abrirModificadores(
+  BuildContext context,
+  Producto p,
+  List<GrupoModificadores> grupos,
+  List<String> notasRapidas, {
+  ResultadoMods? inicial,
+  bool edicion = false,
+}) => showCupertinoModalPopup<ResultadoMods>(
+  context: context,
+  builder: (_) => SobreTeclado(
+    child: HojaModificadores(producto: p, grupos: grupos, notasRapidas: notasRapidas, inicial: inicial, edicion: edicion),
+  ),
+);
 
 class HojaModificadores extends StatefulWidget {
   const HojaModificadores({super.key, required this.producto, required this.grupos, required this.notasRapidas, this.inicial, this.edicion = false});
@@ -81,96 +88,124 @@ class _HojaModificadoresState extends State<HojaModificadores> {
       snapSizes: const [.62, .95],
       expand: false,
       builder: (_, scroll) => Container(
-        decoration: BoxDecoration(color: c.background, borderRadius: const BorderRadius.vertical(top: Radius.circular(RpRadius.widget))),
-        child: Column(children: [
-          const SizedBox(height: 8),
-          Container(width: 38, height: 5, decoration: BoxDecoration(color: c.labelTertiary, borderRadius: BorderRadius.circular(3))),
-          Expanded(
-            child: CupertinoScrollbar(
-              controller: scroll,
-              child: ListView(controller: scroll, padding: const EdgeInsets.fromLTRB(RpSpace.s4, RpSpace.s3, RpSpace.s4, RpSpace.s4), children: [
-                Text(widget.producto.nombre, style: RpText.title2.copyWith(color: c.label)),
-                Text(Dinero.texto(widget.producto.precio), style: RpText.subhead.copyWith(color: c.labelSecondary)),
-                for (final g in widget.grupos) ...[
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(RpSpace.s3, RpSpace.s5, RpSpace.s3, RpSpace.s2),
-                    child: Row(children: [
-                      Expanded(child: Text(g.nombre.toUpperCase(), style: RpText.footnote.copyWith(color: c.labelSecondary))),
-                      Text(g.minimo > 0 ? 'Obligatorio' : (g.max > 1 ? 'Hasta ${g.max}' : 'Opcional'),
-                          style: RpText.footnote.copyWith(color: g.minimo > 0 ? c.accent : c.labelSecondary, fontWeight: FontWeight.w600)),
-                    ]),
-                  ),
-                  CupertinoListSection.insetGrouped(
-                    margin: EdgeInsets.zero,
-                    children: [
-                      for (final m in g.modificadores)
-                        CupertinoListTile(
-                          title: Text(m.nombre),
-                          additionalInfo: Dinero.parse(m.precioAdicional) > Decimal.zero ? Text('+${Dinero.texto(m.precioAdicional)}') : null,
-                          trailing: _elegidos.contains(m.id) ? Icon(CupertinoIcons.checkmark_alt, color: c.accent) : null,
-                          onTap: () => _tocar(g, m),
-                        ),
-                    ],
-                  ),
-                ],
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(RpSpace.s3, RpSpace.s5, RpSpace.s3, RpSpace.s2),
-                  child: Text('NOTA PARA COCINA', style: RpText.footnote.copyWith(color: c.labelSecondary)),
-                ),
-                CupertinoTextField(controller: _nota, placeholder: 'Sin cebolla, bien cocido…', maxLength: 140, padding: const EdgeInsets.all(12)),
-                if (widget.notasRapidas.isNotEmpty) ...[
-                  const SizedBox(height: RpSpace.s2),
-                  Wrap(spacing: 8, runSpacing: 8, children: [
-                    for (final n in widget.notasRapidas)
-                      GestureDetector(
-                        onTap: () => setState(() => _nota.text = _nota.text.isEmpty ? n : '${_nota.text}, $n'),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(color: c.fill, borderRadius: BorderRadius.circular(RpRadius.pill)),
-                          child: Text(n, style: RpText.footnote.copyWith(color: c.label)),
+        decoration: BoxDecoration(
+          color: c.background,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(RpRadius.widget)),
+        ),
+        child: Column(
+          children: [
+            const SizedBox(height: 8),
+            Container(
+              width: 38,
+              height: 5,
+              decoration: BoxDecoration(color: c.labelTertiary, borderRadius: BorderRadius.circular(3)),
+            ),
+            Expanded(
+              child: CupertinoScrollbar(
+                controller: scroll,
+                child: ListView(
+                  controller: scroll,
+                  padding: const EdgeInsets.fromLTRB(RpSpace.s4, RpSpace.s3, RpSpace.s4, RpSpace.s4),
+                  children: [
+                    Text(widget.producto.nombre, style: RpText.title2.copyWith(color: c.label)),
+                    Text(Dinero.texto(widget.producto.precio), style: RpText.subhead.copyWith(color: c.labelSecondary)),
+                    for (final g in widget.grupos) ...[
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(RpSpace.s3, RpSpace.s5, RpSpace.s3, RpSpace.s2),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(g.nombre.toUpperCase(), style: RpText.footnote.copyWith(color: c.labelSecondary)),
+                            ),
+                            Text(
+                              g.minimo > 0 ? 'Obligatorio' : (g.max > 1 ? 'Hasta ${g.max}' : 'Opcional'),
+                              style: RpText.footnote.copyWith(color: g.minimo > 0 ? c.accent : c.labelSecondary, fontWeight: FontWeight.w600),
+                            ),
+                          ],
                         ),
                       ),
-                  ]),
-                ],
-                if (widget.edicion) ...[
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(RpSpace.s3, RpSpace.s5, RpSpace.s3, RpSpace.s2),
-                    child: Text('TIEMPO', style: RpText.footnote.copyWith(color: c.labelSecondary)),
-                  ),
-                  CupertinoSlidingSegmentedControl<String>(
-                    groupValue: _tiempo,
-                    children: const {'': Text('—'), 'ENTRADA': Text('Entrada'), 'FUERTE': Text('Fuerte'), 'POSTRE': Text('Postre')},
-                    onValueChanged: (v) => setState(() {
-                      _tiempo = v ?? '';
-                      if (_tiempo.isEmpty) _espera = false;
-                    }),
-                  ),
-                  CupertinoListTile(
-                    title: const Text('Mantener en espera'),
-                    subtitle: const Text('Se imprime al «marchar» su tiempo'),
-                    trailing: CupertinoSwitch(value: _espera, onChanged: _tiempo.isEmpty ? null : (v) => setState(() => _espera = v)),
-                  ),
-                ],
-              ]),
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.fromLTRB(RpSpace.s4, RpSpace.s3, RpSpace.s4, RpSpace.s6),
-            decoration: BoxDecoration(color: c.bar, border: Border(top: BorderSide(color: c.separator, width: .5))),
-            child: Row(children: [
-              _Stepper(valor: _cantidad, onCambio: (v) => setState(() => _cantidad = v)),
-              const SizedBox(width: RpSpace.s3),
-              Expanded(
-                child: BotonPrincipal(
-                  texto: falta ?? '${widget.edicion ? 'Guardar' : 'Agregar'} · ${Dinero.formato(total)}',
-                  onPressed: falta != null
-                      ? null
-                      : () => Navigator.pop(context, ResultadoMods(_mods, _nota.text.trim(), '$_cantidad', tiempo: _tiempo, enEspera: _espera)),
+                      CupertinoListSection.insetGrouped(
+                        margin: EdgeInsets.zero,
+                        children: [
+                          for (final m in g.modificadores)
+                            CupertinoListTile(
+                              title: Text(m.nombre),
+                              additionalInfo: Dinero.parse(m.precioAdicional) > Decimal.zero ? Text('+${Dinero.texto(m.precioAdicional)}') : null,
+                              trailing: _elegidos.contains(m.id) ? Icon(CupertinoIcons.checkmark_alt, color: c.accent) : null,
+                              onTap: () => _tocar(g, m),
+                            ),
+                        ],
+                      ),
+                    ],
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(RpSpace.s3, RpSpace.s5, RpSpace.s3, RpSpace.s2),
+                      child: Text('NOTA PARA COCINA', style: RpText.footnote.copyWith(color: c.labelSecondary)),
+                    ),
+                    CupertinoTextField(controller: _nota, placeholder: 'Sin cebolla, bien cocido…', maxLength: 140, padding: const EdgeInsets.all(12)),
+                    if (widget.notasRapidas.isNotEmpty) ...[
+                      const SizedBox(height: RpSpace.s2),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          for (final n in widget.notasRapidas)
+                            GestureDetector(
+                              onTap: () => setState(() => _nota.text = _nota.text.isEmpty ? n : '${_nota.text}, $n'),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                decoration: BoxDecoration(color: c.fill, borderRadius: BorderRadius.circular(RpRadius.pill)),
+                                child: Text(n, style: RpText.footnote.copyWith(color: c.label)),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ],
+                    if (widget.edicion) ...[
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(RpSpace.s3, RpSpace.s5, RpSpace.s3, RpSpace.s2),
+                        child: Text('TIEMPO', style: RpText.footnote.copyWith(color: c.labelSecondary)),
+                      ),
+                      CupertinoSlidingSegmentedControl<String>(
+                        groupValue: _tiempo,
+                        children: const {'': Text('—'), 'ENTRADA': Text('Entrada'), 'FUERTE': Text('Fuerte'), 'POSTRE': Text('Postre')},
+                        onValueChanged: (v) => setState(() {
+                          _tiempo = v ?? '';
+                          if (_tiempo.isEmpty) _espera = false;
+                        }),
+                      ),
+                      CupertinoListTile(
+                        title: const Text('Mantener en espera'),
+                        subtitle: const Text('Se imprime al «marchar» su tiempo'),
+                        trailing: CupertinoSwitch(value: _espera, onChanged: _tiempo.isEmpty ? null : (v) => setState(() => _espera = v)),
+                      ),
+                    ],
+                  ],
                 ),
               ),
-            ]),
-          ),
-        ]),
+            ),
+            Container(
+              padding: const EdgeInsets.fromLTRB(RpSpace.s4, RpSpace.s3, RpSpace.s4, RpSpace.s6),
+              decoration: BoxDecoration(
+                color: c.bar,
+                border: Border(top: BorderSide(color: c.separator, width: .5)),
+              ),
+              child: Row(
+                children: [
+                  _Stepper(valor: _cantidad, onCambio: (v) => setState(() => _cantidad = v)),
+                  const SizedBox(width: RpSpace.s3),
+                  Expanded(
+                    child: BotonPrincipal(
+                      texto: falta ?? '${widget.edicion ? 'Guardar' : 'Agregar'} · ${Dinero.formato(total)}',
+                      onPressed: falta != null
+                          ? null
+                          : () => Navigator.pop(context, ResultadoMods(_mods, _nota.text.trim(), '$_cantidad', tiempo: _tiempo, enEspera: _espera)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -186,11 +221,21 @@ class _Stepper extends StatelessWidget {
     return Container(
       height: 54,
       decoration: BoxDecoration(color: c.fill, borderRadius: BorderRadius.circular(RpRadius.xl)),
-      child: Row(children: [
-        CupertinoButton(padding: const EdgeInsets.symmetric(horizontal: 14), onPressed: valor > 1 ? () => onCambio(valor - 1) : null, child: const Icon(CupertinoIcons.minus)),
-        Text('$valor', style: RpText.headline.copyWith(color: c.label)),
-        CupertinoButton(padding: const EdgeInsets.symmetric(horizontal: 14), onPressed: valor < 99 ? () => onCambio(valor + 1) : null, child: const Icon(CupertinoIcons.plus)),
-      ]),
+      child: Row(
+        children: [
+          CupertinoButton(
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            onPressed: valor > 1 ? () => onCambio(valor - 1) : null,
+            child: const Icon(CupertinoIcons.minus),
+          ),
+          Text('$valor', style: RpText.headline.copyWith(color: c.label)),
+          CupertinoButton(
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            onPressed: valor < 99 ? () => onCambio(valor + 1) : null,
+            child: const Icon(CupertinoIcons.plus),
+          ),
+        ],
+      ),
     );
   }
 }

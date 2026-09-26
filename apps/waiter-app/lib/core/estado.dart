@@ -16,8 +16,14 @@ import 'tiempo_real.dart';
 final almacenProvider = Provider<Almacen>((ref) => AlmacenSeguro());
 final baseLocalProvider = Provider<BaseLocal>((ref) => throw UnimplementedError('Se define en main()'));
 final descubridorProvider = Provider<Descubridor>((ref) => Descubridor());
-final apiFabricaProvider = Provider<NodoApi Function(String base)>((ref) => (base) => NodoApi(base: base));
-final tiempoRealFabricaProvider = Provider<TiempoReal Function(Uri Function())>((ref) => (url) => TiempoReal(url));
+final apiFabricaProvider = Provider<NodoApi Function(String base)>(
+  (ref) =>
+      (base) => NodoApi(base: base),
+);
+final tiempoRealFabricaProvider = Provider<TiempoReal Function(Uri Function())>(
+  (ref) =>
+      (url) => TiempoReal(url),
+);
 
 // ---------- Sesión: dispositivo y usuario ----------
 
@@ -211,7 +217,7 @@ class ConexionControlador extends Notifier<Conexion> {
 
 class CatalogoListo {
   CatalogoListo(this.catalogo)
-      : indice = IndiceBusqueda<Producto>(catalogo.productos, nombre: (p) => p.nombre, alias: (p) => p.alias, vendidos: (p) => p.vendidos);
+    : indice = IndiceBusqueda<Producto>(catalogo.productos, nombre: (p) => p.nombre, alias: (p) => p.alias, vendidos: (p) => p.vendidos);
   final Catalogo catalogo;
   final IndiceBusqueda<Producto> indice;
 }
@@ -312,7 +318,14 @@ class AvisosControlador extends Notifier<List<Aviso>> {
         quitar(id);
       } else {
         const txt = {'SIN_PAPEL': 'se quedó sin papel', 'TAPA_ABIERTA': 'tiene la tapa abierta', 'SIN_CONEXION': 'no responde', 'ERROR': 'tiene un error'};
-        agregar(Aviso(id, 'Impresora ${d['name']}', '${d['name']} ${txt[estado] ?? 'tiene un problema'}. Tus comandas esperan y salen solas al resolverlo.', grave: true));
+        agregar(
+          Aviso(
+            id,
+            'Impresora ${d['name']}',
+            '${d['name']} ${txt[estado] ?? 'tiene un problema'}. Tus comandas esperan y salen solas al resolverlo.',
+            grave: true,
+          ),
+        );
       }
     });
     return const [];

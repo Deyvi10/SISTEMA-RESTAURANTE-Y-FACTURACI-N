@@ -34,7 +34,9 @@ class _EmparejarPageState extends ConsumerState<EmparejarPage> with SingleTicker
     setState(() => _procesando = true);
     Haptica.exito();
     try {
-      await ref.read(sesionProvider.notifier).emparejar(qr, nombre: _nombreEquipo(), plataforma: '${Platform.operatingSystem} ${Platform.operatingSystemVersion}', version: '0.1.0');
+      await ref
+          .read(sesionProvider.notifier)
+          .emparejar(qr, nombre: _nombreEquipo(), plataforma: '${Platform.operatingSystem} ${Platform.operatingSystemVersion}', version: '0.1.0');
     } on ApiError catch (e) {
       if (mounted) await mostrarError(context, e.detalle, titulo: 'No se pudo emparejar');
     } finally {
@@ -55,34 +57,38 @@ class _EmparejarPageState extends ConsumerState<EmparejarPage> with SingleTicker
     final ip = TextEditingController();
     await showCupertinoModalPopup<void>(
       context: context,
-      builder: (ctx) => CupertinoActionSheet(
-        title: const Text('Escribir código'),
-        message: Column(children: [
-          const Text('En la caja: Estado del nodo › Emparejar un teléfono.'),
-          const SizedBox(height: 12),
-          CupertinoTextField(controller: codigo, placeholder: 'Código (8 letras)', textCapitalization: TextCapitalization.characters, autofocus: true),
-          const SizedBox(height: 8),
-          CupertinoTextField(controller: ip, placeholder: 'IP de la caja, p. ej. 192.168.1.10', keyboardType: TextInputType.url),
-        ]),
-        actions: [
-          CupertinoActionSheetAction(
-            isDefaultAction: true,
-            onPressed: () {
-              Navigator.pop(ctx);
-              final c = codigo.text.replaceAll(RegExp(r'[^A-Za-z0-9]'), '').toUpperCase();
-              var u = ip.text.trim();
-              if (u.isEmpty || c.length != 8) {
-                mostrarError(context, 'Escribe el código de 8 caracteres y la IP que aparece en la caja.');
-                return;
-              }
-              if (!u.startsWith('http')) u = 'http://$u';
-              if (!RegExp(r':\d+$').hasMatch(u)) u = '$u:7080';
-              _usar(DatosQR(c, [u]));
-            },
-            child: const Text('Emparejar'),
+      builder: (ctx) => SobreTeclado(
+        child: CupertinoActionSheet(
+          title: const Text('Escribir código'),
+          message: Column(
+            children: [
+              const Text('En la caja: Estado del nodo › Emparejar un teléfono.'),
+              const SizedBox(height: 12),
+              CupertinoTextField(controller: codigo, placeholder: 'Código (8 letras)', textCapitalization: TextCapitalization.characters, autofocus: true),
+              const SizedBox(height: 8),
+              CupertinoTextField(controller: ip, placeholder: 'IP de la caja, p. ej. 192.168.1.10', keyboardType: TextInputType.url),
+            ],
           ),
-        ],
-        cancelButton: CupertinoActionSheetAction(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+          actions: [
+            CupertinoActionSheetAction(
+              isDefaultAction: true,
+              onPressed: () {
+                Navigator.pop(ctx);
+                final c = codigo.text.replaceAll(RegExp(r'[^A-Za-z0-9]'), '').toUpperCase();
+                var u = ip.text.trim();
+                if (u.isEmpty || c.length != 8) {
+                  mostrarError(context, 'Escribe el código de 8 caracteres y la IP que aparece en la caja.');
+                  return;
+                }
+                if (!u.startsWith('http')) u = 'http://$u';
+                if (!RegExp(r':\d+$').hasMatch(u)) u = '$u:7080';
+                _usar(DatosQR(c, [u]));
+              },
+              child: const Text('Emparejar'),
+            ),
+          ],
+          cancelButton: CupertinoActionSheetAction(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+        ),
       ),
     );
   }
@@ -96,51 +102,72 @@ class _EmparejarPageState extends ConsumerState<EmparejarPage> with SingleTicker
       child: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: RpSpace.s6),
-          child: Column(children: [
-            const SizedBox(height: RpSpace.s8),
-            IconoApp(icono: CupertinoIcons.person_2_fill, color: t.orange),
-            const SizedBox(height: RpSpace.s5),
-            Text('Escanea el código\nde tu restaurante', textAlign: TextAlign.center, style: RpText.title1.copyWith(color: c.label)),
-            const SizedBox(height: RpSpace.s2),
-            Text('Lo encuentras en la caja: Estado del nodo › Emparejar un teléfono.',
-                textAlign: TextAlign.center, style: RpText.subhead.copyWith(color: c.labelSecondary)),
-            if (error != null) ...[
-              const SizedBox(height: RpSpace.s3),
-              Text(error, textAlign: TextAlign.center, style: RpText.footnote.copyWith(color: c.dangerText)),
-            ],
-            const SizedBox(height: RpSpace.s6),
-            Expanded(
-              child: Center(
-                child: AspectRatio(
-                  aspectRatio: 1,
-                  child: Stack(fit: StackFit.expand, children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(RpRadius.widget * 1.4),
-                      child: Container(
-                        color: const Color(0xFF111111),
-                        child: widget.camara
-                            ? MobileScanner(onDetect: (cap) {
-                                for (final b in cap.barcodes) {
-                                  final qr = DatosQR.leer(b.rawValue ?? '');
-                                  if (qr != null) {
-                                    _usar(qr);
-                                    break;
-                                  }
-                                }
-                              })
-                            : const Center(child: Icon(RpIcons.qr, size: 64, color: Color(0x55FFFFFF))),
-                      ),
+          child: Column(
+            children: [
+              const SizedBox(height: RpSpace.s8),
+              IconoApp(icono: CupertinoIcons.person_2_fill, color: t.orange),
+              const SizedBox(height: RpSpace.s5),
+              Text(
+                'Escanea el código\nde tu restaurante',
+                textAlign: TextAlign.center,
+                style: RpText.title1.copyWith(color: c.label),
+              ),
+              const SizedBox(height: RpSpace.s2),
+              Text(
+                'Lo encuentras en la caja: Estado del nodo › Emparejar un teléfono.',
+                textAlign: TextAlign.center,
+                style: RpText.subhead.copyWith(color: c.labelSecondary),
+              ),
+              if (error != null) ...[
+                const SizedBox(height: RpSpace.s3),
+                Text(
+                  error,
+                  textAlign: TextAlign.center,
+                  style: RpText.footnote.copyWith(color: c.dangerText),
+                ),
+              ],
+              const SizedBox(height: RpSpace.s6),
+              Expanded(
+                child: Center(
+                  child: AspectRatio(
+                    aspectRatio: 1,
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(RpRadius.widget * 1.4),
+                          child: Container(
+                            color: const Color(0xFF111111),
+                            child: widget.camara
+                                ? MobileScanner(
+                                    onDetect: (cap) {
+                                      for (final b in cap.barcodes) {
+                                        final qr = DatosQR.leer(b.rawValue ?? '');
+                                        if (qr != null) {
+                                          _usar(qr);
+                                          break;
+                                        }
+                                      }
+                                    },
+                                  )
+                                : const Center(child: Icon(RpIcons.qr, size: 64, color: Color(0x55FFFFFF))),
+                          ),
+                        ),
+                        AnimatedBuilder(
+                          animation: _esquinas,
+                          builder: (_, _) => CustomPaint(painter: _Esquinas(t.orange, 18 + _esquinas.value * 10)),
+                        ),
+                        if (_procesando) const Center(child: CupertinoActivityIndicator(radius: 18, color: Color(0xFFFFFFFF))),
+                      ],
                     ),
-                    AnimatedBuilder(animation: _esquinas, builder: (_, _) => CustomPaint(painter: _Esquinas(t.orange, 18 + _esquinas.value * 10))),
-                    if (_procesando) const Center(child: CupertinoActivityIndicator(radius: 18, color: Color(0xFFFFFFFF))),
-                  ]),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: RpSpace.s4),
-            CupertinoButton(onPressed: _procesando ? null : _manual, child: const Text('Escribir código')),
-            const SizedBox(height: RpSpace.s4),
-          ]),
+              const SizedBox(height: RpSpace.s4),
+              CupertinoButton(onPressed: _procesando ? null : _manual, child: const Text('Escribir código')),
+              const SizedBox(height: RpSpace.s4),
+            ],
+          ),
         ),
       ),
     );

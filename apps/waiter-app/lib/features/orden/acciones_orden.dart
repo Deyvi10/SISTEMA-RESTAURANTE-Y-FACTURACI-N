@@ -18,9 +18,9 @@ import 'orden_controlador.dart';
 /// Pedido de la mesa: lo enviado (atenuado, con estado) y lo nuevo, que se borra deslizando
 /// como en Mail y se edita con pulsación prolongada (F3-09, F3-11).
 Future<void> abrirPedido(BuildContext context, WidgetRef ref, String mesaId) => showCupertinoModalPopup<void>(
-      context: context,
-      builder: (_) => _HojaPedido(mesaId: mesaId),
-    );
+  context: context,
+  builder: (_) => _HojaPedido(mesaId: mesaId),
+);
 
 class _HojaPedido extends ConsumerWidget {
   const _HojaPedido({required this.mesaId});
@@ -35,76 +35,113 @@ class _HojaPedido extends ConsumerWidget {
     final enviadas = st.orden?.lineas ?? const <LineaEnviada>[];
     return Container(
       height: MediaQuery.sizeOf(context).height * .78,
-      decoration: BoxDecoration(color: c.background, borderRadius: const BorderRadius.vertical(top: Radius.circular(RpRadius.widget))),
-      child: Column(children: [
-        const SizedBox(height: 8),
-        Container(width: 38, height: 5, decoration: BoxDecoration(color: c.labelTertiary, borderRadius: BorderRadius.circular(3))),
-        Padding(
-          padding: const EdgeInsets.all(RpSpace.s4),
-          child: Row(children: [
-            Expanded(child: Text(st.orden == null ? 'Pedido nuevo' : 'Orden #${st.orden!.numero}', style: RpText.title2.copyWith(color: c.label))),
-            Text(Dinero.formato(st.totalEnviado + st.totalBorrador), style: RpText.title3.copyWith(color: c.label)),
-          ]),
-        ),
-        Expanded(
-          child: ListView(padding: const EdgeInsets.only(bottom: RpSpace.s8), children: [
-            if (st.borrador.isNotEmpty) ...[
-              _Titulo('POR ENVIAR · desliza para quitar, mantén para editar'),
-              for (final l in st.borrador)
-                Dismissible(
-                  key: ValueKey(l.id),
-                  direction: DismissDirection.endToStart,
-                  onDismissed: (_) {
-                    Haptica.advertencia();
-                    ctl.quitar(l.id);
-                  },
-                  background: Container(
-                    color: c.dangerFill,
-                    alignment: Alignment.centerRight,
-                    padding: const EdgeInsets.only(right: RpSpace.s6),
-                    child: const Icon(RpIcons.eliminar, color: Color(0xFFFFFFFF)),
-                  ),
-                  child: GestureDetector(
-                    onLongPress: cat == null
-                        ? null
-                        : () async {
-                            Haptica.seleccion();
-                            final r = await abrirModificadores(context, l.producto, cat.catalogo.gruposDe(l.producto), cat.catalogo.categoria(l.producto.categoriaId)?.notas ?? const [],
-                                inicial: ResultadoMods(l.mods, l.nota, l.cantidad, tiempo: l.tiempo, enEspera: l.enEspera), edicion: true);
-                            if (r != null) ctl.reemplazar(l.copia(mods: r.mods, nota: r.nota, cantidad: r.cantidad, tiempo: r.tiempo, enEspera: r.enEspera));
-                          },
-                    child: _FilaLinea(
-                      cantidad: l.cantidad,
-                      nombre: l.producto.nombre,
-                      detalle: [...l.mods.map((m) => m.nombre), if (l.nota.isNotEmpty) '«${l.nota}»', if (l.enEspera) 'En espera · ${l.tiempo.toLowerCase()}'].join(' · '),
-                      total: Dinero.formato(l.total),
-                      nueva: true,
+      decoration: BoxDecoration(
+        color: c.background,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(RpRadius.widget)),
+      ),
+      child: Column(
+        children: [
+          const SizedBox(height: 8),
+          Container(
+            width: 38,
+            height: 5,
+            decoration: BoxDecoration(color: c.labelTertiary, borderRadius: BorderRadius.circular(3)),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(RpSpace.s4),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(st.orden == null ? 'Pedido nuevo' : 'Orden #${st.orden!.numero}', style: RpText.title2.copyWith(color: c.label)),
+                ),
+                Text(Dinero.formato(st.totalEnviado + st.totalBorrador), style: RpText.title3.copyWith(color: c.label)),
+              ],
+            ),
+          ),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.only(bottom: RpSpace.s8),
+              children: [
+                if (st.borrador.isNotEmpty) ...[
+                  _Titulo('POR ENVIAR · desliza para quitar, mantén para editar'),
+                  for (final l in st.borrador)
+                    Dismissible(
+                      key: ValueKey(l.id),
+                      direction: DismissDirection.endToStart,
+                      onDismissed: (_) {
+                        Haptica.advertencia();
+                        ctl.quitar(l.id);
+                      },
+                      background: Container(
+                        color: c.dangerFill,
+                        alignment: Alignment.centerRight,
+                        padding: const EdgeInsets.only(right: RpSpace.s6),
+                        child: const Icon(RpIcons.eliminar, color: Color(0xFFFFFFFF)),
+                      ),
+                      child: GestureDetector(
+                        onLongPress: cat == null
+                            ? null
+                            : () async {
+                                Haptica.seleccion();
+                                final r = await abrirModificadores(
+                                  context,
+                                  l.producto,
+                                  cat.catalogo.gruposDe(l.producto),
+                                  cat.catalogo.categoria(l.producto.categoriaId)?.notas ?? const [],
+                                  inicial: ResultadoMods(l.mods, l.nota, l.cantidad, tiempo: l.tiempo, enEspera: l.enEspera),
+                                  edicion: true,
+                                );
+                                if (r != null) {
+                                  ctl.reemplazar(l.copia(mods: r.mods, nota: r.nota, cantidad: r.cantidad, tiempo: r.tiempo, enEspera: r.enEspera));
+                                }
+                              },
+                        child: _FilaLinea(
+                          cantidad: l.cantidad,
+                          nombre: l.producto.nombre,
+                          detalle: [
+                            ...l.mods.map((m) => m.nombre),
+                            if (l.nota.isNotEmpty) '«${l.nota}»',
+                            if (l.enEspera) 'En espera · ${l.tiempo.toLowerCase()}',
+                          ].join(' · '),
+                          total: Dinero.formato(l.total),
+                          nueva: true,
+                        ),
+                      ),
+                    ),
+                ],
+                if (enviadas.isNotEmpty) ...[
+                  _Titulo('ENVIADO · mantén para anular'),
+                  for (final l in enviadas)
+                    GestureDetector(
+                      onLongPress: l.anulada ? null : () => anularLinea(context, ref, mesaId, l),
+                      child: _FilaLinea(
+                        cantidad: l.cantidad,
+                        nombre: l.producto,
+                        detalle: [
+                          ...l.modificadores,
+                          if (l.nota.isNotEmpty) '«${l.nota}»',
+                          if (l.enEspera) 'En espera · ${l.tiempo.toLowerCase()}',
+                          if (l.anulada) 'Anulado',
+                        ].join(' · '),
+                        total: Dinero.texto(l.total),
+                        anulada: l.anulada,
+                      ),
+                    ),
+                ],
+                if (st.borrador.isEmpty && enviadas.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.all(RpSpace.s8),
+                    child: Text(
+                      'Toca los platos para agregarlos.',
+                      textAlign: TextAlign.center,
+                      style: RpText.body.copyWith(color: c.labelSecondary),
                     ),
                   ),
-                ),
-            ],
-            if (enviadas.isNotEmpty) ...[
-              _Titulo('ENVIADO · mantén para anular'),
-              for (final l in enviadas)
-                GestureDetector(
-                  onLongPress: l.anulada ? null : () => anularLinea(context, ref, mesaId, l),
-                  child: _FilaLinea(
-                    cantidad: l.cantidad,
-                    nombre: l.producto,
-                    detalle: [...l.modificadores, if (l.nota.isNotEmpty) '«${l.nota}»', if (l.enEspera) 'En espera · ${l.tiempo.toLowerCase()}', if (l.anulada) 'Anulado'].join(' · '),
-                    total: Dinero.texto(l.total),
-                    anulada: l.anulada,
-                  ),
-                ),
-            ],
-            if (st.borrador.isEmpty && enviadas.isEmpty)
-              Padding(
-                padding: const EdgeInsets.all(RpSpace.s8),
-                child: Text('Toca los platos para agregarlos.', textAlign: TextAlign.center, style: RpText.body.copyWith(color: c.labelSecondary)),
-              ),
-          ]),
-        ),
-      ]),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -114,9 +151,9 @@ class _Titulo extends StatelessWidget {
   final String texto;
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.fromLTRB(RpSpace.s5, RpSpace.s3, RpSpace.s5, RpSpace.s1),
-        child: Text(texto, style: RpText.footnote.copyWith(color: RpTheme.colorsOf(context).labelSecondary)),
-      );
+    padding: const EdgeInsets.fromLTRB(RpSpace.s5, RpSpace.s3, RpSpace.s5, RpSpace.s1),
+    child: Text(texto, style: RpText.footnote.copyWith(color: RpTheme.colorsOf(context).labelSecondary)),
+  );
 }
 
 class _FilaLinea extends StatelessWidget {
@@ -131,24 +168,43 @@ class _FilaLinea extends StatelessWidget {
     return Container(
       color: c.surface,
       padding: const EdgeInsets.symmetric(horizontal: RpSpace.s5, vertical: RpSpace.s3),
-      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Container(
-          width: 34,
-          padding: const EdgeInsets.symmetric(vertical: 2),
-          decoration: BoxDecoration(color: nueva ? c.accentSoft : c.fill, borderRadius: BorderRadius.circular(8)),
-          alignment: Alignment.center,
-          child: Text(cantidad, style: RpText.subhead.copyWith(fontWeight: FontWeight.w700, color: nueva ? c.accent : color)),
-        ),
-        const SizedBox(width: RpSpace.s3),
-        Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(nombre, style: RpText.body.copyWith(color: color, decoration: deco)),
-            if (detalle.isNotEmpty) Text(detalle, style: RpText.footnote.copyWith(color: c.labelSecondary, decoration: deco)),
-          ]),
-        ),
-        Text(total, style: RpText.body.copyWith(color: color, decoration: deco)),
-        if (!nueva && !anulada) ...[const SizedBox(width: 6), Icon(CupertinoIcons.checkmark_alt, size: 16, color: RpTheme.tintsOf(context).green)],
-      ]),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 34,
+            padding: const EdgeInsets.symmetric(vertical: 2),
+            decoration: BoxDecoration(color: nueva ? c.accentSoft : c.fill, borderRadius: BorderRadius.circular(8)),
+            alignment: Alignment.center,
+            child: Text(
+              cantidad,
+              style: RpText.subhead.copyWith(fontWeight: FontWeight.w700, color: nueva ? c.accent : color),
+            ),
+          ),
+          const SizedBox(width: RpSpace.s3),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  nombre,
+                  style: RpText.body.copyWith(color: color, decoration: deco),
+                ),
+                if (detalle.isNotEmpty)
+                  Text(
+                    detalle,
+                    style: RpText.footnote.copyWith(color: c.labelSecondary, decoration: deco),
+                  ),
+              ],
+            ),
+          ),
+          Text(
+            total,
+            style: RpText.body.copyWith(color: color, decoration: deco),
+          ),
+          if (!nueva && !anulada) ...[const SizedBox(width: 6), Icon(CupertinoIcons.checkmark_alt, size: 16, color: RpTheme.tintsOf(context).green)],
+        ],
+      ),
     );
   }
 }
@@ -196,34 +252,45 @@ Future<(String, bool)?> _pedirMotivo(BuildContext context) async {
   return showCupertinoModalPopup<(String, bool)>(
     context: context,
     builder: (ctx) => StatefulBuilder(
-      builder: (ctx, set) => CupertinoActionSheet(
-        title: const Text('Motivo de la anulación'),
-        message: Column(children: [
-          Wrap(spacing: 8, runSpacing: 8, children: [
-            for (final m in const ['El cliente cambió de opinión', 'Error del mesero', 'Demoró demasiado', 'Plato en mal estado'])
-              CupertinoButton(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                color: RpTheme.colorsOf(ctx).fill,
-                minimumSize: const Size(0, 30),
-                onPressed: () => set(() => ctl.text = m),
-                child: Text(m, style: RpText.footnote.copyWith(color: RpTheme.colorsOf(ctx).label)),
+      builder: (ctx, set) => SobreTeclado(
+        child: CupertinoActionSheet(
+          title: const Text('Motivo de la anulación'),
+          message: Column(
+            children: [
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final m in const ['El cliente cambió de opinión', 'Error del mesero', 'Demoró demasiado', 'Plato en mal estado'])
+                    CupertinoButton(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      color: RpTheme.colorsOf(ctx).fill,
+                      minimumSize: const Size(0, 30),
+                      onPressed: () => set(() => ctl.text = m),
+                      child: Text(m, style: RpText.footnote.copyWith(color: RpTheme.colorsOf(ctx).label)),
+                    ),
+                ],
               ),
-          ]),
-          const SizedBox(height: 10),
-          CupertinoTextField(controller: ctl, placeholder: 'Escribe el motivo', maxLength: 140),
-          CupertinoListTile(title: const Text('¿Se llegó a preparar?'), trailing: CupertinoSwitch(value: sePreparo, onChanged: (v) => set(() => sePreparo = v))),
-        ]),
-        actions: [
-          CupertinoActionSheetAction(
-            isDestructiveAction: true,
-            onPressed: () {
-              if (ctl.text.trim().length < 3) return;
-              Navigator.pop(ctx, (ctl.text.trim(), sePreparo));
-            },
-            child: const Text('Anular plato'),
+              const SizedBox(height: 10),
+              CupertinoTextField(controller: ctl, placeholder: 'Escribe el motivo', maxLength: 140),
+              CupertinoListTile(
+                title: const Text('¿Se llegó a preparar?'),
+                trailing: CupertinoSwitch(value: sePreparo, onChanged: (v) => set(() => sePreparo = v)),
+              ),
+            ],
           ),
-        ],
-        cancelButton: CupertinoActionSheetAction(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+          actions: [
+            CupertinoActionSheetAction(
+              isDestructiveAction: true,
+              onPressed: () {
+                if (ctl.text.trim().length < 3) return;
+                Navigator.pop(ctx, (ctl.text.trim(), sePreparo));
+              },
+              child: const Text('Anular plato'),
+            ),
+          ],
+          cancelButton: CupertinoActionSheetAction(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+        ),
       ),
     ),
   );
@@ -239,10 +306,8 @@ Future<String?> pedirSupervisor(BuildContext context, WidgetRef ref, String acci
       title: const Text('Autorización de supervisor'),
       message: const Text('Quien tenga permiso para anular elige su nombre y escribe su PIN.'),
       actions: [
-        for (final p in gente.where((p) => p.rol != 'MESERO'))
-          CupertinoActionSheetAction(onPressed: () => Navigator.pop(ctx, p), child: Text(p.nombre)),
-        for (final p in gente.where((p) => p.rol == 'MESERO'))
-          CupertinoActionSheetAction(onPressed: () => Navigator.pop(ctx, p), child: Text(p.nombre)),
+        for (final p in gente.where((p) => p.rol != 'MESERO')) CupertinoActionSheetAction(onPressed: () => Navigator.pop(ctx, p), child: Text(p.nombre)),
+        for (final p in gente.where((p) => p.rol == 'MESERO')) CupertinoActionSheetAction(onPressed: () => Navigator.pop(ctx, p), child: Text(p.nombre)),
       ],
       cancelButton: CupertinoActionSheetAction(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
     ),
@@ -253,26 +318,32 @@ Future<String?> pedirSupervisor(BuildContext context, WidgetRef ref, String acci
     context: context,
     builder: (ctx) => Container(
       padding: const EdgeInsets.fromLTRB(0, RpSpace.s6, 0, RpSpace.s8),
-      decoration: const BoxDecoration(color: Color(0xF0161620), borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
+      decoration: const BoxDecoration(
+        color: Color(0xF0161620),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
       child: SafeArea(
         top: false,
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Avatar(nombre: quien.nombre, iniciales: quien.iniciales, tamano: 56),
-          const SizedBox(height: RpSpace.s2),
-          TecladoPIN(
-            titulo: 'PIN de ${quien.nombre.split(' ').first}',
-            claroSobreOscuro: true,
-            alCompletar: (pin) async {
-              try {
-                token = await ref.read(sesionProvider).api!.autorizar(quien.id, pin, accion, referencia);
-                if (ctx.mounted) Navigator.pop(ctx);
-                return null;
-              } on ApiError catch (e) {
-                return e.detalle;
-              }
-            },
-          ),
-        ]),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Avatar(nombre: quien.nombre, iniciales: quien.iniciales, tamano: 56),
+            const SizedBox(height: RpSpace.s2),
+            TecladoPIN(
+              titulo: 'PIN de ${quien.nombre.split(' ').first}',
+              claroSobreOscuro: true,
+              alCompletar: (pin) async {
+                try {
+                  token = await ref.read(sesionProvider).api!.autorizar(quien.id, pin, accion, referencia);
+                  if (ctx.mounted) Navigator.pop(ctx);
+                  return null;
+                } on ApiError catch (e) {
+                  return e.detalle;
+                }
+              },
+            ),
+          ],
+        ),
       ),
     ),
   );
@@ -311,7 +382,11 @@ Future<void> accionesDeOrden(BuildContext context, WidgetRef ref, String mesaId)
       Haptica.exito();
       final aviso = r['aviso'] as String?;
       if (context.mounted) {
-        await mostrarError(context, aviso ?? 'Total ${Dinero.texto((r['totales'] as Map)['total'] as String)}. La mesa quedó «Por pagar».', titulo: 'Pre-cuenta impresa');
+        await mostrarError(
+          context,
+          aviso ?? 'Total ${Dinero.texto((r['totales'] as Map)['total'] as String)}. La mesa quedó «Por pagar».',
+          titulo: 'Pre-cuenta impresa',
+        );
       }
     } else if (eleccion.startsWith('marchar:')) {
       await ctl.marchar(eleccion.substring(8));
@@ -349,17 +424,17 @@ Future<void> accionesDeOrden(BuildContext context, WidgetRef ref, String mesaId)
 }
 
 Future<int?> _elegirPersonas(BuildContext context) => showCupertinoModalPopup<int>(
-      context: context,
-      builder: (ctx) => CupertinoActionSheet(
-        title: const Text('¿Dividir entre cuántas personas?'),
-        message: const Text('Solo informativo: la pre-cuenta muestra cuánto le toca a cada uno.'),
-        actions: [
-          CupertinoActionSheetAction(onPressed: () => Navigator.pop(ctx, 1), child: const Text('No dividir')),
-          for (final n in [2, 3, 4, 5, 6]) CupertinoActionSheetAction(onPressed: () => Navigator.pop(ctx, n), child: Text('$n personas')),
-        ],
-        cancelButton: CupertinoActionSheetAction(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
-      ),
-    );
+  context: context,
+  builder: (ctx) => CupertinoActionSheet(
+    title: const Text('¿Dividir entre cuántas personas?'),
+    message: const Text('Solo informativo: la pre-cuenta muestra cuánto le toca a cada uno.'),
+    actions: [
+      CupertinoActionSheetAction(onPressed: () => Navigator.pop(ctx, 1), child: const Text('No dividir')),
+      for (final n in [2, 3, 4, 5, 6]) CupertinoActionSheetAction(onPressed: () => Navigator.pop(ctx, n), child: Text('$n personas')),
+    ],
+    cancelButton: CupertinoActionSheetAction(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+  ),
+);
 
 Future<T?> _elegir<T>(BuildContext context, String titulo, List<T> opciones, String Function(T) nombre) {
   if (opciones.isEmpty) {

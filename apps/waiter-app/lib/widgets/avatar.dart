@@ -25,7 +25,10 @@ class Avatar extends StatelessWidget {
         shape: BoxShape.circle,
         gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color.lerp(c, const Color(0xFFFFFFFF), .3)!, c]),
       ),
-      child: Text(iniciales, style: RpText.title2.copyWith(color: const Color(0xFFFFFFFF), fontSize: tamano * .36)),
+      child: Text(
+        iniciales,
+        style: RpText.title2.copyWith(color: const Color(0xFFFFFFFF), fontSize: tamano * .36),
+      ),
     );
     if (foto == null) return base;
     return ClipOval(

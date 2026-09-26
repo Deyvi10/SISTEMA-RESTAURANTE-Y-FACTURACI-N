@@ -55,23 +55,36 @@ class _PildoraConexionState extends ConsumerState<PildoraConexion> {
           height: 30,
           padding: EdgeInsets.symmetric(horizontal: _expandida ? 12 : 10),
           decoration: BoxDecoration(color: const Color(0xFF000000), borderRadius: BorderRadius.circular(RpRadius.pill)),
-          child: Row(mainAxisSize: MainAxisSize.min, children: [
-            Container(width: 9, height: 9, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
-            AnimatedSize(
-              duration: RpMotion.base,
-              curve: RpMotion.easeStandard,
-              child: _expandida
-                  ? Padding(
-                      padding: const EdgeInsets.only(left: 8),
-                      child: Row(mainAxisSize: MainAxisSize.min, children: [
-                        Icon(icono, size: 14, color: color),
-                        const SizedBox(width: 6),
-                        Text(texto, style: RpText.footnote.copyWith(color: const Color(0xFFFFFFFF), fontWeight: FontWeight.w600)),
-                      ]),
-                    )
-                  : const SizedBox.shrink(),
-            ),
-          ]),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 9,
+                height: 9,
+                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+              ),
+              AnimatedSize(
+                duration: RpMotion.base,
+                curve: RpMotion.easeStandard,
+                child: _expandida
+                    ? Padding(
+                        padding: const EdgeInsets.only(left: 8),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(icono, size: 14, color: color),
+                            const SizedBox(width: 6),
+                            Text(
+                              texto,
+                              style: RpText.footnote.copyWith(color: const Color(0xFFFFFFFF), fontWeight: FontWeight.w600),
+                            ),
+                          ],
+                        ),
+                      )
+                    : const SizedBox.shrink(),
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -3,16 +3,33 @@
 /// El índice se arma una vez al cargar el catálogo; cada pulsación es O(n) sin asignar.
 class IndiceBusqueda<T> {
   IndiceBusqueda(Iterable<T> items, {required String Function(T) nombre, String Function(T)? alias, int Function(T)? vendidos})
-      : _entradas = [
-          for (final it in items)
-            _Entrada(it, _palabras(normalizar(nombre(it))), normalizar(alias?.call(it) ?? ''), vendidos?.call(it) ?? 0),
-        ];
+    : _entradas = [for (final it in items) _Entrada(it, _palabras(normalizar(nombre(it))), normalizar(alias?.call(it) ?? ''), vendidos?.call(it) ?? 0)];
 
   final List<_Entrada<T>> _entradas;
 
   static final _mapa = {
-    'á': 'a', 'à': 'a', 'ä': 'a', 'â': 'a', 'é': 'e', 'è': 'e', 'ë': 'e', 'ê': 'e', 'í': 'i', 'ì': 'i', 'ï': 'i', 'î': 'i',
-    'ó': 'o', 'ò': 'o', 'ö': 'o', 'ô': 'o', 'ú': 'u', 'ù': 'u', 'ü': 'u', 'û': 'u', 'ñ': 'n', 'ç': 'c',
+    'á': 'a',
+    'à': 'a',
+    'ä': 'a',
+    'â': 'a',
+    'é': 'e',
+    'è': 'e',
+    'ë': 'e',
+    'ê': 'e',
+    'í': 'i',
+    'ì': 'i',
+    'ï': 'i',
+    'î': 'i',
+    'ó': 'o',
+    'ò': 'o',
+    'ö': 'o',
+    'ô': 'o',
+    'ú': 'u',
+    'ù': 'u',
+    'ü': 'u',
+    'û': 'u',
+    'ñ': 'n',
+    'ç': 'c',
   };
 
   /// Minúsculas sin tildes ni signos.

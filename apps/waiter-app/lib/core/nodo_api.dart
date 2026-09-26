@@ -20,10 +20,7 @@ class NodoApi {
   String? tokenUsuario;
 
   Map<String, String> get _cabeceras {
-    final cred = [
-      if (tokenDispositivo != null) 'Dispositivo $tokenDispositivo',
-      if (tokenUsuario != null) 'Usuario $tokenUsuario',
-    ];
+    final cred = [if (tokenDispositivo != null) 'Dispositivo $tokenDispositivo', if (tokenUsuario != null) 'Usuario $tokenUsuario'];
     return {'Content-Type': 'application/json', 'Accept': 'application/json', if (cred.isNotEmpty) 'Authorization': cred.join(', ')};
   }
 
@@ -64,15 +61,23 @@ class NodoApi {
 
   Future<Map<String, dynamic>> emparejar(Identidad id, String codigo, String nombre, String plataforma, String version) async =>
       await _llamar('POST', '/v1/dispositivos/emparejar', {
-        'codigo': codigo, 'dispositivoId': id.dispositivoId, 'llavePublica': id.publicaB64,
-        'nombre': nombre, 'tipo': 'MOVIL', 'plataforma': plataforma, 'versionApp': version,
-      }) as Map<String, dynamic>;
+            'codigo': codigo,
+            'dispositivoId': id.dispositivoId,
+            'llavePublica': id.publicaB64,
+            'nombre': nombre,
+            'tipo': 'MOVIL',
+            'plataforma': plataforma,
+            'versionApp': version,
+          })
+          as Map<String, dynamic>;
 
   /// Desafío-respuesta: el nodo manda un número, el teléfono lo firma con su llave privada.
   Future<void> abrirSesionDispositivo(Identidad id) async {
     final d = await _llamar('GET', '/v1/dispositivos/desafio?dispositivoId=${id.dispositivoId}') as Map<String, dynamic>;
     final nonce = d['nonce'] as String;
-    final s = await _llamar('POST', '/v1/dispositivos/sesion', {'dispositivoId': id.dispositivoId, 'nonce': nonce, 'firma': await id.firmarDesafio(nonce)}) as Map<String, dynamic>;
+    final s =
+        await _llamar('POST', '/v1/dispositivos/sesion', {'dispositivoId': id.dispositivoId, 'nonce': nonce, 'firma': await id.firmarDesafio(nonce)})
+            as Map<String, dynamic>;
     tokenDispositivo = s['token'] as String;
   }
 
@@ -95,7 +100,9 @@ class NodoApi {
   }
 
   Future<String> autorizar(String supervisorId, String pin, String accion, String referencia) async {
-    final a = await _llamar('POST', '/v1/autorizaciones', {'usuarioId': supervisorId, 'pin': pin, 'accion': accion, 'referencia': referencia}) as Map<String, dynamic>;
+    final a =
+        await _llamar('POST', '/v1/autorizaciones', {'usuarioId': supervisorId, 'pin': pin, 'accion': accion, 'referencia': referencia})
+            as Map<String, dynamic>;
     return a['token'] as String;
   }
 
@@ -130,8 +137,9 @@ class NodoApi {
       await _llamar('POST', '/v1/ordenes/$orden/precuenta', {'personas': personas}) as Map<String, dynamic>;
 
   Future<Orden> anular(String orden, List<String> lineas, String motivo, bool sePreparo, {String? autorizacion}) async => Orden.fromJson(
-      await _llamar('POST', '/v1/ordenes/$orden/anular', {'lineas': lineas, 'motivo': motivo, 'sePreparo': sePreparo, 'autorizacion': ?autorizacion})
-          as Map<String, dynamic>);
+    await _llamar('POST', '/v1/ordenes/$orden/anular', {'lineas': lineas, 'motivo': motivo, 'sePreparo': sePreparo, 'autorizacion': ?autorizacion})
+        as Map<String, dynamic>,
+  );
 
   Future<Orden> mover(String orden, String mesa, {List<String> lineas = const []}) async =>
       Orden.fromJson(await _llamar('POST', '/v1/ordenes/$orden/mover', {'mesaId': mesa, 'lineas': lineas}) as Map<String, dynamic>);
@@ -148,9 +156,6 @@ class NodoApi {
   /// URL del WebSocket con las credenciales como parámetros.
   Uri urlTiempoReal() {
     final u = Uri.parse(base);
-    return u.replace(scheme: u.scheme == 'https' ? 'wss' : 'ws', path: '/v1/ws', queryParameters: {
-      'dispositivo': ?tokenDispositivo,
-      'usuario': ?tokenUsuario,
-    });
+    return u.replace(scheme: u.scheme == 'https' ? 'wss' : 'ws', path: '/v1/ws', queryParameters: {'dispositivo': ?tokenDispositivo, 'usuario': ?tokenUsuario});
   }
 }

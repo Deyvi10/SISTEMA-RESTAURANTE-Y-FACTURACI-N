@@ -66,49 +66,67 @@ class TecladoPINState extends State<TecladoPIN> with SingleTickerProviderStateMi
     final c = RpTheme.colorsOf(context);
     final texto = widget.claroSobreOscuro ? const Color(0xFFFFFFFF) : c.label;
     final tecla = widget.claroSobreOscuro ? const Color(0x33FFFFFF) : c.fill;
-    return Column(mainAxisSize: MainAxisSize.min, children: [
-      if (widget.titulo != null) Text(widget.titulo!, style: RpText.title3.copyWith(color: texto)),
-      const SizedBox(height: RpSpace.s5),
-      AnimatedBuilder(
-        animation: _sacudida,
-        builder: (_, child) => Transform.translate(offset: Offset(sin(_sacudida.value * pi * 6) * 14 * (1 - _sacudida.value), 0), child: child),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          for (var i = 0; i < widget.largo; i++)
-            AnimatedContainer(
-              duration: RpMotion.fast,
-              margin: const EdgeInsets.symmetric(horizontal: 9),
-              width: 14,
-              height: 14,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: i < _pin.length ? texto : const Color(0x00000000),
-                border: Border.all(color: texto, width: 1.5),
-              ),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (widget.titulo != null) Text(widget.titulo!, style: RpText.title3.copyWith(color: texto)),
+        const SizedBox(height: RpSpace.s5),
+        AnimatedBuilder(
+          animation: _sacudida,
+          builder: (_, child) => Transform.translate(offset: Offset(sin(_sacudida.value * pi * 6) * 14 * (1 - _sacudida.value), 0), child: child),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (var i = 0; i < widget.largo; i++)
+                AnimatedContainer(
+                  duration: RpMotion.fast,
+                  margin: const EdgeInsets.symmetric(horizontal: 9),
+                  width: 14,
+                  height: 14,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: i < _pin.length ? texto : const Color(0x00000000),
+                    border: Border.all(color: texto, width: 1.5),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        SizedBox(
+          height: 40,
+          child: Center(
+            child: _ocupado
+                ? CupertinoActivityIndicator(color: texto)
+                : Text(
+                    _error ?? '',
+                    textAlign: TextAlign.center,
+                    style: RpText.footnote.copyWith(color: RpTheme.tintsOf(context).red),
+                  ),
+          ),
+        ),
+        for (final fila in const [
+          ['1', '2', '3'],
+          ['4', '5', '6'],
+          ['7', '8', '9'],
+          ['', '0', '⌫'],
+        ])
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 7),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (final k in fila)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    child: k.isEmpty
+                        ? const SizedBox(width: RpSize.keypadKey, height: RpSize.keypadKey)
+                        : _Tecla(etiqueta: k, fondo: k == '⌫' ? const Color(0x00000000) : tecla, color: texto, onTap: () => k == '⌫' ? borrar() : tocar(k)),
+                  ),
+              ],
             ),
-        ]),
-      ),
-      SizedBox(
-        height: 40,
-        child: Center(
-          child: _ocupado
-              ? CupertinoActivityIndicator(color: texto)
-              : Text(_error ?? '', textAlign: TextAlign.center, style: RpText.footnote.copyWith(color: RpTheme.tintsOf(context).red)),
-        ),
-      ),
-      for (final fila in const [['1', '2', '3'], ['4', '5', '6'], ['7', '8', '9'], ['', '0', '⌫']])
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 7),
-          child: Row(mainAxisSize: MainAxisSize.min, children: [
-            for (final k in fila)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 14),
-                child: k.isEmpty
-                    ? const SizedBox(width: RpSize.keypadKey, height: RpSize.keypadKey)
-                    : _Tecla(etiqueta: k, fondo: k == '⌫' ? const Color(0x00000000) : tecla, color: texto, onTap: () => k == '⌫' ? borrar() : tocar(k)),
-              ),
-          ]),
-        ),
-    ]);
+          ),
+      ],
+    );
   }
 }
 
@@ -144,11 +162,20 @@ class _TeclaState extends State<_Tecla> {
           alignment: Alignment.center,
           child: borrar
               ? Icon(CupertinoIcons.delete_left, color: widget.color, size: 28)
-              : Column(mainAxisSize: MainAxisSize.min, children: [
-                  Text(widget.etiqueta, style: TextStyle(fontSize: 34, height: 1.05, fontWeight: FontWeight.w400, color: widget.color)),
-                  if (_letras[widget.etiqueta] != null)
-                    Text(_letras[widget.etiqueta]!, style: TextStyle(fontSize: 10, letterSpacing: 2, fontWeight: FontWeight.w600, color: widget.color)),
-                ]),
+              : Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      widget.etiqueta,
+                      style: TextStyle(fontSize: 34, height: 1.05, fontWeight: FontWeight.w400, color: widget.color),
+                    ),
+                    if (_letras[widget.etiqueta] != null)
+                      Text(
+                        _letras[widget.etiqueta]!,
+                        style: TextStyle(fontSize: 10, letterSpacing: 2, fontWeight: FontWeight.w600, color: widget.color),
+                      ),
+                  ],
+                ),
         ),
       ),
     );

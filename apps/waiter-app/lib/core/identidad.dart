@@ -59,9 +59,14 @@ class Identidad {
       final semilla = base64.decode(j['semilla'] as String);
       final par = await _ed.newKeyPairFromSeed(semilla);
       final pub = (await par.extractPublicKey()).bytes;
-      return Identidad._(j['id'] as String, par, pub,
-          urls: [for (final u in (j['urls'] as List? ?? const [])) u as String],
-          restaurante: j['restaurante'] as String? ?? '', local: j['local'] as String? ?? '');
+      return Identidad._(
+        j['id'] as String,
+        par,
+        pub,
+        urls: [for (final u in (j['urls'] as List? ?? const [])) u as String],
+        restaurante: j['restaurante'] as String? ?? '',
+        local: j['local'] as String? ?? '',
+      );
     }
     final par = await _ed.newKeyPair();
     final pub = (await par.extractPublicKey()).bytes;

@@ -47,18 +47,20 @@ class BaseLocal extends _$BaseLocal {
 
   Future<String?> leerCache(String clave) async => (await (select(cache)..where((c) => c.clave.equals(clave))).getSingleOrNull())?.valor;
 
-  Future<void> guardarCache(String clave, String valor) => into(cache).insertOnConflictUpdate(
-      CacheCompanion.insert(clave: clave, valor: valor, actualizado: DateTime.now().millisecondsSinceEpoch));
+  Future<void> guardarCache(String clave, String valor) =>
+      into(cache).insertOnConflictUpdate(CacheCompanion.insert(clave: clave, valor: valor, actualizado: DateTime.now().millisecondsSinceEpoch));
 
   Future<void> encolar(String clave, String mesa, String cuerpo) => into(pendientes).insert(
-      PendientesCompanion.insert(clave: clave, mesa: mesa, cuerpo: cuerpo, creado: DateTime.now().millisecondsSinceEpoch),
-      mode: InsertMode.insertOrIgnore);
+    PendientesCompanion.insert(clave: clave, mesa: mesa, cuerpo: cuerpo, creado: DateTime.now().millisecondsSinceEpoch),
+    mode: InsertMode.insertOrIgnore,
+  );
 
   Future<List<Pendiente>> listaPendientes() => (select(pendientes)..orderBy([(t) => OrderingTerm(expression: t.creado)])).get();
   Stream<List<Pendiente>> vigilarPendientes() => (select(pendientes)..orderBy([(t) => OrderingTerm(expression: t.creado)])).watch();
 
   Future<void> quitarPendiente(String clave) => (delete(pendientes)..where((t) => t.clave.equals(clave))).go();
 
-  Future<void> falloPendiente(String clave, String error) => (update(pendientes)..where((t) => t.clave.equals(clave)))
-      .write(PendientesCompanion.custom(intentos: pendientes.intentos + const Constant(1), ultimoError: Variable(error)));
+  Future<void> falloPendiente(String clave, String error) => (update(
+    pendientes,
+  )..where((t) => t.clave.equals(clave))).write(PendientesCompanion.custom(intentos: pendientes.intentos + const Constant(1), ultimoError: Variable(error)));
 }

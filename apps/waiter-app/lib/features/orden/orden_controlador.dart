@@ -12,8 +12,8 @@ import '../../data/modelos.dart';
 /// Un plato aún no enviado (vive en el teléfono hasta tocar «Enviar»).
 class LineaBorrador {
   LineaBorrador({required this.producto, this.cantidad = '1', List<Modificador>? mods, this.nota = '', this.tiempo = '', this.enEspera = false, String? id})
-      : id = id ?? const Uuid().v7(),
-        mods = mods ?? const [];
+    : id = id ?? const Uuid().v7(),
+      mods = mods ?? const [];
   final String id;
   final Producto producto;
   final String cantidad;
@@ -24,17 +24,28 @@ class LineaBorrador {
   Decimal get total => Dinero.totalLinea(producto.precio, mods.map((m) => m.precioAdicional), cantidad);
 
   LineaBorrador copia({String? cantidad, List<Modificador>? mods, String? nota, String? tiempo, bool? enEspera}) => LineaBorrador(
-      id: id, producto: producto, cantidad: cantidad ?? this.cantidad, mods: mods ?? this.mods, nota: nota ?? this.nota,
-      tiempo: tiempo ?? this.tiempo, enEspera: enEspera ?? this.enEspera);
+    id: id,
+    producto: producto,
+    cantidad: cantidad ?? this.cantidad,
+    mods: mods ?? this.mods,
+    nota: nota ?? this.nota,
+    tiempo: tiempo ?? this.tiempo,
+    enEspera: enEspera ?? this.enEspera,
+  );
 
   /// Dos unidades se juntan en una línea solo si son idénticas (F3-09).
   bool mismaQue(Producto p, List<Modificador> m, String n) =>
       producto.id == p.id && nota == n && tiempo.isEmpty && !enEspera && mods.map((x) => x.id).join(',') == m.map((x) => x.id).join(',');
 
   Map<String, dynamic> aJson() => {
-        'id': id, 'productoId': producto.id, 'cantidad': cantidad, 'modificadores': [for (final m in mods) m.id],
-        'nota': nota, 'tiempo': tiempo, 'enEspera': enEspera,
-      };
+    'id': id,
+    'productoId': producto.id,
+    'cantidad': cantidad,
+    'modificadores': [for (final m in mods) m.id],
+    'nota': nota,
+    'tiempo': tiempo,
+    'enEspera': enEspera,
+  };
 }
 
 class EstadoOrden {
@@ -50,17 +61,26 @@ class EstadoOrden {
   Decimal get totalEnviado => Dinero.parse(orden?.total ?? '0');
   bool get soloLectura => bloqueadaPor != null;
 
-  EstadoOrden copia({Orden? orden, List<LineaBorrador>? borrador, String? bloqueadaPor, bool limpiarBloqueo = false, bool? cargando, bool? enviando,
-          (int, LineaBorrador)? deshacer, bool limpiarDeshacer = false, String? error, bool limpiarError = false}) =>
-      EstadoOrden(
-        orden: orden ?? this.orden,
-        borrador: borrador ?? this.borrador,
-        bloqueadaPor: limpiarBloqueo ? null : (bloqueadaPor ?? this.bloqueadaPor),
-        cargando: cargando ?? this.cargando,
-        enviando: enviando ?? this.enviando,
-        deshacer: limpiarDeshacer ? null : (deshacer ?? this.deshacer),
-        error: limpiarError ? null : (error ?? this.error),
-      );
+  EstadoOrden copia({
+    Orden? orden,
+    List<LineaBorrador>? borrador,
+    String? bloqueadaPor,
+    bool limpiarBloqueo = false,
+    bool? cargando,
+    bool? enviando,
+    (int, LineaBorrador)? deshacer,
+    bool limpiarDeshacer = false,
+    String? error,
+    bool limpiarError = false,
+  }) => EstadoOrden(
+    orden: orden ?? this.orden,
+    borrador: borrador ?? this.borrador,
+    bloqueadaPor: limpiarBloqueo ? null : (bloqueadaPor ?? this.bloqueadaPor),
+    cargando: cargando ?? this.cargando,
+    enviando: enviando ?? this.enviando,
+    deshacer: limpiarDeshacer ? null : (deshacer ?? this.deshacer),
+    error: limpiarError ? null : (error ?? this.error),
+  );
 }
 
 enum ResultadoEnvio { enviado, pendiente }
