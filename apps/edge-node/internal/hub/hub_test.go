@@ -144,7 +144,7 @@ func TestClienteLentoNoFrenaALosDemas(t *testing.T) {
 // El vigilante saca al cliente cuyo pendiente más antiguo pasa de lentoTras, y solo a ese.
 func TestVigilanteDeClienteAtascado(t *testing.T) {
 	now := time.Now()
-	c := &Cliente{senal: make(chan struct{}, 1)}
+	c := nuevaCola()
 	c.encolar([]byte("a"), now)
 	if c.atascado(now.Add(lentoTras / 2)) {
 		t.Fatal("aún no debería estar atascado")
