@@ -15,6 +15,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/caja"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/impresoras"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/nodos"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/salon"
@@ -100,6 +101,11 @@ func (c *cliente) nodoOperativo() *nodoSim {
 	n.req("POST", "/v1/sync/push", edgesync.PushRequest{NodeID: n.id, Events: []edgesync.Event{n.evento("prueba.creada")}}, true, 200, nil)
 	c.impresoraConPrueba(n, "10.0.0.9")
 	n.emparejar("Tablet de Carlos")
+	// Un turno cerrado en el nodo: su Cierre Z llega y se envía al dueño.
+	var cajas []caja.Caja
+	c.do("GET", "/v1/cajas", nil, 200, &cajas)
+	n.cierreZ(cajas[0].ID, 1, "", "-0.50")
+	c.e.notificarCierres()
 	return n
 }
 

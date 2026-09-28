@@ -157,9 +157,29 @@ export interface CajaInfo {
   estacionId: string | null;
 }
 
+export interface MetodoPago {
+  id: string;
+  nombre: string;
+  tipo: string; // EFECTIVO, TARJETA_CREDITO, TARJETA_DEBITO, TRANSFERENCIA, BILLETERA, OTRO
+  codigoSri: string;
+  abreCajon: boolean;
+  pideReferencia: boolean;
+  icono: string;
+}
+
+/** Billete o moneda del asistente de cierre (la lista la define el nodo). */
+export interface Denominacion {
+  clave: string; // B20, M0.25…
+  valor: string;
+  moneda: boolean;
+  etiqueta: string;
+}
+
 export interface ConfigCaja {
   cajas: CajaInfo[];
+  metodos: MetodoPago[];
   consumidorFinalMaximo: string;
+  denominaciones: Denominacion[];
 }
 
 export interface Jornada {
@@ -200,6 +220,33 @@ export interface Movimiento {
   createdAt: string;
 }
 
+export type ResultadoCierre = "CUADRADO" | "SOBRANTE" | "FALTANTE";
+
+export interface LineaCierre {
+  metodoId: string;
+  metodo: string;
+  tipo: string;
+  diferencia: string;
+  resultado: ResultadoCierre;
+}
+
+/** Lo que la caja muestra del Cierre Z ya generado: resultados, no el esperado. */
+export interface CierreZ {
+  id: string;
+  numero: number;
+  caja: string;
+  cajero: string;
+  efectivoContado: string;
+  lineas: LineaCierre[];
+  resultado: ResultadoCierre;
+}
+
+export interface CierreOut {
+  cierre: CierreZ;
+  impresoras: string[];
+  aviso?: string;
+}
+
 // ---------- Llamadas ----------
 
 export const nodo = {
@@ -219,5 +266,7 @@ export const nodo = {
   cerrarJornada: (transferirOrdenes: boolean) => api<Jornada>("POST", "/v1/jornada/cerrar", { transferirOrdenes }),
   abrirTurno: (cajaId: string, fondoInicial: string) => api<Turno>("POST", "/v1/turnos", { cajaId, fondoInicial }),
   movimiento: (b: { cajaId: string; tipo: TipoMovimiento; monto: string; motivo: string; idempotencyKey: string }) => api<Movimiento>("POST", "/v1/caja/movimientos", b),
+  cerrarTurno: (b: { cajaId: string; conteo: { clave: string; cantidad: number }[]; declarado: { metodoId: string; monto: string }[]; idempotencyKey: string }) =>
+    api<CierreOut>("POST", "/v1/turnos/cerrar", b),
   movimientos: (turnoId: string) => api<Movimiento[]>("GET", `/v1/turnos/${turnoId}/movimientos`),
 };

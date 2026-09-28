@@ -123,6 +123,8 @@ export interface Local {
   propinaLegalActiva: boolean;
   propinaPorcentaje: string;
   preciosIncluyenIva: boolean;
+  /** Diferencia de caja (USD) que convierte el correo del Cierre Z en alerta crítica. */
+  umbralAlertaCierre: string;
 }
 export interface Estacion {
   id: UUID;

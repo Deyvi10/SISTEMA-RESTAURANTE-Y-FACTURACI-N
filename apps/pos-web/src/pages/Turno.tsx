@@ -8,6 +8,7 @@ import { ApiError, type ConfigCaja, type EstadoCaja, type Movimiento, nodo, type
 import { useSesion } from "../api/sesion";
 import { useAtajo } from "../components/atajos";
 import { montoDe, TecladoMonto } from "../components/TecladoMonto";
+import { CierreTurno } from "./CierreTurno";
 
 const CLAVE_CAJA = "restpos.caja";
 
@@ -103,7 +104,7 @@ const MOVIMIENTO: Record<TipoMovimiento, { titulo: string; ayuda: string; signo:
   GASTO: { titulo: "Gasto menor", ayuda: "Compra pagada con el efectivo del cajón (hielo, gas, un repuesto).", signo: "−" },
 };
 
-type Hoja = { tipo: "abrir" } | { tipo: "movimiento"; mov: TipoMovimiento } | { tipo: "cerrarJornada" } | null;
+type Hoja = { tipo: "abrir" } | { tipo: "movimiento"; mov: TipoMovimiento } | { tipo: "cerrarJornada" } | { tipo: "cerrarTurno" } | null;
 
 export function Turno({ caja }: { caja: Caja }) {
   const { puede } = useSesion();
@@ -133,6 +134,7 @@ export function Turno({ caja }: { caja: Caja }) {
   useAtajo("F6", "Retiro a caja fuerte", () => setHoja({ tipo: "movimiento", mov: "RETIRO" }), "Turno", libre && !!turno);
   useAtajo("F7", "Ingreso de efectivo", () => setHoja({ tipo: "movimiento", mov: "INGRESO" }), "Turno", libre && !!turno);
   useAtajo("F8", "Gasto menor", () => setHoja({ tipo: "movimiento", mov: "GASTO" }), "Turno", libre && !!turno);
+  useAtajo("F4", "Cerrar el turno (cierre ciego)", () => setHoja({ tipo: "cerrarTurno" }), "Turno", libre && !!turno);
 
   if (config && !cajaId) {
     return (
@@ -230,6 +232,9 @@ export function Turno({ caja }: { caja: Caja }) {
                   </button>
                 ))}
               </div>
+              <button className="rp-btn rp-btn--tinted" disabled={!autorizado} onClick={() => setHoja({ tipo: "cerrarTurno" })} data-testid="cerrar-turno">
+                Cerrar turno <kbd className="tecla">F4</kbd>
+              </button>
             </>
           ) : (
             <>
@@ -274,6 +279,10 @@ export function Turno({ caja }: { caja: Caja }) {
       {hoja?.tipo === "movimiento" && cajaId && (
         <HojaMovimiento cajaId={cajaId} tipo={hoja.mov} cerrar={() => setHoja(null)} listo={(m) => hecho(`${MOVIMIENTO[m.tipo].titulo} de ${formatMoney(m.monto)} registrado.`)} />
       )}
+      {hoja?.tipo === "cerrarTurno" && cajaId && config && <CierreTurno cajaId={cajaId} config={config} cerrar={() => setHoja(null)} listo={(r) => {
+            setAviso(`Turno cerrado con el Cierre Z ${String(r.cierre.numero).padStart(4, "0")}. Abre un turno nuevo para volver a cobrar.`);
+            recargar();
+          }} />}
       {hoja?.tipo === "cerrarJornada" && <AlertaCerrarJornada cerrar={() => setHoja(null)} listo={(msg) => hecho(msg)} />}
     </section>
   );

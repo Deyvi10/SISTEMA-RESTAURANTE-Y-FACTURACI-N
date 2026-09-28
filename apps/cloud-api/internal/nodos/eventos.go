@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/auth"
+	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/caja"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/edgesync"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/ids"
 )
@@ -110,6 +111,8 @@ func (s *Service) Aplicador(n auth.Nodo) edgesync.Applier {
 			}
 			_, err := tx.Exec(ctx, `UPDATE dispositivos SET ultimo_uso_at = $2 WHERE id = $1 AND (ultimo_uso_at IS NULL OR ultimo_uso_at < $2)`, d.ID, e.CreatedAt)
 			return err
+		case caja.EventoCierreZ:
+			return caja.RegistrarCierre(ctx, tx, n.TenantID, n.LocalID, e.Payload)
 		case EventoImpresoraDetectada:
 			var d ImpresoraDetectada
 			if err := json.Unmarshal(e.Payload, &d); err != nil || d.ID == ids.Nil {

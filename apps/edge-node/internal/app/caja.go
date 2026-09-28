@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/edge-node/internal/store"
+	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/cierrez"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/edgesync"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/ids"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/money"
@@ -47,6 +48,8 @@ type ConfigCaja struct {
 	ConsumidorFinalMaximo string            `json:"consumidorFinalMaximo"`
 	PropinaActiva         bool              `json:"propinaActiva"`
 	PropinaPorcentaje     string            `json:"propinaPorcentaje"`
+	// Billetes y monedas del asistente de cierre (la lista vive en un solo lugar: cierrez).
+	Denominaciones []cierrez.Denominacion `json:"denominaciones"`
 }
 
 // consumidorFinalPorDefecto se usa si el nodo aún no recibió el parámetro global (DP-07).
@@ -54,7 +57,8 @@ const consumidorFinalPorDefecto = "50.00"
 
 func (a *App) ConfigCaja(ctx context.Context) (ConfigCaja, error) {
 	q := a.Store.Read()
-	c := ConfigCaja{Cajas: []Caja{}, Metodos: []MetodoPago{}, Motivos: []MotivoDescuento{}, ConsumidorFinalMaximo: consumidorFinalPorDefecto, PropinaPorcentaje: "10"}
+	c := ConfigCaja{Cajas: []Caja{}, Metodos: []MetodoPago{}, Motivos: []MotivoDescuento{}, ConsumidorFinalMaximo: consumidorFinalPorDefecto, PropinaPorcentaje: "10",
+		Denominaciones: cierrez.Denominaciones}
 	rows, err := q.QueryContext(ctx, `SELECT id, nombre, estacion_id FROM cajas WHERE deleted_at IS NULL AND activa = 1 ORDER BY nombre`)
 	if err != nil {
 		return c, err

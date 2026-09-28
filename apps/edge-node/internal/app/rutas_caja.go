@@ -51,6 +51,13 @@ func (a *App) rutasCaja() {
 		}
 		return a.AbrirTurno(ctx, u, in)
 	}))
+	m.Handle("POST /v1/turnos/cerrar", a.enCaja(func(ctx context.Context, _ Dispositivo, u Usuario, r *http.Request) (any, error) {
+		in, err := leer[CerrarTurnoIn](nil, r)
+		if err != nil {
+			return nil, err
+		}
+		return a.CerrarTurno(ctx, u, in)
+	}))
 	m.Handle("POST /v1/caja/movimientos", a.enCaja(func(ctx context.Context, _ Dispositivo, u Usuario, r *http.Request) (any, error) {
 		in, err := leer[MovimientoIn](nil, r)
 		if err != nil {

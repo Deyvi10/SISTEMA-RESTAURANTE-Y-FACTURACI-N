@@ -178,7 +178,7 @@ export function Ajustes() {
   useEffect(() => setForm(local), [local]);
   const guardar = useGuardar(() => api.editarLocal(local!.id, {
     nombre: form?.nombre, direccion: form?.direccion, propinaLegalActiva: form?.propinaLegalActiva,
-    propinaPorcentaje: form?.propinaPorcentaje, preciosIncluyenIva: form?.preciosIncluyenIva,
+    propinaPorcentaje: form?.propinaPorcentaje, preciosIncluyenIva: form?.preciosIncluyenIva, umbralAlertaCierre: form?.umbralAlertaCierre,
   }), ["locales", "productos"]);
   if (!form) return <Spinner />;
   const set = <K extends keyof typeof form>(k: K, v: (typeof form)[K]) => setForm({ ...form, [k]: v });
@@ -194,7 +194,7 @@ export function Ajustes() {
   return (
     <>
       <header className="page-head">
-        <div><h1 className="rp-t-large-title">Ajustes</h1><p>Datos de tu local, propina de servicio e IVA.</p></div>
+        <div><h1 className="rp-t-large-title">Ajustes</h1><p>Datos de tu local, propina de servicio, IVA y alertas de caja.</p></div>
         <button className="rp-btn rp-btn--primary" onClick={() => void onSave()} disabled={guardar.isPending}>{guardar.isPending ? "Guardando…" : "Guardar cambios"}</button>
       </header>
       <div style={{ maxWidth: 640, display: "flex", flexDirection: "column", gap: 18 }}>
@@ -217,6 +217,18 @@ export function Ajustes() {
           <ToggleRow label="Mis precios incluyen IVA" detalle={`Recomendado: lo que ve el cliente es lo que paga. Ej.: ${formatUSD("15.00")} ya con IVA.`} checked={form.preciosIncluyenIva} onChange={(v) => set("preciosIncluyenIva", v)} />
         </div>
         {errores.propinaPorcentaje && <p className="error-inline">{errores.propinaPorcentaje}</p>}
+        <div className="rp-section-header" style={{ margin: "0 4px -10px" }}>Cierre de caja</div>
+        <div className="rp-group" style={{ margin: 0 }}>
+          <div className="rp-cell">
+            <span className="rp-cell__body">
+              <span className="rp-cell__title">Alertarme si la diferencia pasa de</span>
+              <span className="rp-cell__subtitle">Cada Cierre Z te llega por correo en PDF; si un faltante o sobrante supera este monto, llega como alerta.</span>
+            </span>
+            <span>$</span>
+            <input aria-label="Umbral de alerta del cierre" inputMode="decimal" value={form.umbralAlertaCierre} onChange={(e) => set("umbralAlertaCierre", e.target.value)} style={{ width: 90, minHeight: 40, textAlign: "right" }} />
+          </div>
+        </div>
+        {errores.umbralAlertaCierre && <p className="error-inline">{errores.umbralAlertaCierre}</p>}
         <div className="rp-section-header" style={{ margin: "0 4px -10px" }}>Equipos</div>
         <div className="rp-group" style={{ margin: 0 }}>
           <Link to="/nodo" className="rp-cell" style={{ color: "inherit", textDecoration: "none" }}>

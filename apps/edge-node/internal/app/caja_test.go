@@ -64,7 +64,7 @@ var nocheDel25 = time.Date(2026, 9, 26, 3, 0, 0, 0, time.UTC)
 func TestConfigDeCaja(t *testing.T) {
 	c := nuevaCaja(t, nocheDel25)
 	st, cfg := c.pos.req("GET", "/v1/caja/config", nil)
-	if st != 200 || len(cfg["cajas"].([]any)) != 1 || len(cfg["metodos"].([]any)) != 2 || cfg["consumidorFinalMaximo"] != "50.00" || cfg["propinaActiva"] != true {
+	if st != 200 || len(cfg["cajas"].([]any)) != 1 || len(cfg["metodos"].([]any)) != 2 || cfg["consumidorFinalMaximo"] != "50.00" || cfg["propinaActiva"] != true || len(cfg["denominaciones"].([]any)) != 12 {
 		t.Fatalf("config: %d %v", st, cfg)
 	}
 	// Un teléfono de mesero no es una caja.

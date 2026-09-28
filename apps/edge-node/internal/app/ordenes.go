@@ -694,28 +694,15 @@ func (a *App) Precuenta(ctx context.Context, u Usuario, orden ids.ID, in Precuen
 		_ = tx.QueryRowContext(ctx, `SELECT nombre FROM locales LIMIT 1`).Scan(&local)
 		pc := escpos.PreCuenta{Local: local, Mesa: o.Mesa, Mesero: o.MeseroNombre, Hora: now.In(loc), Subtotal: base, IVA: iva, Propina: propina, Total: total, Personas: in.Personas}
 		pc.Lineas = lineasCuenta(o.Lineas)
-		// Estación de caja: sus impresoras; si no tiene, la primera impresora activa.
-		var cajaID string
-		err = tx.QueryRowContext(ctx, `SELECT id FROM estaciones WHERE tipo = 'CAJA' AND deleted_at IS NULL ORDER BY orden LIMIT 1`).Scan(&cajaID)
-		var imps []impresion.Impresora
-		if err == nil {
-			cid, _ := ids.Parse(cajaID)
-			imps, err = impresorasDe(ctx, tx, cid)
-			if err != nil {
-				return err
-			}
+		imps, respaldo, err := a.impresorasDeCaja(ctx, tx, nil)
+		if err != nil {
+			return err
 		}
-		if len(imps) == 0 {
-			todas, err := a.impresorasActivas(ctx)
-			if err != nil {
-				return err
-			}
-			if len(todas) > 0 {
-				imps = todas[:1]
-				out.Aviso = "La estación de caja no tiene impresora: la pre-cuenta salió en «" + todas[0].Nombre + "»."
-			} else {
-				out.Aviso = "No hay impresoras configuradas: la mesa quedó por pagar, pero no se imprimió nada."
-			}
+		switch {
+		case respaldo != "":
+			out.Aviso = "La estación de caja no tiene impresora: la pre-cuenta salió en «" + respaldo + "»."
+		case len(imps) == 0:
+			out.Aviso = "No hay impresoras configuradas: la mesa quedó por pagar, pero no se imprimió nada."
 		}
 		out.Impresoras = []string{}
 		oid := orden.String()

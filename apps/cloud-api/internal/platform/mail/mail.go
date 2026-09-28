@@ -4,6 +4,7 @@ package mail
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"fmt"
 	"html/template"
 	"mime"
@@ -14,10 +15,18 @@ import (
 )
 
 type Message struct {
-	To      string
-	Subject string
-	Text    string
-	HTML    string
+	To          string
+	Subject     string
+	Text        string
+	HTML        string
+	Attachments []Attachment
+}
+
+// Attachment es un archivo adjunto (p. ej. el PDF del Cierre Z).
+type Attachment struct {
+	Name        string
+	ContentType string
+	Data        []byte
 }
 
 type Sender interface {
@@ -37,12 +46,31 @@ func (s SMTP) Send(_ context.Context, m Message) error {
 	boundary := fmt.Sprintf("restpos-%d", time.Now().UnixNano())
 	var b bytes.Buffer
 	fmt.Fprintf(&b, "From: %s\r\nTo: %s\r\nSubject: %s\r\nMIME-Version: 1.0\r\n", s.From, m.To, mime.QEncoding.Encode("utf-8", m.Subject))
+	if len(m.Attachments) > 0 {
+		// multipart/mixed: el cuerpo (texto + HTML) y luego los adjuntos en base64.
+		fmt.Fprintf(&b, "Content-Type: multipart/mixed; boundary=%s-m\r\n\r\n--%s-m\r\n", boundary, boundary)
+	}
 	fmt.Fprintf(&b, "Content-Type: multipart/alternative; boundary=%s\r\n\r\n", boundary)
 	fmt.Fprintf(&b, "--%s\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n%s\r\n", boundary, m.Text)
 	if m.HTML != "" {
 		fmt.Fprintf(&b, "--%s\r\nContent-Type: text/html; charset=utf-8\r\n\r\n%s\r\n", boundary, m.HTML)
 	}
 	fmt.Fprintf(&b, "--%s--\r\n", boundary)
+	for _, a := range m.Attachments {
+		if strings.ContainsAny(a.Name+a.ContentType, "\r\n\"") {
+			return fmt.Errorf("mail: adjunto con nombre inválido")
+		}
+		fmt.Fprintf(&b, "--%s-m\r\nContent-Type: %s; name=\"%s\"\r\nContent-Disposition: attachment; filename=\"%s\"\r\nContent-Transfer-Encoding: base64\r\n\r\n", boundary, a.ContentType, a.Name, a.Name)
+		enc := base64.StdEncoding.EncodeToString(a.Data)
+		for len(enc) > 76 {
+			b.WriteString(enc[:76] + "\r\n")
+			enc = enc[76:]
+		}
+		b.WriteString(enc + "\r\n")
+	}
+	if len(m.Attachments) > 0 {
+		fmt.Fprintf(&b, "--%s-m--\r\n", boundary)
+	}
 	from := s.From
 	if i := strings.LastIndex(from, "<"); i >= 0 {
 		from = strings.Trim(from[i:], "<>")

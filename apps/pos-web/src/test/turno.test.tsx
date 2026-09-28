@@ -2,6 +2,8 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
 import { describe, expect, it } from "vitest";
 import { montoDe, TecladoMonto, teclearMonto, verMonto } from "../components/TecladoMonto";
+import { AtajosProvider } from "../components/atajos";
+import { CierreTurno, centavos, montoValido, totalContado } from "../pages/CierreTurno";
 import { cajaDeEstaPC, verFecha } from "../pages/Turno";
 
 const escribir = (teclas: string[]) => teclas.reduce(teclearMonto, "");
@@ -59,5 +61,49 @@ describe("turno de caja", () => {
 
   it("la fecha de negocio se lee sin zona horaria", () => {
     expect(verFecha("2026-09-25")).toBe("viernes, 25 de septiembre");
+  });
+});
+
+describe("cierre de turno", () => {
+  const dens = [
+    { clave: "B20", valor: "20", moneda: false, etiqueta: "$20" },
+    { clave: "B1", valor: "1", moneda: false, etiqueta: "$1" },
+    { clave: "M0.25", valor: "0.25", moneda: true, etiqueta: "25¢" },
+    { clave: "M0.01", valor: "0.01", moneda: true, etiqueta: "1¢" },
+  ];
+
+  it("suma el conteo en centavos exactos", () => {
+    expect(centavos("0.25")).toBe(25);
+    expect(centavos("100")).toBe(10000);
+    expect(centavos("0.1")).toBe(10);
+    expect(totalContado(dens, {})).toBe("0.00");
+    expect(totalContado(dens, { B20: 3, B1: 2, "M0.25": 3, "M0.01": 7 })).toBe("62.82");
+    // 0.1 + 0.2 en coma flotante no da 0.3; en centavos sí.
+    expect(totalContado([{ clave: "a", valor: "0.10", moneda: true, etiqueta: "" }, { clave: "b", valor: "0.20", moneda: true, etiqueta: "" }], { a: 1, b: 1 })).toBe("0.30");
+  });
+
+  it("valida los montos declarados", () => {
+    expect(["15.40", "0", "12", " 3.5 "].every(montoValido)).toBe(true);
+    expect(["15.405", "-2", "abc", "", "1,5"].some(montoValido)).toBe(false);
+  });
+
+  it("el contador responde a +, −, flechas y números", () => {
+    render(
+      <AtajosProvider>
+        <CierreTurno cajaId="c" config={{ cajas: [], metodos: [], consumidorFinalMaximo: "50.00", denominaciones: dens }} cerrar={() => {}} listo={() => {}} />
+      </AtajosProvider>,
+    );
+    const fila = screen.getByTestId("den-B20");
+    fireEvent.keyDown(fila, { key: "+" });
+    fireEvent.keyDown(fila, { key: "ArrowRight" });
+    fireEvent.keyDown(fila, { key: "-" });
+    expect(fila).toHaveAccessibleName("$20 billete: 1");
+    fireEvent.keyDown(fila, { key: "Backspace" });
+    fireEvent.keyDown(fila, { key: "1" });
+    fireEvent.keyDown(fila, { key: "2" });
+    expect(fila).toHaveAccessibleName("$20 billete: 12");
+    expect(screen.getByText("$240.00", { selector: "b" })).toBeInTheDocument();
+    // Sin métodos distintos del efectivo, el asistente salta ese paso.
+    expect(screen.getByText("1 de 3")).toBeInTheDocument();
   });
 });

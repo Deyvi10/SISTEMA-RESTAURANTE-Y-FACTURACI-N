@@ -119,3 +119,29 @@ button { font: inherit; }
 .hoja-caja__pie { display: flex; flex-direction: column; gap: 12px; padding: 12px 20px 0; }
 .teclado-monto { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 8px 20px; }
 .teclado-monto__valor { font: 300 48px/1.1 var(--rp-font-display, inherit); letter-spacing: -0.5px; min-height: 56px; }
+
+/* ---------- Cierre de turno (F4-12) ---------- */
+.hoja-cierre { width: min(520px, 94vw); }
+.hoja-cierre .rp-sheet__header .pasos { justify-self: end; font-size: 13px; }
+.hoja-cierre .rp-section-header { margin: 4px 20px 6px; }
+.hoja-cierre .hoja-caja__ayuda { margin-bottom: 10px; font-size: 14px; }
+.hoja-cierre .rp-group { margin: 0 20px; }
+.contador { min-height: 52px; }
+.contador:focus-visible { outline: 3px solid var(--rp-color-accent); outline-offset: -3px; }
+.contador__etiqueta { font: 600 19px/1.2 var(--rp-font-display, inherit); }
+.contador__subtotal { min-width: 80px; text-align: right; }
+.contador .rp-stepper svg { width: 18px; height: 18px; }
+.contador .rp-stepper button:disabled { opacity: 0.35; cursor: default; }
+.monto-voucher { width: 110px; min-height: 40px; text-align: right; font: inherit; border-radius: 10px; border: 1px solid var(--rp-color-separator); background: var(--rp-color-surface); color: var(--rp-color-label); padding: 0 10px; }
+.monto-voucher[aria-invalid="true"] { border-color: var(--rp-color-danger-text); }
+.cierre__contado { margin: 0; text-align: center; color: var(--rp-color-label-secondary); }
+.cierre__contado b { color: var(--rp-color-label); font-size: 20px; margin-left: 6px; }
+.cierre-resultado { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 8px 0 4px; }
+.cierre-resultado .rp-group { align-self: stretch; }
+.cierre-resultado__icono { width: 84px; height: 84px; }
+.cierre-resultado[data-tono="verde"] .cierre-resultado__icono { color: var(--rp-color-success-text); }
+.cierre-resultado[data-tono="amarillo"] .cierre-resultado__icono { color: var(--rp-color-warning-text); }
+.cierre-resultado[data-tono="rojo"] .cierre-resultado__icono { color: var(--rp-color-danger-fill); }
+.cierre-resultado__titulo { margin: 0; }
+.cierre-resultado [data-tono="amarillo"] .rp-cell__subtitle { color: var(--rp-color-warning-text); }
+.cierre-resultado [data-tono="rojo"] .rp-cell__subtitle { color: var(--rp-color-danger-text); }

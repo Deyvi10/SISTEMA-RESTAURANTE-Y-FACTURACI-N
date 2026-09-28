@@ -30,19 +30,20 @@ type Local struct {
 	PropinaLegalActiva    bool   `json:"propinaLegalActiva"`
 	PropinaPorcentaje     string `json:"propinaPorcentaje"`
 	PreciosIncluyenIVA    bool   `json:"preciosIncluyenIva"`
+	UmbralAlertaCierre    string `json:"umbralAlertaCierre"` // diferencia de caja que dispara la alerta crítica (F4-12)
 }
 
 func (s *Service) Locales(ctx context.Context, p auth.Principal) ([]Local, error) {
 	var out []Local
 	err := s.DB.InTenant(ctx, p.TenantID, func(tx db.Tx) error {
-		rows, err := tx.Query(ctx, `SELECT id, nombre, direccion, codigo_establecimiento, zona_horaria, propina_legal_activa, propina_porcentaje::text, precios_incluyen_iva
+		rows, err := tx.Query(ctx, `SELECT id, nombre, direccion, codigo_establecimiento, zona_horaria, propina_legal_activa, propina_porcentaje::text, precios_incluyen_iva, umbral_alerta_cierre::text
 			FROM locales WHERE deleted_at IS NULL ORDER BY codigo_establecimiento`)
 		if err != nil {
 			return err
 		}
 		out, err = pgx.CollectRows(rows, func(r pgx.CollectableRow) (Local, error) {
 			var l Local
-			err := r.Scan(&l.ID, &l.Nombre, &l.Direccion, &l.CodigoEstablecimiento, &l.ZonaHoraria, &l.PropinaLegalActiva, &l.PropinaPorcentaje, &l.PreciosIncluyenIVA)
+			err := r.Scan(&l.ID, &l.Nombre, &l.Direccion, &l.CodigoEstablecimiento, &l.ZonaHoraria, &l.PropinaLegalActiva, &l.PropinaPorcentaje, &l.PreciosIncluyenIVA, &l.UmbralAlertaCierre)
 			return l, err
 		})
 		return err
@@ -56,6 +57,7 @@ type LocalCambios struct {
 	PropinaLegalActiva *bool   `json:"propinaLegalActiva"`
 	PropinaPorcentaje  *string `json:"propinaPorcentaje"`
 	PreciosIncluyenIVA *bool   `json:"preciosIncluyenIva"`
+	UmbralAlertaCierre *string `json:"umbralAlertaCierre"`
 }
 
 func (s *Service) ActualizarLocal(ctx context.Context, p auth.Principal, id ids.ID, c LocalCambios) (Local, error) {
@@ -68,6 +70,10 @@ func (s *Service) ActualizarLocal(ctx context.Context, p auth.Principal, id ids.
 		d, err := decimal.NewFromString(*c.PropinaPorcentaje)
 		v.Check(err == nil && !d.IsNegative() && d.LessThanOrEqual(decimal.NewFromInt(100)), "propinaPorcentaje", "Escribe un porcentaje entre 0 y 100.")
 	}
+	if c.UmbralAlertaCierre != nil {
+		d, err := decimal.NewFromString(strings.TrimSpace(*c.UmbralAlertaCierre))
+		v.Check(err == nil && !d.IsNegative() && d.Exponent() >= -2 && d.LessThan(decimal.NewFromInt(100000)), "umbralAlertaCierre", "Escribe un monto en dólares, de 0 en adelante y con hasta dos decimales.")
+	}
 	if err := v.Err(); err != nil {
 		return Local{}, err
 	}
@@ -75,8 +81,8 @@ func (s *Service) ActualizarLocal(ctx context.Context, p auth.Principal, id ids.
 		tag, err := tx.Exec(ctx, `UPDATE locales SET
 			nombre = coalesce($2, nombre), direccion = coalesce($3, direccion),
 			propina_legal_activa = coalesce($4, propina_legal_activa), propina_porcentaje = coalesce($5::numeric, propina_porcentaje),
-			precios_incluyen_iva = coalesce($6, precios_incluyen_iva)
-			WHERE id = $1 AND deleted_at IS NULL`, id, c.Nombre, c.Direccion, c.PropinaLegalActiva, c.PropinaPorcentaje, c.PreciosIncluyenIVA)
+			precios_incluyen_iva = coalesce($6, precios_incluyen_iva), umbral_alerta_cierre = coalesce($7::numeric, umbral_alerta_cierre)
+			WHERE id = $1 AND deleted_at IS NULL`, id, c.Nombre, c.Direccion, c.PropinaLegalActiva, c.PropinaPorcentaje, c.PreciosIncluyenIVA, c.UmbralAlertaCierre)
 		if err == nil && tag.RowsAffected() == 0 {
 			return apperr.ErrNotFound
 		}

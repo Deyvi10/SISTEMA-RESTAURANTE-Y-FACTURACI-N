@@ -163,6 +163,7 @@ func serve(ctx context.Context) error {
 		Caja: &caja.Service{DB: app.DB},
 	}
 	go deps.Nodos.Avisos.Escuchar(ctx, app.DB.Pool, slog.Default())
+	go (&caja.Notificador{DB: app.DB, Mail: app.Mail, Log: slog.Default()}).Correr(ctx, app.DB.Pool)
 	srv := &http.Server{
 		Addr: cfg.HTTPAddr, Handler: server.Handler(deps, server.Routes(deps)),
 		ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 30 * time.Second, WriteTimeout: 60 * time.Second, IdleTimeout: 120 * time.Second,

@@ -10,6 +10,8 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/cierrez"
+	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/ids"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/money"
 	"pgregory.net/rapid"
 )
@@ -237,4 +239,24 @@ func TestQRTooLongFallsBackToText(t *testing.T) {
 	if !strings.Contains(doc.Text(), "AAAA") || len(doc.Warnings) > 0 {
 		t.Fatalf("se esperaba el texto sin advertencias: %v", doc.Warnings)
 	}
+}
+
+func TestGoldenCierreZ(t *testing.T) {
+	efectivo, tarjeta := ids.New(), ids.New()
+	c := cierrez.Cierre{
+		Local: "Cevichería Don Pepe", Caja: "Caja 1", Numero: 7, Cajero: "Luis P.", CerradoPor: "Pepe Andrade", FechaNegocio: "2026-09-24",
+		AbiertoAt: hora.Add(-5 * time.Hour), CerradoAt: hora,
+		Movimientos: cierrez.Movimientos{FondoInicial: money.MustParse("50"), Ingresos: money.MustParse("10"), Retiros: money.MustParse("100"), Gastos: money.MustParse("3.50")},
+		Conteo:      []cierrez.Conteo{{Clave: "B20", Cantidad: 3}, {Clave: "B10", Cantidad: 1}, {Clave: "B5", Cantidad: 1}, {Clave: "M1", Cantidad: 1}, {Clave: "M0.25", Cantidad: 3}, {Clave: "B100", Cantidad: 0}},
+		Hash:        "9f2c4e1a7b3d5f60aa11bb22cc33dd44ee55ff6677889900aabbccddeeff0011", HashAnterior: "0011aabbccddeeff00112233445566778899aabbccddeeff0011223344556677",
+	}
+	c.EfectivoTotal, _ = cierrez.TotalConteo(c.Conteo)
+	c.Lineas, c.Resultado = cierrez.Calcular([]cierrez.Metodo{{ID: efectivo, Nombre: "Efectivo", Tipo: "EFECTIVO"}, {ID: tarjeta, Nombre: "Tarjeta crédito", Tipo: "TARJETA_CREDITO"}},
+		c.Movimientos, map[ids.ID]money.Money{efectivo: money.MustParse("120.40"), tarjeta: money.MustParse("35.40")}, c.EfectivoTotal, map[ids.ID]money.Money{tarjeta: money.MustParse("30.40")})
+	doc := Decode(ImprimirCierreZ(Paper80, c, time.UTC))
+	if len(doc.Warnings) > 0 {
+		t.Fatal(doc.Warnings)
+	}
+	golden(t, "cierre-z-80", doc.Text())
+	golden(t, "cierre-z-58", Decode(ImprimirCierreZ(Paper58, c, time.UTC)).Text())
 }
