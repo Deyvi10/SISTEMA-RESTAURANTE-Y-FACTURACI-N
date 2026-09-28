@@ -135,13 +135,26 @@ func TestKill9NoCorrompe(t *testing.T) {
 		t.Skip("prueba de procesos")
 	}
 	path := filepath.Join(t.TempDir(), "nodo.db")
+	listo := path + ".escribiendo"
 	for ronda := range 6 {
+		_ = os.Remove(listo)
 		cmd := exec.Command(os.Args[0], "-test.run=^TestAyudanteEscritor$") //nolint:gosec // re-ejecuta el binario de prueba
-		cmd.Env = append(os.Environ(), "RESTPOS_ESCRITOR_DB="+path)
+		cmd.Env = append(os.Environ(), "RESTPOS_ESCRITOR_DB="+path, "RESTPOS_ESCRITOR_LISTO="+listo)
 		if err := cmd.Start(); err != nil {
 			t.Fatal(err)
 		}
-		time.Sleep(time.Duration(150+ronda*60) * time.Millisecond)
+		// El corte cae en plena escritura: se espera a que el hijo haya migrado la base y
+		// empezado a escribir (no un tiempo fijo, que depende de la carga de la máquina).
+		for fin := time.Now().Add(20 * time.Second); ; time.Sleep(5 * time.Millisecond) {
+			if _, err := os.Stat(listo); err == nil {
+				break
+			}
+			if time.Now().After(fin) {
+				_ = cmd.Process.Kill()
+				t.Fatal("el proceso hijo no empezó a escribir")
+			}
+		}
+		time.Sleep(time.Duration(40+ronda*30) * time.Millisecond)
 		_ = cmd.Process.Kill()
 		_ = cmd.Wait()
 	}
@@ -177,6 +190,9 @@ func TestAyudanteEscritor(t *testing.T) {
 	}
 	relleno := make([]byte, 4096)
 	for i := 0; ; i++ {
+		if i == 20 {
+			_ = os.WriteFile(os.Getenv("RESTPOS_ESCRITOR_LISTO"), nil, 0o600) // ya hay escrituras en curso
+		}
 		id := fmt.Sprintf("%d-%d", os.Getpid(), i)
 		_ = s.Write(ctx, func(tx *sql.Tx) error {
 			for _, lado := range []string{"a", "b"} {
