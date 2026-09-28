@@ -90,6 +90,52 @@ describe("pantalla de cobro", () => {
   });
 });
 
+describe("cuenta dividida", () => {
+  const lineas = [
+    { id: "l1", producto: "Arroz marinero", cantidad: "1", modificadores: [], estado: "ENVIADA", total: "14.00" },
+    { id: "l2", producto: "Cerveza", cantidad: "2", modificadores: [], estado: "ENVIADA", total: "6.00" },
+  ];
+  const cuenta = (id: string, numero: number, estado: "ABIERTA" | "PAGADA", asig: [string, number][], lin: Record<string, string>, total: string) => ({
+    id, numero, estado, asignaciones: asig.map(([lineaId, peso]) => ({ lineaId, peso })), lineas: lin, subtotal: "14.78", iva: "2.22", propina: "1.48", total,
+  });
+
+  it("cobra la cuenta elegida con sus totales y ofrece la siguiente", async () => {
+    vi.spyOn(nodo, "orden").mockResolvedValue({ orden: { ...orden, lineas }, totales: totales("22.00") });
+    vi.spyOn(nodo, "cuentas").mockResolvedValue({
+      cuentas: [cuenta("c1", 1, "ABIERTA", [["l1", 1], ["l2", 1]], { l1: "14.00", l2: "3.00" }, "18.48"), cuenta("c2", 2, "ABIERTA", [["l2", 1]], { l2: "3.00" }, "3.52")],
+      sinCuenta: [],
+      total: "22.00",
+    });
+    const cobrar = vi.spyOn(nodo, "cobrar").mockResolvedValue({
+      documento: { ...docCF, id: "d", cuenta: 1, codigo: "INT-000002", mesa: "Mesa 4", totales: totales("18.48"), metodo: "Efectivo", pagos: [], recibido: "18.48", vuelto: "0.00", abreCajon: true },
+      impresoras: ["Caja"],
+      cerrada: false,
+    });
+    montar();
+    await waitFor(() => expect(screen.getByTestId("total")).toHaveTextContent("$18.48"));
+    expect(screen.getByText("Total de la cuenta 1")).toBeInTheDocument();
+    expect(screen.getByText("Compartido · 1/2")).toBeInTheDocument();
+    expect(screen.getByText("$14.78")).toBeInTheDocument(); // subtotal de la cuenta, no de la orden
+    expect(screen.getByTestId("elegir-cuenta-2")).toHaveTextContent("Cuenta 2 $3.52");
+    fireEvent.click(screen.getByTestId("billete-18.48"));
+    expect(cobrar).toHaveBeenCalledWith("o1", expect.objectContaining({ cuentaId: "c1", recibido: "18.48" }));
+    expect(await screen.findByTestId("siguiente-cuenta")).toBeInTheDocument();
+    expect(screen.getByText(/cuenta 1 de Mesa 4 cobrada/)).toBeInTheDocument();
+  });
+
+  it("con la división abierta, las teclas del cobro no cobran", async () => {
+    vi.spyOn(nodo, "orden").mockResolvedValue({ orden: { ...orden, lineas }, totales: totales("22.00") });
+    vi.spyOn(nodo, "cuentas").mockResolvedValue({ cuentas: [], sinCuenta: [], total: "22.00" });
+    const cobrar = vi.spyOn(nodo, "cobrar");
+    montar();
+    await waitFor(() => expect(screen.getByTestId("total")).toHaveTextContent("$22.00"));
+    act(() => void fireEvent.keyDown(window, { key: "v" }));
+    await screen.findByTestId("division");
+    act(() => void fireEvent.keyDown(window, { key: "1" }));
+    expect(cobrar).not.toHaveBeenCalled();
+  });
+});
+
 describe("pago mixto", () => {
   const ef = metodos[0]!;
   const tc = metodos[1]!;

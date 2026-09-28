@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"github.com/shopspring/decimal"
+
+	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/testdata"
 	"pgregory.net/rapid"
 )
 
@@ -157,4 +159,71 @@ func TestPropertySplitAndAllocatePreserveTotal(t *testing.T) {
 			}
 		}
 	})
+}
+
+func TestAllocateUltimo(t *testing.T) {
+	uno := decimal.NewFromInt(1)
+	cases := []struct {
+		total string
+		pesos []int64
+		want  []string
+	}{
+		{"10.00", []int64{1, 1, 1}, []string{"3.33", "3.33", "3.34"}},
+		{"0.02", []int64{1, 1, 1}, []string{"0.00", "0.01", "0.01"}},
+		{"12.50", []int64{2, 1}, []string{"8.33", "4.17"}},
+		{"7.00", []int64{1, 0, 1}, []string{"3.50", "0.00", "3.50"}},
+	}
+	for _, c := range cases {
+		ws := make([]decimal.Decimal, len(c.pesos))
+		for i, p := range c.pesos {
+			ws[i] = uno.Mul(decimal.NewFromInt(p))
+		}
+		got, err := AllocateUltimo(MustParse(c.total), ws)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for i := range got {
+			if got[i].String() != c.want[i] {
+				t.Fatalf("%s %v: %v, quiero %v", c.total, c.pesos, got, c.want)
+			}
+		}
+	}
+	// Allocate conserva su desempate hacia el primero.
+	a, _ := Allocate(MustParse("10.00"), []decimal.Decimal{uno, uno, uno})
+	if a[0].String() != "3.34" {
+		t.Fatalf("Allocate cambió: %v", a)
+	}
+}
+
+// Los mismos casos que la vista previa de la caja (packages/testdata/reparto-centavos.json).
+func TestVectoresRepartoCentavos(t *testing.T) {
+	var v struct {
+		Casos []struct {
+			Total    string   `json:"total"`
+			Pesos    []int64  `json:"pesos"`
+			Esperado []string `json:"esperado"`
+		} `json:"casos"`
+	}
+	b, err := testdata.FS.ReadFile("reparto-centavos.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(b, &v); err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range v.Casos {
+		ws := make([]decimal.Decimal, len(c.Pesos))
+		for i, p := range c.Pesos {
+			ws[i] = decimal.NewFromInt(p)
+		}
+		got, err := AllocateUltimo(MustParse(c.Total), ws)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for i := range got {
+			if got[i].String() != c.Esperado[i] {
+				t.Fatalf("%s %v: %v, quiero %v", c.Total, c.Pesos, got, c.Esperado)
+			}
+		}
+	}
 }

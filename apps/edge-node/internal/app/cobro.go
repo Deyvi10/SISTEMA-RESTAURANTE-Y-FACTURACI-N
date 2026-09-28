@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"regexp"
 	"strings"
@@ -43,8 +44,10 @@ type CobrarIn struct {
 	Pagos           []PagoIn `json:"pagos"` // pago mixto: varios métodos que suman el total
 	ConsumidorFinal bool     `json:"consumidorFinal"`
 	// Comprador identificado (F4-07). Nulo con ConsumidorFinal = venta a consumidor final.
-	Comprador      *CompradorIn `json:"comprador"`
-	IdempotencyKey string       `json:"idempotencyKey"`
+	Comprador *CompradorIn `json:"comprador"`
+	// Cuenta que se cobra cuando la orden está dividida (F4-08).
+	CuentaID       *ids.ID `json:"cuentaId"`
+	IdempotencyKey string  `json:"idempotencyKey"`
 	// Cobro de un solo método (el toque en un billete): equivale a Pagos con un elemento.
 	MetodoID   ids.ID `json:"metodoId"`
 	Recibido   string `json:"recibido"`
@@ -69,13 +72,15 @@ type PagoDoc struct {
 
 // DocumentoVenta es lo que devuelve el cobro: el documento emitido y el vuelto.
 type DocumentoVenta struct {
-	ID        ids.ID `json:"id"`
-	Tipo      string `json:"tipo"` // INTERNO (en F5, el comprobante electrónico)
-	Numero    int    `json:"numero"`
-	Codigo    string `json:"codigo"` // INT-000123
-	OrdenID   ids.ID `json:"ordenId"`
-	Mesa      string `json:"mesa"`
-	Comprador string `json:"comprador"` // nombre o razón social
+	ID        ids.ID  `json:"id"`
+	Tipo      string  `json:"tipo"` // INTERNO (en F5, el comprobante electrónico)
+	Numero    int     `json:"numero"`
+	Codigo    string  `json:"codigo"` // INT-000123
+	OrdenID   ids.ID  `json:"ordenId"`
+	CuentaID  *ids.ID `json:"cuentaId,omitempty"`
+	Cuenta    int     `json:"cuenta,omitempty"` // número de la cuenta si la orden se dividió
+	Mesa      string  `json:"mesa"`
+	Comprador string  `json:"comprador"` // nombre o razón social
 	// Identificación del comprador con su código SRI (07 = consumidor final).
 	CompradorTipo           string    `json:"compradorTipo"`
 	CompradorIdentificacion string    `json:"compradorIdentificacion"`
@@ -96,6 +101,7 @@ type DocumentoVenta struct {
 
 type CobroOut struct {
 	Documento  DocumentoVenta `json:"documento"`
+	Cerrada    bool           `json:"cerrada"` // la orden quedó cerrada (con división: al cobrar la última cuenta)
 	Impresoras []string       `json:"impresoras"`
 	Aviso      string         `json:"aviso,omitempty"`
 }
@@ -205,9 +211,41 @@ func (a *App) Cobrar(ctx context.Context, u Usuario, orden ids.ID, in CobrarIn) 
 		if err != nil {
 			return err
 		}
+		// Orden dividida (F4-08): se cobra una cuenta, con sus propios totales.
+		_, cuentas, res, _, errCuentas := a.cuentasDe(ctx, tx, o)
+		var cuenta *CuentaTotales
+		switch {
+		case len(cuentas) == 0 && in.CuentaID != nil:
+			return invalido("Esta orden no está dividida.")
+		case len(cuentas) > 0:
+			if errCuentas != nil {
+				return errDivision(errCuentas, o)
+			}
+			if in.CuentaID == nil {
+				return problema(http.StatusConflict, "ORDEN_DIVIDIDA", "La orden está dividida: elige qué cuenta cobras.")
+			}
+			for i := range res {
+				if res[i].ID == *in.CuentaID {
+					cuenta = &res[i]
+				}
+			}
+			if cuenta == nil {
+				return problema(http.StatusNotFound, "NO_ENCONTRADO", "Esa cuenta no es de esta orden.")
+			}
+			if cuenta.Pagada {
+				return problema(http.StatusConflict, "CUENTA_PAGADA", "Esa cuenta ya se cobró.")
+			}
+			base, iva, propina, total = cuenta.Subtotal, cuenta.IVA, cuenta.Propina, cuenta.Total
+			lineas := map[ids.ID]string{}
+			for l, m := range cuenta.Lineas {
+				lineas[l] = m.String()
+			}
+			tot = Totales{Subtotal: base.String(), IVA: iva.String(), Propina: propina.String(), Total: total.String(), PropinaActiva: tot.PropinaActiva,
+				PropinaPorcentaje: tot.PropinaPorcentaje, PropinaRetirada: tot.PropinaRetirada, Descuento: "0.00", Descuentos: []Descuento{}, Lineas: lineas, PorTarifa: cuenta.PorTarifa}
+		}
 		// Total en cero: si todo es cortesía la orden se cierra con un documento en $0 (sin pagos
 		// ni cajón); sin platos o sin descuentos no hay nada que cobrar.
-		todoCortesia := total.IsZero() && tot.Descuento != "0.00" && len(o.Lineas) > 0
+		todoCortesia := total.IsZero() && (tot.Descuento != "0.00" || cuenta != nil) && len(o.Lineas) > 0
 		if !total.GreaterThan(money.Money{}) && !todoCortesia {
 			return problema(http.StatusConflict, "ORDEN_VACIA", "La orden no tiene nada que cobrar.")
 		}
@@ -237,7 +275,7 @@ func (a *App) Cobrar(ctx context.Context, u Usuario, orden ids.ID, in CobrarIn) 
 			ON CONFLICT (clave) DO UPDATE SET valor = valor + 1 RETURNING valor`).Scan(&numero); err != nil {
 			return err
 		}
-		doc := DocumentoVenta{ID: ids.New(), Tipo: "INTERNO", Numero: numero, Codigo: escpos.NumeroInterno(numero), OrdenID: o.ID, Mesa: o.Mesa,
+		doc := DocumentoVenta{ID: ids.New(), Tipo: "INTERNO", Numero: numero, Codigo: escpos.NumeroInterno(numero), OrdenID: o.ID, CuentaID: in.CuentaID, Mesa: o.Mesa,
 			Comprador: comprador.RazonSocial, CompradorTipo: comprador.TipoIdentificacion, CompradorIdentificacion: comprador.Identificacion,
 			CompradorEmail: comprador.Email, CompradorDireccion: comprador.Direccion, CompradorTelefono: comprador.Telefono, Totales: tot, Metodo: metodo, Pagos: docPagos, Recibido: recibido.String(), Vuelto: vuelto.String(),
 			AbreCajon: abreCajon, Cajero: u.Nombre, TurnoID: t.ID, EmitidoAt: now}
@@ -248,21 +286,24 @@ func (a *App) Cobrar(ctx context.Context, u Usuario, orden ids.ID, in CobrarIn) 
 			}
 			doc.ClienteGuardado = true
 		}
+		if cuenta != nil {
+			doc.Cuenta = cuenta.Numero
+		}
 		raw, err := json.Marshal(doc)
 		if err != nil {
 			return err
 		}
 		ts := now.Format(time.RFC3339Nano)
 		if _, err := tx.ExecContext(ctx, `INSERT INTO documentos_venta (id, numero, orden_id, turno_id, comprador_tipo, comprador_identificacion, comprador_nombre,
-			subtotal, iva, propina, total, datos, idempotency_key, emitido_por, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			subtotal, iva, propina, total, datos, idempotency_key, emitido_por, created_at, cuenta_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			doc.ID.String(), numero, o.ID.String(), t.ID.String(), comprador.TipoIdentificacion, comprador.Identificacion, comprador.RazonSocial,
-			base.String(), iva.String(), propina.String(), total.String(), string(raw), in.IdempotencyKey, u.ID.String(), ts); err != nil {
+			base.String(), iva.String(), propina.String(), total.String(), string(raw), in.IdempotencyKey, u.ID.String(), ts, idOrNil(in.CuentaID)); err != nil {
 			return err
 		}
 		for _, p := range docPagos {
-			if _, err := tx.ExecContext(ctx, `INSERT INTO pagos (id, orden_id, turno_id, metodo_pago_id, monto, recibido, vuelto, referencia, lote, ultimos4, documento_id, created_at)
-				VALUES (?, ?, ?, ?, ?, nullif(?, ''), nullif(?, ''), nullif(?, ''), nullif(?, ''), nullif(?, ''), ?, ?)`,
-				ids.New().String(), o.ID.String(), t.ID.String(), p.MetodoID.String(), p.Monto, p.Recibido, p.Vuelto, p.Referencia, p.Lote, p.Ultimos4, doc.ID.String(), ts); err != nil {
+			if _, err := tx.ExecContext(ctx, `INSERT INTO pagos (id, orden_id, cuenta_id, turno_id, metodo_pago_id, monto, recibido, vuelto, referencia, lote, ultimos4, documento_id, created_at)
+				VALUES (?, ?, ?, ?, ?, ?, nullif(?, ''), nullif(?, ''), nullif(?, ''), nullif(?, ''), nullif(?, ''), ?, ?)`,
+				ids.New().String(), o.ID.String(), idOrNil(in.CuentaID), t.ID.String(), p.MetodoID.String(), p.Monto, p.Recibido, p.Vuelto, p.Referencia, p.Lote, p.Ultimos4, doc.ID.String(), ts); err != nil {
 				return err
 			}
 		}
@@ -277,11 +318,30 @@ func (a *App) Cobrar(ctx context.Context, u Usuario, orden ids.ID, in CobrarIn) 
 				return err
 			}
 		}
-		// La orden se cierra y la mesa queda libre; se suelta cualquier bloqueo vencido.
-		if _, err := tx.ExecContext(ctx, `UPDATE ordenes SET estado = 'CERRADA', cerrada_at = ?, version = version + 1 WHERE id = ?`, ts, o.ID.String()); err != nil {
-			return err
+		// Una cuenta cobrada queda congelada con lo que pagó; la orden se cierra con la última.
+		cerrar := true
+		if cuenta != nil {
+			pagado, err := json.Marshal(cuenta)
+			if err != nil {
+				return err
+			}
+			if _, err := tx.ExecContext(ctx, `UPDATE cuentas SET estado = 'PAGADA', documento_id = ?, pagado = ?, pagada_at = ? WHERE id = ?`,
+				doc.ID.String(), string(pagado), ts, cuenta.ID.String()); err != nil {
+				return err
+			}
+			var abiertas int
+			if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM cuentas WHERE orden_id = ? AND estado = 'ABIERTA'`, o.ID.String()).Scan(&abiertas); err != nil {
+				return err
+			}
+			cerrar = abiertas == 0
 		}
-		if o.MesaID != nil {
+		if cerrar {
+			// La orden se cierra y la mesa queda libre; se suelta cualquier bloqueo vencido.
+			if _, err := tx.ExecContext(ctx, `UPDATE ordenes SET estado = 'CERRADA', cerrada_at = ?, version = version + 1 WHERE id = ?`, ts, o.ID.String()); err != nil {
+				return err
+			}
+		}
+		if o.MesaID != nil && cerrar {
 			if _, err := tx.ExecContext(ctx, `DELETE FROM bloqueos_mesa WHERE mesa_id = ?`, o.MesaID.String()); err != nil {
 				return err
 			}
@@ -310,7 +370,7 @@ func (a *App) Cobrar(ctx context.Context, u Usuario, orden ids.ID, in CobrarIn) 
 		_ = tx.QueryRowContext(ctx, `SELECT nombre FROM locales LIMIT 1`).Scan(&local)
 		ticket := escpos.DocumentoVenta{Local: local, Numero: numero, Hora: now.In(loc), Mesa: o.Mesa, Cajero: u.Nombre, Comprador: comprador.RazonSocial,
 			CompradorID: map[bool]string{true: "", false: comprador.Identificacion}[esCF],
-			Lineas:      lineasCuenta(o.Lineas), Descuento: money.MustParse(tot.Descuento), Subtotal: base, IVA: iva, Propina: propina, Total: total, Recibido: recibido, Vuelto: vuelto}
+			Lineas:      lineasTicket(o, cuenta, cuentas), Descuento: money.MustParse(tot.Descuento), Subtotal: base, IVA: iva, Propina: propina, Total: total, Recibido: recibido, Vuelto: vuelto}
 		for _, p := range docPagos {
 			ticket.Pagos = append(ticket.Pagos, escpos.PagoTicket{Metodo: p.Metodo, Monto: money.MustParse(p.Monto), Ultimos4: p.Ultimos4})
 		}
@@ -330,7 +390,8 @@ func (a *App) Cobrar(ctx context.Context, u Usuario, orden ids.ID, in CobrarIn) 
 			return err
 		}
 		out.Documento = doc
-		return a.eventoCaja(ctx, tx, EventoVentaCobrada, doc.ID, map[string]any{"documento": doc, "lineas": o.Lineas,
+		out.Cerrada = cerrar
+		return a.eventoCaja(ctx, tx, EventoVentaCobrada, doc.ID, map[string]any{"documento": doc, "lineas": o.Lineas, "cuenta": cuenta,
 			"meseroId": o.MeseroID, "meseroNombre": o.MeseroNombre, "propina": propina.String(), "propinaRetirada": o.PropinaRetirada}, now)
 	})
 	if err != nil {
@@ -399,4 +460,35 @@ func resolverPagos(ctx context.Context, tx *store.Tx, pagos []pagoValido, total 
 		return nil, money.Money{}, money.Money{}, false, invalido("Los pagos suman $" + suma.String() + " y el total es $" + total.String() + ".")
 	}
 	return out, recibido, vuelto, abreCajon, nil
+}
+
+// lineasTicket: el detalle del documento. Con división, lo que lleva esa cuenta de cada plato
+// («1/3 Pizza» si se repartió); sin división, la orden completa.
+func lineasTicket(o Orden, cuenta *CuentaTotales, cuentas []cuentaReparto) []escpos.LineaCuenta {
+	if cuenta == nil {
+		return lineasCuenta(o.Lineas)
+	}
+	var pesos map[ids.ID]int64
+	suma := map[ids.ID]int64{}
+	for _, c := range cuentas {
+		if c.ID == cuenta.ID {
+			pesos = c.Pesos
+		}
+		for l, p := range c.Pesos {
+			suma[l] += p
+		}
+	}
+	var out []escpos.LineaCuenta
+	for _, l := range o.Lineas {
+		m, ok := cuenta.Lineas[l.ID]
+		if !ok || l.Estado == "ANULADA" {
+			continue
+		}
+		cant := l.Cantidad
+		if p := pesos[l.ID]; p > 0 && suma[l.ID] > p {
+			cant = fmt.Sprintf("%d/%d", p, suma[l.ID])
+		}
+		out = append(out, escpos.LineaCuenta{Cantidad: cant, Producto: l.Producto, Total: m})
+	}
+	return out
 }

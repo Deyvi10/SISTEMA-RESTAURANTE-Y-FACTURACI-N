@@ -32,6 +32,18 @@ func SplitEqual(total Money, n int) ([]Money, error) {
 //
 // Se usa para prorratear descuentos, propinas o IVA entre líneas sin perder centavos.
 func Allocate(total Money, weights []decimal.Decimal) ([]Money, error) {
+	return allocate(total, weights, false)
+}
+
+// AllocateUltimo es Allocate con los empates a favor del índice mayor: con pesos iguales el
+// residuo de centavos cae en las últimas partes (RF-04-06.2-3: «ajuste en la última cuenta»).
+//
+//	AllocateUltimo(10.00, [1, 1, 1]) → [3.33, 3.33, 3.34]
+func AllocateUltimo(total Money, weights []decimal.Decimal) ([]Money, error) {
+	return allocate(total, weights, true)
+}
+
+func allocate(total Money, weights []decimal.Decimal, ultimo bool) ([]Money, error) {
 	if len(weights) == 0 {
 		return nil, ErrInvalidWeights
 	}
@@ -71,7 +83,12 @@ func Allocate(total Money, weights []decimal.Decimal) ([]Money, error) {
 	left := cents - assigned
 	order := make([]share, len(shares))
 	copy(order, shares)
-	sort.SliceStable(order, func(a, b int) bool { return order[a].rem.GreaterThan(order[b].rem) })
+	sort.SliceStable(order, func(a, b int) bool {
+		if c := order[a].rem.Cmp(order[b].rem); c != 0 {
+			return c > 0
+		}
+		return ultimo && order[a].idx > order[b].idx
+	})
 	for i := int64(0); i < left; i++ {
 		shares[order[i%int64(len(order))].idx].base++
 	}

@@ -184,6 +184,13 @@ func (a *App) AplicarDescuento(ctx context.Context, d Dispositivo, u Usuario, or
 		if err != nil {
 			return err
 		}
+		var lineas []ids.ID
+		if in.LineaID != nil {
+			lineas = append(lineas, *in.LineaID)
+		}
+		if err := bloqueoPorCuentas(ctx, tx, orden, lineas...); err != nil {
+			return err
+		}
 		var motivo, tipoMotivo string
 		err = tx.QueryRowContext(ctx, `SELECT nombre, tipo FROM motivos_descuento WHERE id = ? AND deleted_at IS NULL AND activo = 1`, in.MotivoID.String()).Scan(&motivo, &tipoMotivo)
 		if errors.Is(err, sql.ErrNoRows) {
@@ -291,6 +298,13 @@ func (a *App) QuitarDescuento(ctx context.Context, u Usuario, orden, descuento i
 		}
 		if quitado == nil {
 			return problema(http.StatusNotFound, "NO_ENCONTRADO", "Ese descuento ya no está vigente.")
+		}
+		var lineas []ids.ID
+		if quitado.LineaID != nil {
+			lineas = append(lineas, *quitado.LineaID)
+		}
+		if err := bloqueoPorCuentas(ctx, tx, orden, lineas...); err != nil {
+			return err
 		}
 		if _, err := tx.ExecContext(ctx, `UPDATE descuentos SET quitado_at = ?, quitado_por = ? WHERE id = ?`, now.Format(time.RFC3339Nano), u.ID.String(), descuento.String()); err != nil {
 			return err

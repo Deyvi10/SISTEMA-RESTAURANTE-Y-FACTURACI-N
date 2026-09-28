@@ -369,8 +369,34 @@ export interface PagoDocumento {
   ultimos4?: string;
 }
 
+export interface Asignacion {
+  lineaId: string;
+  peso: number;
+}
+
+/** Una cuenta de la división (F4-08). */
+export interface Cuenta {
+  id: string;
+  numero: number;
+  estado: "ABIERTA" | "PAGADA";
+  asignaciones: Asignacion[];
+  lineas: Record<string, string>; // lo que lleva de cada plato
+  subtotal: string;
+  iva: string;
+  propina: string;
+  total: string;
+  documento?: string;
+}
+
+export interface Division {
+  cuentas: Cuenta[];
+  sinCuenta: string[];
+  total: string;
+}
+
 export interface DocumentoVenta {
   id: string;
+  cuenta?: number;
   codigo: string; // INT-000123
   mesa: string;
   totales: Totales;
@@ -387,6 +413,7 @@ export interface DocumentoVenta {
 
 export interface CobroOut {
   documento: DocumentoVenta;
+  cerrada?: boolean; // con división: la orden se cierra al cobrar la última cuenta
   impresoras: string[];
   aviso?: string;
 }
@@ -445,6 +472,8 @@ export const nodo = {
     api<{ orden: Orden; comandaNumero: number }>("POST", "/v1/ordenes/enviar", b),
   buscarCliente: (identificacion: string, tipo = "") =>
     api<BusquedaCliente>("GET", `/v1/clientes/buscar?${new URLSearchParams({ identificacion, tipo })}`),
+  cuentas: (ordenId: string) => api<Division>("GET", `/v1/ordenes/${ordenId}/cuentas`),
+  dividir: (ordenId: string, cuentas: { asignaciones: Asignacion[] }[]) => api<Division>("PUT", `/v1/ordenes/${ordenId}/cuentas`, { cuentas }),
   descontar: (ordenId: string, b: { lineaId: string | null; tipo: string; valor: string; cortesia: boolean; motivoId: string; autorizacion: string }) =>
     api<Totales>("POST", `/v1/ordenes/${ordenId}/descuentos`, b),
   quitarDescuento: (ordenId: string, id: string) => api<Totales>("DELETE", `/v1/ordenes/${ordenId}/descuentos/${id}`),
@@ -460,6 +489,7 @@ export const nodo = {
       recibido?: string;
       pagos?: { metodoId: string; monto: string; recibido: string; referencia: string; lote: string; ultimos4: string }[];
       comprador?: { tipoIdentificacion: string; identificacion: string; razonSocial: string; email: string; direccion: string; telefono: string; consentimiento: boolean };
+      cuentaId?: string;
     },
   ) =>
     api<CobroOut>("POST", `/v1/ordenes/${ordenId}/cobrar`, b),

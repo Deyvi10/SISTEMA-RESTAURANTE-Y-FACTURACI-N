@@ -100,6 +100,24 @@ func (a *App) rutasCaja() {
 		}
 		return a.QuitarDescuento(ctx, u, id, desc)
 	}))
+	m.Handle("GET /v1/ordenes/{id}/cuentas", a.enCaja(func(ctx context.Context, _ Dispositivo, _ Usuario, r *http.Request) (any, error) {
+		id, err := idRuta(r)
+		if err != nil {
+			return nil, err
+		}
+		return a.Cuentas(ctx, id)
+	}))
+	m.Handle("PUT /v1/ordenes/{id}/cuentas", a.enCaja(func(ctx context.Context, _ Dispositivo, u Usuario, r *http.Request) (any, error) {
+		id, err := idRuta(r)
+		if err != nil {
+			return nil, err
+		}
+		in, err := leer[DivisionIn](nil, r)
+		if err != nil {
+			return nil, err
+		}
+		return a.Dividir(ctx, u, id, in)
+	}))
 	m.Handle("POST /v1/ordenes/{id}/cobrar", a.enCaja(func(ctx context.Context, _ Dispositivo, u Usuario, r *http.Request) (any, error) {
 		id, err := idRuta(r)
 		if err != nil {

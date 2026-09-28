@@ -30,6 +30,9 @@ func (a *App) CambiarPropina(ctx context.Context, u Usuario, orden ids.ID, in Pr
 		if err != nil {
 			return err
 		}
+		if err := bloqueoPorCuentas(ctx, tx, orden); err != nil {
+			return err
+		}
 		antes, _, _, _, _, err := a.calcularTotales(ctx, tx, o)
 		if err != nil {
 			return err

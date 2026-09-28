@@ -1,0 +1,142 @@
+{
+  "casos": [
+    {
+      "total": "10.00",
+      "pesos": [
+        1,
+        1,
+        1
+      ],
+      "esperado": [
+        "3.33",
+        "3.33",
+        "3.34"
+      ],
+      "nota": "partes iguales: el residuo a la última"
+    },
+    {
+      "total": "12.50",
+      "pesos": [
+        1,
+        1,
+        1
+      ],
+      "esperado": [
+        "4.16",
+        "4.17",
+        "4.17"
+      ],
+      "nota": "el ceviche entre tres"
+    },
+    {
+      "total": "0.02",
+      "pesos": [
+        1,
+        1,
+        1
+      ],
+      "esperado": [
+        "0.00",
+        "0.01",
+        "0.01"
+      ],
+      "nota": "menos centavos que partes"
+    },
+    {
+      "total": "12.50",
+      "pesos": [
+        2,
+        1
+      ],
+      "esperado": [
+        "8.33",
+        "4.17"
+      ],
+      "nota": "pesos distintos: mayor residuo"
+    },
+    {
+      "total": "7.00",
+      "pesos": [
+        1,
+        0,
+        1
+      ],
+      "esperado": [
+        "3.50",
+        "0.00",
+        "3.50"
+      ],
+      "nota": "peso cero"
+    },
+    {
+      "total": "100.00",
+      "pesos": [
+        3,
+        3,
+        3,
+        1
+      ],
+      "esperado": [
+        "30.00",
+        "30.00",
+        "30.00",
+        "10.00"
+      ]
+    },
+    {
+      "total": "0.00",
+      "pesos": [
+        1,
+        2
+      ],
+      "esperado": [
+        "0.00",
+        "0.00"
+      ]
+    },
+    {
+      "total": "19.99",
+      "pesos": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "esperado": [
+        "2.85",
+        "2.85",
+        "2.85",
+        "2.86",
+        "2.86",
+        "2.86",
+        "2.86"
+      ]
+    },
+    {
+      "total": "5.01",
+      "pesos": [
+        5,
+        3,
+        2
+      ],
+      "esperado": [
+        "2.51",
+        "1.50",
+        "1.00"
+      ]
+    },
+    {
+      "total": "33.33",
+      "pesos": [
+        1
+      ],
+      "esperado": [
+        "33.33"
+      ]
+    }
+  ],
+  "descripcion": "Reparto de centavos por pesos con el método del mayor residuo; los empates van a las últimas partes (RF-04-06: «ajuste en la última cuenta»). Lo usan el nodo (money.AllocateUltimo) y la vista previa de la caja al dividir la cuenta."
+}

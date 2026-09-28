@@ -734,6 +734,12 @@ type Totales struct {
 	Descuentos []Descuento `json:"descuentos"`
 	// Importe final de cada línea tras los descuentos (base del detalle del comprobante en F5).
 	Lineas map[ids.ID]string `json:"lineas,omitempty"`
+	// Base e IVA por tarifa (clave: % de IVA), para dividir la cuenta y para el XML.
+	PorTarifa map[string]TarifaTotales `json:"porTarifa,omitempty"`
+
+	reparto    []lineaReparto // platos con su importe final y tarifa (para dividir la cuenta)
+	incluyeIVA bool
+	propinaM   money.Money
 }
 
 func (a *App) calcularTotales(ctx context.Context, q queryer, o Orden) (Totales, money.Money, money.Money, money.Money, money.Money, error) {
@@ -757,6 +763,8 @@ func (a *App) calcularTotales(ctx context.Context, q queryer, o Orden) (Totales,
 		descuento = descuento.Add(m)
 	}
 	lineasFinales := map[ids.ID]string{}
+	var reparto []lineaReparto
+	tarifas := map[string]TarifaTotales{}
 	porTarifa := map[string]money.Money{}
 	for _, l := range o.Lineas {
 		if l.Estado == "ANULADA" {
@@ -769,6 +777,7 @@ func (a *App) calcularTotales(ctx context.Context, q queryer, o Orden) (Totales,
 		t := finales[l.ID]
 		lineasFinales[l.ID] = t.String()
 		porTarifa[pct] = porTarifa[pct].Add(t)
+		reparto = append(reparto, lineaReparto{ID: l.ID, Pct: pct, Final: t})
 	}
 	if ds == nil {
 		ds = []Descuento{}
@@ -786,12 +795,15 @@ func (a *App) calcularTotales(ctx context.Context, q queryer, o Orden) (Totales,
 			p = decimal.Zero
 		}
 		f := p.Div(decimal.NewFromInt(100))
+		var tt TarifaTotales
 		if incluye == 1 {
 			b := money.FromDecimal(monto.Decimal().Div(decimal.NewFromInt(1).Add(f))).Round2()
-			base, iva = base.Add(b), iva.Add(monto.Sub(b))
+			tt = TarifaTotales{Base: b, IVA: monto.Sub(b)}
 		} else {
-			base, iva = base.Add(monto), iva.Add(monto.Mul(f).Round2())
+			tt = TarifaTotales{Base: monto, IVA: monto.Mul(f).Round2()}
 		}
+		tarifas[k] = tt
+		base, iva = base.Add(tt.Base), iva.Add(tt.IVA)
 	}
 	propina := money.Money{}
 	// 10 % de la base imponible (sin IVA; los descuentos de F4-09 ya la reducen) y sin gravar IVA.
@@ -804,7 +816,8 @@ func (a *App) calcularTotales(ctx context.Context, q queryer, o Orden) (Totales,
 	total := base.Add(iva).Add(propina)
 	return Totales{Subtotal: base.String(), IVA: iva.String(), Propina: propina.String(), Total: total.String(),
 		PropinaActiva: propActiva == 1, PropinaPorcentaje: propPct, PropinaRetirada: o.PropinaRetirada,
-		Descuento: descuento.String(), Descuentos: ds, Lineas: lineasFinales}, base, iva, propina, total, nil
+		Descuento: descuento.String(), Descuentos: ds, Lineas: lineasFinales, PorTarifa: tarifas,
+		reparto: reparto, incluyeIVA: incluye == 1, propinaM: propina}, base, iva, propina, total, nil
 }
 
 type PrecuentaIn struct {
@@ -981,6 +994,11 @@ func (a *App) Mover(ctx context.Context, d Dispositivo, u Usuario, orden ids.ID,
 		if err != nil {
 			return err
 		}
+		if div, err := ordenDividida(ctx, tx, orden); err != nil {
+			return err
+		} else if div {
+			return problema(http.StatusConflict, "ORDEN_DIVIDIDA", "La orden está dividida en cuentas: deshaz la división antes de mover o unir.")
+		}
 		origenMesa = o.MesaID
 		if o.MesaID != nil && *o.MesaID == in.MesaID {
 			return invalido("Elige una mesa distinta.")
@@ -1090,6 +1108,17 @@ func (a *App) Unir(ctx context.Context, u Usuario, orden ids.ID, in UnirIn) (Ord
 		if err != nil {
 			return err
 		}
+		if div, err := ordenDividida(ctx, tx, orden); err != nil {
+			return err
+		} else if div {
+			return problema(http.StatusConflict, "ORDEN_DIVIDIDA", "La orden está dividida en cuentas: deshaz la división antes de mover o unir.")
+		}
+		if div, err := ordenDividida(ctx, tx, in.OrdenDestino); err != nil {
+			return err
+		} else if div {
+			return problema(http.StatusConflict, "ORDEN_DIVIDIDA", "La orden está dividida en cuentas: deshaz la división antes de mover o unir.")
+		}
+
 		for _, m := range []*ids.ID{o.MesaID, dest.MesaID} {
 			if m != nil {
 				mesas = append(mesas, *m)
@@ -1206,6 +1235,9 @@ func (a *App) AnularLineasOrden(ctx context.Context, d Dispositivo, u Usuario, o
 		}
 		o, err := ordenAbierta(ctx, tx, orden)
 		if err != nil {
+			return err
+		}
+		if err := bloqueoPorCuentas(ctx, tx, orden, in.Lineas...); err != nil {
 			return err
 		}
 		mesa = o.MesaID

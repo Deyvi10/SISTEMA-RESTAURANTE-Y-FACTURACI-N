@@ -4,12 +4,13 @@ import { formatMoney } from "@restpos/ui";
 import { ArrowLeft, Check, CreditCard, Landmark, Smartphone, Wallet } from "lucide-react";
 import { type Dispatch, type SetStateAction, useCallback, useEffect, useRef, useState } from "react";
 import { uuidv7 } from "../api/identidad";
-import { ApiError, type CobroOut, type DescuentoAplicado, type MetodoPago, nodo, type Orden, type Totales } from "../api/nodo";
+import { ApiError, type CobroOut, type DescuentoAplicado, type Division as DivisionT, type MetodoPago, nodo, type Orden, type Totales } from "../api/nodo";
 import { useAtajo } from "../components/atajos";
 import { montoDe, TecladoMonto } from "../components/TecladoMonto";
 import { opcionesBillete, vueltoCentavos } from "../lib/billetes";
 import { centavos, verCentavos } from "../lib/dinero";
 import { HojaDescuento } from "./Descuento";
+import { Division } from "./Division";
 import { Comprador, compradorInicial, compradorParaCobro, esConsumidorFinal, type EstadoComprador, validar } from "./Comprador";
 import { HojaPagos, type PagoEnvio } from "./PagoMixto";
 import type { Caja } from "./Turno";
@@ -73,16 +74,39 @@ export function Cobro({
   // Una clave por intento de cobro: un doble toque o un reintento no cobra dos veces.
   const clave = useRef(uuidv7());
 
-  useEffect(() => {
+  const [division, setDivision] = useState<DivisionT | null>(null);
+  const [dividiendo, setDividiendo] = useState(false);
+  const [cuentaSel, setCuentaSel] = useState<string | null>(null);
+  const recargar = useCallback(() => {
     nodo
       .orden(aCobrar.ordenId)
       .then(setDatos)
       .catch((e) => setError(e instanceof ApiError ? e.message : "No se pudo leer la orden."));
+    nodo
+      .cuentas(aCobrar.ordenId)
+      .then((d) => {
+        setDivision(d.cuentas.length > 0 ? d : null);
+        setCuentaSel((sel) => (d.cuentas.some((c) => c.id === sel && c.estado === "ABIERTA") ? sel : (d.cuentas.find((c) => c.estado === "ABIERTA")?.id ?? null)));
+      })
+      .catch(() => setDivision(null));
   }, [aCobrar.ordenId]);
+  useEffect(recargar, [recargar]);
+  const cuenta = division?.cuentas.find((c) => c.id === cuentaSel) ?? null;
+  /** Parte de un plato compartido que lleva la cuenta elegida («1/3»), o null si lo lleva entero. */
+  const parteDe = (linea: string) => {
+    if (!cuenta || !division) return null;
+    const peso = (c: { asignaciones: { lineaId: string; peso: number }[] }) => c.asignaciones.find((a) => a.lineaId === linea)?.peso ?? 0;
+    const todas = division.cuentas.reduce((t, c) => t + peso(c), 0);
+    const mia = peso(cuenta);
+    return mia > 0 && mia < todas ? `${mia}/${todas}` : null;
+  };
+  // Lo que se muestra en los totales: la cuenta elegida o toda la orden.
+  const vistaTotales = cuenta ? { subtotal: cuenta.subtotal, iva: cuenta.iva, propina: cuenta.propina } : datos?.totales;
 
   const config = caja.config;
   const turno = caja.estado?.turno ?? null;
-  const total = datos?.totales.total ?? "0.00";
+  // Con la cuenta dividida se cobra la cuenta elegida.
+  const total = cuenta ? cuenta.total : (datos?.totales.total ?? "0.00");
   const maximo = config?.consumidorFinalMaximo ?? "50.00";
   const excedeCF = centavos(total) > centavos(maximo);
   const cf = esConsumidorFinal(comprador);
@@ -100,7 +124,14 @@ export function Cobro({
       setOcupado(true);
       setError(null);
       nodo
-        .cobrar(datos.orden.id, { cajaId: caja.cajaId, consumidorFinal: cf, ...(datosComprador ? { comprador: datosComprador } : {}), idempotencyKey: clave.current, ...pago })
+        .cobrar(datos.orden.id, {
+          cajaId: caja.cajaId,
+          consumidorFinal: cf,
+          ...(datosComprador ? { comprador: datosComprador } : {}),
+          ...(cuenta ? { cuentaId: cuenta.id } : {}),
+          idempotencyKey: clave.current,
+          ...pago,
+        })
         .then(setHecho)
         .catch((e) => {
           setOcupado(false);
@@ -108,7 +139,7 @@ export function Cobro({
           setError(e instanceof ApiError ? e.message : "No se pudo cobrar. Intenta de nuevo.");
         });
     },
-    [caja.cajaId, datos, ocupado, cf, datosComprador],
+    [caja.cajaId, datos, ocupado, cf, datosComprador, cuenta],
   );
   const cobrar = useCallback(
     (metodo: MetodoPago | undefined, recibido: string) => {
@@ -121,7 +152,7 @@ export function Cobro({
   );
 
   const billetes = opcionesBillete(total);
-  const libre = puedeCobrar && otroMonto === null && hojaPago === null && !quitandoServicio && !hojaDescuento;
+  const libre = puedeCobrar && !dividiendo && otroMonto === null && hojaPago === null && !quitandoServicio && !hojaDescuento;
   const cambiarServicio = (retirar: boolean, motivo = "") => {
     if (!datos) return;
     nodo
@@ -129,6 +160,7 @@ export function Cobro({
       .then((t) => {
         setDatos((d) => (d ? { ...d, totales: t } : d));
         setQuitandoServicio(false);
+        if (division) recargar(); // las cuentas se recalculan en el nodo
         clave.current = uuidv7(); // el total cambió: es otro cobro
       })
       .catch((e) => setError(e instanceof ApiError ? e.message : "No se pudo cambiar el servicio."));
@@ -139,6 +171,7 @@ export function Cobro({
   const precioLinea = (l: { id: string; total: string }) => centavos(l.total) - descuentosDe(l.id).reduce((t, d) => t + centavos(d.monto), 0);
   const alCambiarTotales = (t: Totales) => {
     setDatos((d) => (d ? { ...d, totales: t } : d));
+    if (division) recargar();
     clave.current = uuidv7(); // el total cambió: es otro cobro
   };
   const quitarDescuento = (id: string) => {
@@ -154,17 +187,40 @@ export function Cobro({
   useAtajo("4", "Cobrar con el cuarto billete", () => billetes[3] && cobrar(efectivo, billetes[3]), "Cobro", libre && billetes.length > 3);
   useAtajo("o", "Otro monto en efectivo", () => setOtroMonto(""), "Cobro", libre);
   useAtajo("m", "Pago mixto (varios métodos)", () => setHojaPago({}), "Cobro", libre);
-  useAtajo("d", "Descuento o cortesía", () => setHojaDescuento(true), "Cobro", !!datos && !hecho && otroMonto === null && hojaPago === null && !quitandoServicio && !hojaDescuento);
-  useAtajo("s", "Quitar o reponer el servicio (propina)", () => (datos?.totales.propinaRetirada ? cambiarServicio(false) : setQuitandoServicio(true)), "Cobro", !!servicio && otroMonto === null && hojaPago === null && !quitandoServicio);
+  useAtajo("d", "Descuento o cortesía", () => setHojaDescuento(true), "Cobro", !!datos && !hecho && !dividiendo && otroMonto === null && hojaPago === null && !quitandoServicio && !hojaDescuento);
+  useAtajo("s", "Quitar o reponer el servicio (propina)", () => (datos?.totales.propinaRetirada ? cambiarServicio(false) : setQuitandoServicio(true)), "Cobro", !!servicio && !dividiendo && otroMonto === null && hojaPago === null && !quitandoServicio);
   useAtajo("c", "Datos del comprador", () => {
     setComprador((x) => ({ ...x, modo: "ID" }));
     requestAnimationFrame(() => campoId.current?.focus());
-  }, "Cobro", !hecho && otroMonto === null && hojaPago === null);
-  useAtajo("a", "Agregar platos a la orden", () => datos && agregar?.(datos.orden), "Cobro", !!datos && datos.orden.tipo !== "MESA" && !!agregar && !hecho && otroMonto === null);
-  useAtajo("Escape", hecho ? "Siguiente cliente" : "Volver a las mesas", volver, "Cobro", otroMonto === null && hojaPago === null);
-  useAtajo("Enter", "Siguiente cliente", volver, "Cobro", !!hecho);
+  }, "Cobro", !hecho && !dividiendo && otroMonto === null && hojaPago === null);
+  useAtajo("a", "Agregar platos a la orden", () => datos && agregar?.(datos.orden), "Cobro", !!datos && datos.orden.tipo !== "MESA" && !!agregar && !hecho && !dividiendo && otroMonto === null);
+  useAtajo("Escape", hecho ? "Siguiente cliente" : "Volver a las mesas", volver, "Cobro", !dividiendo && otroMonto === null && hojaPago === null);
+  useAtajo("Enter", hecho?.cerrada === false ? "Cobrar la siguiente cuenta" : "Siguiente cliente", () => (hecho?.cerrada === false ? siguienteCuenta() : volver()), "Cobro", !!hecho);
 
-  if (hecho) return <Listo out={hecho} conMesa={datos?.orden.tipo === "MESA"} volver={volver} />;
+  const siguienteCuenta = () => {
+    setHecho(null);
+    setOcupado(false);
+    setComprador(compradorInicial);
+    clave.current = uuidv7();
+    recargar();
+  };
+  useAtajo("v", "Dividir la cuenta", () => setDividiendo(true), "Cobro", !!datos && !hecho && !dividiendo && otroMonto === null && hojaPago === null && !hojaDescuento && !quitandoServicio);
+
+  if (dividiendo && datos)
+    return (
+      <Division
+        ordenId={datos.orden.id}
+        lineas={datos.orden.lineas}
+        totales={datos.totales}
+        volver={() => setDividiendo(false)}
+        listo={() => {
+          setDividiendo(false);
+          clave.current = uuidv7();
+          recargar();
+        }}
+      />
+    );
+  if (hecho) return <Listo out={hecho} conMesa={datos?.orden.tipo === "MESA"} volver={volver} siguiente={hecho.cerrada === false ? siguienteCuenta : undefined} />;
 
   return (
     <section className="cobro" data-testid="cobro">
@@ -184,20 +240,21 @@ export function Cobro({
         {datos && (
           <div className="rp-group cobro__lineas">
             {datos.orden.lineas
-              .filter((l) => l.estado !== "ANULADA")
+              .filter((l) => l.estado !== "ANULADA" && (!cuenta || cuenta.lineas[l.id] !== undefined))
               .map((l) => (
                 <div className="rp-cell" key={l.id}>
                   <span className="rp-num cobro__cant">{l.cantidad}</span>
                   <span className="rp-cell__body">
                     <span className="rp-cell__title">{l.producto}</span>
+                    {parteDe(l.id) && <span className="rp-cell__subtitle">Compartido · {parteDe(l.id)}</span>}
                     {l.modificadores.length > 0 && <span className="rp-cell__subtitle">{l.modificadores.map((m) => m.nombre).join(", ")}</span>}
                     {descuentosDe(l.id).map((d) => (
                       <ChipDescuento key={d.id} d={d} quitar={hecho ? undefined : () => quitarDescuento(d.id)} />
                     ))}
                   </span>
                   <span className="rp-cell__value rp-num">
-                    {descuentosDe(l.id).length > 0 && <s className="cobro__antes">{formatMoney(l.total)}</s>}
-                    {formatMoney(verCentavos(precioLinea(l)))}
+                    {!cuenta && descuentosDe(l.id).length > 0 && <s className="cobro__antes">{formatMoney(l.total)}</s>}
+                    {formatMoney(cuenta ? (cuenta.lineas[l.id] ?? "0") : verCentavos(precioLinea(l)))}
                   </span>
                 </div>
               ))}
@@ -209,13 +266,18 @@ export function Cobro({
           </p>
         ))}
         {datos && !hecho && (
-          <button className="rp-btn rp-btn--gray rp-btn--sm cobro__agregar" onClick={() => setHojaDescuento(true)} data-testid="descuento">
-            Descuento o cortesía <kbd className="tecla">D</kbd>
-          </button>
+          <div className="cobro__herramientas">
+            <button className="rp-btn rp-btn--gray rp-btn--sm" onClick={() => setHojaDescuento(true)} data-testid="descuento">
+              Descuento o cortesía <kbd className="tecla">D</kbd>
+            </button>
+            <button className="rp-btn rp-btn--gray rp-btn--sm" onClick={() => setDividiendo(true)} data-testid="dividir">
+              {division ? "Cambiar la división" : "Dividir la cuenta"} <kbd className="tecla">V</kbd>
+            </button>
+          </div>
         )}
         {datos && (
           <dl className="cobro__totales">
-            {centavos(datos.totales.descuento ?? "0") > 0 && (
+            {!cuenta && centavos(datos.totales.descuento ?? "0") > 0 && (
               <>
                 <dt>Descuentos</dt>
                 <dd className="rp-num" data-testid="total-descuento">
@@ -224,9 +286,9 @@ export function Cobro({
               </>
             )}
             <dt>Subtotal</dt>
-            <dd className="rp-num">{formatMoney(datos.totales.subtotal)}</dd>
+            <dd className="rp-num">{formatMoney(vistaTotales?.subtotal ?? "0")}</dd>
             <dt>IVA</dt>
-            <dd className="rp-num">{formatMoney(datos.totales.iva)}</dd>
+            <dd className="rp-num">{formatMoney(vistaTotales?.iva ?? "0")}</dd>
             {datos.totales.propinaActiva && (
               <>
                 <dt className="cobro__servicio">
@@ -241,7 +303,7 @@ export function Cobro({
                     </button>
                   )}
                 </dt>
-                <dd className="rp-num">{datos.totales.propinaRetirada ? <s>{formatMoney("0")}</s> : formatMoney(datos.totales.propina)}</dd>
+                <dd className="rp-num">{datos.totales.propinaRetirada ? <s>{formatMoney("0")}</s> : formatMoney(vistaTotales?.propina ?? "0")}</dd>
               </>
             )}
           </dl>
@@ -249,7 +311,19 @@ export function Cobro({
       </div>
 
       <div className="cobro__panel">
-        <p className="cobro__rotulo">Total</p>
+        {division && (
+          <div className="rp-segmented cobro__cuentas" role="radiogroup" aria-label="Cuenta que se cobra">
+            {division.cuentas.map((c) => (
+              <label key={c.id}>
+                <input type="radio" name="cuenta" checked={c.id === cuentaSel} disabled={c.estado === "PAGADA"} onChange={() => (setCuentaSel(c.id), setComprador(compradorInicial), (clave.current = uuidv7()))} />
+                <span data-testid={`elegir-cuenta-${c.numero}`}>
+                  Cuenta {c.numero} {c.estado === "PAGADA" ? "✓" : formatMoney(c.total)}
+                </span>
+              </label>
+            ))}
+          </div>
+        )}
+        <p className="cobro__rotulo">{cuenta ? `Total de la cuenta ${cuenta.numero}` : "Total"}</p>
         <p className="cobro__total rp-num" data-testid="total">
           {formatMoney(total)}
         </p>
@@ -418,14 +492,15 @@ function OtroMonto({
   );
 }
 
-function Listo({ out, conMesa, volver }: { out: CobroOut; conMesa: boolean; volver: () => void }) {
+function Listo({ out, conMesa, volver, siguiente }: { out: CobroOut; conMesa: boolean; volver: () => void; siguiente?: () => void }) {
   const d = out.documento;
   const vuelto = useConteo(centavos(d.vuelto));
-  // Caja libre para el siguiente cliente: vuelve sola a las mesas.
+  // Caja libre para el siguiente cliente: vuelve sola a las mesas (con cuentas pendientes, no).
   useEffect(() => {
+    if (siguiente) return;
     const t = setTimeout(volver, 6000);
     return () => clearTimeout(t);
-  }, [volver]);
+  }, [volver, siguiente]);
   return (
     <section className="cobro-listo" data-testid="cobro-listo">
       <span className="cobro-listo__check">
@@ -458,13 +533,19 @@ function Listo({ out, conMesa, volver }: { out: CobroOut; conMesa: boolean; volv
         </p>
       )}
       <p className="rp-secondary">
-        {d.metodo} · {d.codigo} · {d.mesa} {conMesa ? "libre" : "cobrada"}
+        {d.metodo} · {d.codigo} · {d.cuenta ? `cuenta ${d.cuenta} de ${d.mesa}` : d.mesa} {siguiente ? "cobrada" : conMesa ? "libre" : "cobrada"}
         {d.abreCajon ? " · cajón abierto" : ""}
       </p>
       {out.aviso && <p className="cobro__aviso">{out.aviso}</p>}
-      <button className="rp-btn rp-btn--primary" onClick={volver} autoFocus data-testid="siguiente-cliente">
-        Siguiente cliente <kbd className="tecla">Intro</kbd>
-      </button>
+      {siguiente ? (
+        <button className="rp-btn rp-btn--primary" onClick={siguiente} autoFocus data-testid="siguiente-cuenta">
+          Cobrar la siguiente cuenta <kbd className="tecla">Intro</kbd>
+        </button>
+      ) : (
+        <button className="rp-btn rp-btn--primary" onClick={volver} autoFocus data-testid="siguiente-cliente">
+          Siguiente cliente <kbd className="tecla">Intro</kbd>
+        </button>
+      )}
     </section>
   );
 }

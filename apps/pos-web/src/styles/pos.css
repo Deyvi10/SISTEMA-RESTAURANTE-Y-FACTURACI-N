@@ -293,3 +293,30 @@ button { font: inherit; }
 .chip-descuento__quitar:hover { background: color-mix(in srgb, var(--rp-color-success-text) 18%, transparent); }
 .cobro__antes { display: block; font-size: 12px; color: var(--rp-color-label-tertiary); text-align: right; }
 .cobro__descuento-cuenta { margin: 0; }
+
+/* ---------- División de cuenta (F4-08) ---------- */
+.cobro__herramientas { display: flex; gap: 8px; flex-wrap: wrap; }
+.cobro__cuentas { align-self: stretch; flex-wrap: wrap; }
+.cobro__cuentas input:disabled + span { opacity: 0.55; }
+.division { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(320px, 1fr); gap: 24px; max-width: 1180px; margin: 0 auto; }
+.division__platos { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.division__platos > .rp-btn { align-self: flex-start; }
+.division__platos .rp-btn svg, .division__cuentas .rp-btn svg { width: 16px; height: 16px; }
+.division__platos p { margin: 0; }
+.division__lista { margin: 8px 0 0; }
+.division__plato { padding-right: 6px; }
+.division__plato[aria-selected="true"] { box-shadow: inset 3px 0 0 var(--rp-color-accent); }
+.division__asignar { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; padding: 0; }
+.division__cuentas { display: flex; flex-direction: column; gap: 10px; padding: 20px; border-radius: 22px; background: var(--rp-color-surface); align-self: start; }
+.division__cuentas p { margin: 0; }
+.division__acciones { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.division__cuenta { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 2px 10px; padding: 12px 14px; border-radius: 14px; border: 2px solid transparent;
+  background: var(--rp-color-background); color: var(--rp-color-label); font: inherit; text-align: left; cursor: pointer; }
+.division__cuenta[aria-pressed="true"] { border-color: var(--rp-color-accent); }
+.division__cuenta small { color: var(--rp-color-label-secondary); }
+.division__cuenta-titulo { font-weight: 700; display: inline-flex; align-items: center; gap: 6px; }
+.division__cuenta-total { font: 700 22px/1 var(--rp-font-display, inherit); grid-row: span 2; }
+.division__cuenta--pagada { display: flex; align-items: center; gap: 8px; cursor: default; color: var(--rp-color-label-secondary); }
+.division__cuenta--pagada b { margin-left: auto; color: var(--rp-color-label); }
+.division__cuenta--pagada svg { width: 16px; height: 16px; }
+.division__nota { font-size: 13px; }
