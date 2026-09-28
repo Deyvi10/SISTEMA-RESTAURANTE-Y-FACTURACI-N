@@ -164,6 +164,9 @@ func (s *Service) Crear(ctx context.Context, p auth.Principal, in UsuarioInput) 
 			if _, err := tx.Exec(ctx, `INSERT INTO usuario_locales (tenant_id, usuario_id, local_id) SELECT $1, $2, id FROM locales WHERE deleted_at IS NULL`, p.TenantID, id); err != nil {
 				return err
 			}
+			if err := s.auditar(ctx, tx, p, "USUARIO_ALTA", id, nil, map[string]any{"nombre": in.NombreMostrar, "rol": in.Rol, "accesoWeb": in.Email != nil}); err != nil {
+				return err
+			}
 		} else {
 			temporal = "" // reintento idempotente: no se reenvía la invitación
 		}
@@ -248,7 +251,21 @@ func (s *Service) Actualizar(ctx context.Context, p auth.Principal, id ids.ID, i
 			}
 		}
 		u, err = s.obtener(ctx, tx, id)
-		return err
+		if err != nil {
+			return err
+		}
+		vista := func(x Usuario) map[string]any {
+			return map[string]any{"nombre": x.NombreMostrar, "rol": x.Rol, "accesoWeb": x.AccesoWeb}
+		}
+		if actual.NombreMostrar != u.NombreMostrar || actual.Rol != u.Rol || actual.AccesoWeb != u.AccesoWeb {
+			if err := s.auditar(ctx, tx, p, "USUARIO_EDITADO", id, vista(actual), vista(u)); err != nil {
+				return err
+			}
+		}
+		if pin != "" {
+			return s.auditar(ctx, tx, p, "PIN_CAMBIADO", id, nil, nil)
+		}
+		return nil
 	})
 	if err == nil && invitar != "" {
 		if err := s.invitar(ctx, *in.Email, in.NombreMostrar, negocio, invitar); err != nil {
@@ -267,7 +284,10 @@ func (s *Service) CambiarPIN(ctx context.Context, p auth.Principal, id ids.ID, p
 		if _, err := s.obtener(ctx, tx, id); err != nil {
 			return err
 		}
-		return s.guardarPIN(ctx, tx, p.TenantID, id, strings.TrimSpace(pin))
+		if err := s.guardarPIN(ctx, tx, p.TenantID, id, strings.TrimSpace(pin)); err != nil {
+			return err
+		}
+		return s.auditar(ctx, tx, p, "PIN_CAMBIADO", id, nil, nil) // el PIN nunca va en la auditoría
 	})
 }
 
@@ -298,6 +318,12 @@ func (s *Service) CambiarEstado(ctx context.Context, p auth.Principal, id ids.ID
 		}
 		if _, err := tx.Exec(ctx, `UPDATE usuarios SET activo=$2 WHERE id=$1`, id, activo); err != nil {
 			return traducir(err)
+		}
+		if actual.Activo != activo {
+			accion := map[bool]string{true: "USUARIO_REACTIVADO", false: "USUARIO_BAJA"}[activo]
+			if err := s.auditar(ctx, tx, p, accion, id, map[string]any{"activo": actual.Activo}, map[string]any{"activo": activo}); err != nil {
+				return err
+			}
 		}
 		if !activo {
 			if _, err := tx.Exec(ctx, `UPDATE sesiones SET revocada_at = now() WHERE usuario_id=$1 AND revocada_at IS NULL`, id); err != nil {

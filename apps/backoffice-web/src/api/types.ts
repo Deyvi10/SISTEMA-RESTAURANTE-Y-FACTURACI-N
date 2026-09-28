@@ -266,3 +266,18 @@ export interface MotivoDescuento {
   tipo: "DESCUENTO" | "CORTESIA";
   activo: boolean;
 }
+
+/** Un permiso de la matriz RBAC para una persona (F4-14). */
+export interface PermisoPersona {
+  permiso: string;
+  nombre: string;
+  descripcion: string;
+  concedido: boolean;
+  configurable: boolean; // ⚙️: el dueño lo puede cambiar para su rol
+  porDefecto: boolean;
+}
+export interface PermisosPersona {
+  usuarioId: UUID;
+  rol: Rol;
+  permisos: PermisoPersona[];
+}

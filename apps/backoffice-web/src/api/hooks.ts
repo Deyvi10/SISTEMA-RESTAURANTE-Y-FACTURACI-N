@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { del, get, post, put, patch } from "./client";
 import type {
-  Caja, Categoria, CodigoNodo, MetodoPago, MotivoDescuento, ComandoNodo, Estacion, Impresora, ImpresoraInstalada, FotoGaleria, Grupo, IconoCategoria, Imagen, Local, Mesa, NodoLocal, Persona, Producto, Resumen, TarifaIVA, Zona,
+  Caja, Categoria, CodigoNodo, MetodoPago, MotivoDescuento, ComandoNodo, Estacion, Impresora, ImpresoraInstalada, FotoGaleria, Grupo, IconoCategoria, Imagen, Local, Mesa, NodoLocal, PermisosPersona, Persona, Producto, Resumen, TarifaIVA, Zona,
 } from "./types";
 
 export const useResumen = () => useQuery({ queryKey: ["resumen"], queryFn: () => get<Resumen>("/v1/resumen") });
@@ -23,6 +23,8 @@ export const useCajas = () => useQuery({ queryKey: ["cajas"], queryFn: () => get
 export const useMetodosPago = () => useQuery({ queryKey: ["metodos-pago"], queryFn: () => get<MetodoPago[]>("/v1/metodos-pago") });
 export const useMotivos = () => useQuery({ queryKey: ["motivos-descuento"], queryFn: () => get<MotivoDescuento[]>("/v1/motivos-descuento") });
 export const usePersonal = () => useQuery({ queryKey: ["personal"], queryFn: () => get<Persona[]>("/v1/usuarios") });
+export const usePermisos = (id: string | undefined) =>
+  useQuery({ queryKey: ["permisos", id], queryFn: () => get<PermisosPersona>(`/v1/usuarios/${id}/permisos`), enabled: !!id });
 
 /** Mutación que al terminar refresca las listas afectadas y el progreso de la guía. */
 export function useGuardar<TIn, TOut>(fn: (v: TIn) => Promise<TOut>, invalida: string[]) {
@@ -72,6 +74,7 @@ export const api = {
   crearPersona: (b: object) => post<Persona>("/v1/usuarios", b),
   editarPersona: (id: string, b: object) => put<Persona>(`/v1/usuarios/${id}`, b),
   cambiarPIN: (id: string, pin: string) => put<void>(`/v1/usuarios/${id}/pin`, { pin }),
+  cambiarPermiso: (id: string, permiso: string, concedido: boolean) => put<PermisosPersona>(`/v1/usuarios/${id}/permisos`, { permiso, concedido }),
   cambiarEstado: (id: string, activo: boolean) => put<Persona>(`/v1/usuarios/${id}/estado`, { activo }),
   crearImpresora: (b: object) => post<Impresora>("/v1/impresoras", b),
   editarImpresora: (id: string, b: object) => put<Impresora>(`/v1/impresoras/${id}`, b),

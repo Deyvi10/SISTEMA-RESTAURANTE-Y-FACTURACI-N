@@ -1,7 +1,8 @@
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import { ApiError, uuidv7 } from "../api/client";
-import { api, useGuardar, useLocales, usePersonal } from "../api/hooks";
+import { api, useGuardar, useLocales, usePermisos, usePersonal } from "../api/hooks";
 import { useSession } from "../api/session";
 import type { Persona, Rol } from "../api/types";
 import { useFeedback } from "../components/feedback";
@@ -164,6 +165,7 @@ function PersonaSheet({ persona, onClose }: { persona: Persona | null; onClose: 
         ) : rol !== "ADMIN" || cambiarPin ? (
           <PinInput value={pin} onChange={setPin} error={errores.pin} />
         ) : null}
+        {persona && persona.rol !== "ADMIN" && (rol === persona.rol ? <Permisos persona={persona} /> : <p className="rp-secondary" style={{ fontSize: 13 }}>Guarda el cambio de rol para ajustar sus permisos.</p>)}
       </div>
     </Sheet>
   );
@@ -239,5 +241,47 @@ export function Ajustes() {
         </div>
       </div>
     </>
+  );
+}
+
+/**
+ * Permisos de una persona (F4-14, RF-01-07): interruptores para lo que el dueño puede ajustar
+ * en su rol (⚙️ en la matriz) y la lista de lo que el rol ya trae. Cada cambio se guarda al
+ * instante, queda en la auditoría y llega a las cajas y teléfonos por el Nodo Local.
+ */
+export function Permisos({ persona }: { persona: Persona }) {
+  const { toast } = useFeedback();
+  const qc = useQueryClient();
+  const permisos = usePermisos(persona.id);
+  const cambiar = useMutation({
+    mutationFn: ({ permiso, concedido }: { permiso: string; concedido: boolean }) => api.cambiarPermiso(persona.id, permiso, concedido),
+    onSuccess: (datos) => qc.setQueryData(["permisos", persona.id], datos),
+    onError: (e) => toast(e instanceof ApiError ? e.message : "No se pudo cambiar el permiso.", "error"),
+  });
+  if (!permisos.data) return permisos.isError ? <p className="error-inline">No se pudieron cargar los permisos.</p> : <Spinner />;
+  const ajustables = permisos.data.permisos.filter((p) => p.configurable);
+  const incluidos = permisos.data.permisos.filter((p) => !p.configurable && p.concedido);
+  return (
+    <section aria-label="Permisos" data-testid="permisos">
+      <div className="rp-section-header" style={{ margin: "4px 4px 6px" }}>Permisos que puedes ajustar</div>
+      {ajustables.length === 0 ? (
+        <p className="rp-secondary" style={{ fontSize: 13 }}>Su rol no tiene permisos ajustables.</p>
+      ) : (
+        <div className="rp-group" style={{ margin: 0 }}>
+          {ajustables.map((p) => (
+            <ToggleRow key={p.permiso} label={p.nombre} detalle={p.descripcion} checked={p.concedido} onChange={(v) => cambiar.mutate({ permiso: p.permiso, concedido: v })} />
+          ))}
+        </div>
+      )}
+      <p className="rp-secondary" style={{ fontSize: 13, margin: "6px 4px 0" }}>
+        Los cambios se guardan al instante y quedan registrados. Cuando no tenga un permiso, un supervisor puede autorizar con su PIN.
+      </p>
+      {incluidos.length > 0 && (
+        <>
+          <div className="rp-section-header" style={{ margin: "14px 4px 6px" }}>Incluidos con su rol</div>
+          <p className="rp-secondary" style={{ fontSize: 14, margin: "0 4px" }}>{incluidos.map((p) => p.nombre).join(" · ")}</p>
+        </>
+      )}
+    </section>
   );
 }
