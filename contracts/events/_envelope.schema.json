@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://restpos/contracts/events/_envelope.json",
+  "title": "envelope",
+  "description": "Sobre de todo mensaje WebSocket entre el Nodo Local y sus clientes (docs/03 §6).",
+  "type": "object",
+  "properties": {
+    "v": {
+      "type": "integer",
+      "description": "Versión del esquema del mensaje"
+    },
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "UUID v7 del mensaje"
+    },
+    "type": {
+      "type": "string",
+      "description": "Tipo de evento, p. ej. table.locked"
+    },
+    "ts": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "data": {
+      "type": "object"
+    }
+  },
+  "required": [
+    "v",
+    "id",
+    "type",
+    "ts",
+    "data"
+  ]
+}

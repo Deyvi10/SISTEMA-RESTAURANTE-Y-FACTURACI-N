@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://restpos/contracts/events/device.revoked.json",
+  "title": "device.revoked",
+  "description": "Un dispositivo fue revocado: debe desconectarse y volver a emparejarse.",
+  "x-event-version": 1,
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "device_id": {
+      "type": "string",
+      "format": "uuid"
+    }
+  },
+  "required": [
+    "device_id"
+  ]
+}

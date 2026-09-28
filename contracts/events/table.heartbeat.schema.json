@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://restpos/contracts/events/table.heartbeat.json",
+  "title": "table.heartbeat",
+  "description": "El dispositivo que tiene la mesa confirma que sigue trabajando en ella.",
+  "x-event-version": 1,
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "table_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "device_id": {
+      "type": "string",
+      "format": "uuid"
+    }
+  },
+  "required": [
+    "table_id",
+    "device_id"
+  ]
+}

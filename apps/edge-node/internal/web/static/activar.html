@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Activar Nodo Local</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23FF9F0A'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/static/tokens.css">
+<link rel="stylesheet" href="/static/nodo.css">
+</head>
+<body>
+<main>
+  <section id="paso-codigo">
+    <div class="app-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><path d="M6 6h.01M6 18h.01"/></svg>
+    </div>
+    <h1>Activa este Nodo Local</h1>
+    <p class="sub">Escribe el código de 8 caracteres que aparece en el backoffice, en <b>Nodo Local</b>.</p>
+    <form id="form" autocomplete="off" novalidate>
+      <div class="codigo" id="codigo" role="group" aria-label="Código de activación"></div>
+      <p class="mensaje" id="mensaje" role="status" aria-live="polite"></p>
+    </form>
+    <div class="ayuda">
+      <ol>
+        <li>En otro equipo o en tu celular, entra al <b>backoffice</b>.</li>
+        <li>Ve a <b>Nodo Local</b> (o Ajustes › Nodo Local en el celular) y toca <b>Generar código de activación</b>.</li>
+        <li>Escríbelo aquí. Vale 30 minutos y se usa una sola vez.</li>
+      </ol>
+    </div>
+  </section>
+
+  <section id="paso-listo" class="listo" hidden>
+    <svg class="check" viewBox="0 0 96 96" aria-hidden="true"><circle cx="48" cy="48" r="46"/><path d="M28 50l13 13 27-29"/></svg>
+    <h1>¡Nodo activado!</h1>
+    <p class="sub" id="listo-detalle"></p>
+    <a class="boton" href="/estado">Ver el estado del nodo</a>
+  </section>
+</main>
+<script>
+(() => {
+  const N = 8, VALIDOS = /[A-Z0-9]/;
+  const caja = document.getElementById('codigo'), msg = document.getElementById('mensaje');
+  const inputs = [];
+  for (let i = 0; i < N; i++) {
+    if (i === N / 2) { const g = document.createElement('span'); g.className = 'guion'; g.setAttribute('aria-hidden', 'true'); caja.append(g); }
+    const inp = document.createElement('input');
+    Object.assign(inp, { inputMode: 'text', maxLength: 1, autocapitalize: 'characters', spellcheck: false });
+    inp.setAttribute('aria-label', `Carácter ${i + 1} de ${N}`);
+    inp.autocomplete = i === 0 ? 'one-time-code' : 'off';
+    caja.append(inp); inputs.push(inp);
+  }
+  const limpiar = (s) => (s || '').toUpperCase().split('').filter(c => VALIDOS.test(c)).join('');
+  const valor = () => inputs.map(i => i.value).join('');
+  const llenar = (desde, texto) => {
+    let j = desde;
+    for (const c of limpiar(texto)) { if (j >= N) break; inputs[j++].value = c; }
+    inputs[Math.min(j, N - 1)].focus();
+    if (valor().length === N) enviar();
+  };
+  inputs.forEach((inp, i) => {
+    inp.addEventListener('input', () => {
+      const v = limpiar(inp.value); inp.value = '';
+      if (v) llenar(i, v); estado('');
+    });
+    inp.addEventListener('keydown', (e) => {
+      if (e.key === 'Backspace' && !inp.value && i > 0) { inputs[i - 1].value = ''; inputs[i - 1].focus(); e.preventDefault(); }
+      if (e.key === 'ArrowLeft' && i > 0) inputs[i - 1].focus();
+      if (e.key === 'ArrowRight' && i < N - 1) inputs[i + 1].focus();
+      if (e.key === 'Enter') enviar();
+    });
+    inp.addEventListener('paste', (e) => { e.preventDefault(); llenar(i, e.clipboardData.getData('text')); });
+    inp.addEventListener('focus', () => inp.select());
+  });
+  inputs[0].focus();
+
+  function estado(e, texto = '') {
+    caja.dataset.estado = e;
+    msg.className = 'mensaje' + (e === 'error' ? ' error' : '');
+    msg.innerHTML = e === 'cargando' ? '<span class="spinner"></span>&nbsp; Conectando con la nube…' : '';
+    if (texto) msg.textContent = texto;
+    inputs.forEach(i => i.disabled = e === 'cargando');
+  }
+  let enviando = false;
+  async function enviar() {
+    const codigo = valor();
+    if (enviando) return;
+    if (codigo.length !== N) { estado('error', 'Faltan caracteres: el código tiene 8.'); return; }
+    enviando = true; estado('cargando');
+    try {
+      const r = await fetch('/v1/activacion', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ codigo }) });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data.detail || 'No se pudo activar. Intenta de nuevo.');
+      document.getElementById('listo-detalle').textContent = `Este equipo ya es el servidor de ${data.nombreComercial} · ${data.nombreLocal}. Los meseros y la caja se conectarán aquí.`;
+      document.getElementById('paso-codigo').hidden = true;
+      document.getElementById('paso-listo').hidden = false;
+    } catch (e) {
+      estado('error', e.message === 'Failed to fetch' ? 'No hay conexión con el nodo.' : e.message);
+      inputs.forEach(i => i.value = ''); inputs[0].focus();
+    } finally { enviando = false; if (caja.dataset.estado === 'cargando') estado(''); }
+  }
+  document.getElementById('form').addEventListener('submit', (e) => { e.preventDefault(); enviar(); });
+})();
+</script>
+</body>
+</html>

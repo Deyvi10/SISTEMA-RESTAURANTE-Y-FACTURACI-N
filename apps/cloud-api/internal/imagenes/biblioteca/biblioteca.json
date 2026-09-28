@@ -1,0 +1,218 @@
+[
+ {
+  "slug": "ceviche-camaron",
+  "nombre": "Ceviche de camarón",
+  "categoria": "Mariscos",
+  "palabras": "ceviche camaron camarones coctel",
+  "licencia": "CC0",
+  "fuente": "https://www.flickr.com/photos/37996646802@N01/498917157",
+  "autor": "cogdogblog"
+ },
+ {
+  "slug": "ceviche-pescado",
+  "nombre": "Ceviche de pescado",
+  "categoria": "Mariscos",
+  "palabras": "ceviche pescado corvina mixto",
+  "licencia": "PDM",
+  "fuente": "https://commons.wikimedia.org/wiki/File:Ceviche_de_pescado_(La_Punta,_Callao).jpg",
+  "autor": "Jorge G. Mori"
+ },
+ {
+  "slug": "arroz-marinero",
+  "nombre": "Arroz marinero",
+  "categoria": "Mariscos",
+  "palabras": "arroz marinero mariscos paella camaron",
+  "licencia": "CC0",
+  "fuente": "https://www.rawpixel.com/image/448148/delicious-seafood-paella-and-lemons",
+  "autor": "Jakub Kapusnak"
+ },
+ {
+  "slug": "pescado-frito",
+  "nombre": "Pescado frito",
+  "categoria": "Mariscos",
+  "palabras": "pescado frito corvina tilapia apanado",
+  "licencia": "CC0",
+  "fuente": "https://www.flickr.com/photos/35034347371@N01/136193078",
+  "autor": "roland"
+ },
+ {
+  "slug": "seco-pollo",
+  "nombre": "Seco de pollo",
+  "categoria": "Platos fuertes",
+  "palabras": "seco pollo gallina estofado arroz",
+  "licencia": "CC0",
+  "fuente": "https://wordpress.org/photos/photo/90068afd0e/",
+  "autor": "Faisal Ahammad"
+ },
+ {
+  "slug": "parrillada",
+  "nombre": "Parrillada",
+  "categoria": "Platos fuertes",
+  "palabras": "parrillada carne asada pollo plancha churrasco",
+  "licencia": "CC0",
+  "fuente": "https://stocksnap.io/photo/grilled-chicken-34LMASJHCT",
+  "autor": "Krzysztof%20Puszczy%u0144ski"
+ },
+ {
+  "slug": "pasta",
+  "nombre": "Pasta",
+  "categoria": "Platos fuertes",
+  "palabras": "pasta tallarin espagueti fideos",
+  "licencia": "CC0",
+  "fuente": "https://www.flickr.com/photos/35034347371@N01/72707177",
+  "autor": "roland"
+ },
+ {
+  "slug": "bolon",
+  "nombre": "Bolón mixto",
+  "categoria": "Desayunos",
+  "palabras": "bolon verde tigrillo chicharron desayuno",
+  "licencia": "PDM",
+  "fuente": "https://commons.wikimedia.org/wiki/File:Tacacho_con_cecina_y_chorizo_(Lima).JPG",
+  "autor": "Dtarazona"
+ },
+ {
+  "slug": "desayuno",
+  "nombre": "Desayuno completo",
+  "categoria": "Desayunos",
+  "palabras": "desayuno huevos tostadas americano",
+  "licencia": "CC0",
+  "fuente": "https://www.flickr.com/photos/35034347371@N01/101266618",
+  "autor": "roland"
+ },
+ {
+  "slug": "empanadas",
+  "nombre": "Empanadas",
+  "categoria": "Entradas",
+  "palabras": "empanada empanadas verde queso",
+  "licencia": "PDM",
+  "fuente": "https://www.flickr.com/photos/134894678@N07/24163074516",
+  "autor": "MI PERÚ"
+ },
+ {
+  "slug": "alitas",
+  "nombre": "Alitas BBQ",
+  "categoria": "Entradas",
+  "palabras": "alitas bbq pollo wings",
+  "licencia": "CC0",
+  "fuente": "https://www.rawpixel.com/image/5970535/photo-image-public-domain-food",
+  "autor": ""
+ },
+ {
+  "slug": "ensalada",
+  "nombre": "Ensalada fresca",
+  "categoria": "Entradas",
+  "palabras": "ensalada vegetariana verde",
+  "licencia": "CC0",
+  "fuente": "https://www.rawpixel.com/image/5925656/photo-image-public-domain-plant-green",
+  "autor": ""
+ },
+ {
+  "slug": "sopa",
+  "nombre": "Crema del día",
+  "categoria": "Sopas",
+  "palabras": "sopa crema locro zapallo",
+  "licencia": "CC0",
+  "fuente": "https://www.rawpixel.com/image/5922901/photo-image-public-domain-leaf-fruit",
+  "autor": ""
+ },
+ {
+  "slug": "hamburguesa",
+  "nombre": "Hamburguesa",
+  "categoria": "Rápidas",
+  "palabras": "hamburguesa burger doble",
+  "licencia": "CC0",
+  "fuente": "https://www.flickr.com/photos/55128416@N05/25039204229",
+  "autor": "brenkee"
+ },
+ {
+  "slug": "pizza",
+  "nombre": "Pizza",
+  "categoria": "Rápidas",
+  "palabras": "pizza personal familiar",
+  "licencia": "PDM",
+  "fuente": "https://www.flickr.com/photos/149556095@N03/34870120685",
+  "autor": "marcostetter"
+ },
+ {
+  "slug": "sanduche",
+  "nombre": "Sánduche",
+  "categoria": "Rápidas",
+  "palabras": "sanduche sandwich emparedado",
+  "licencia": "PDM",
+  "fuente": "https://www.flickr.com/photos/57873306@N00/7346865110",
+  "autor": "Kim Siever"
+ },
+ {
+  "slug": "papas-fritas",
+  "nombre": "Papas fritas",
+  "categoria": "Rápidas",
+  "palabras": "papas fritas salchipapa",
+  "licencia": "CC0",
+  "fuente": "https://www.flickr.com/photos/137346712@N07/25434078495",
+  "autor": "CC0photo"
+ },
+ {
+  "slug": "torta-chocolate",
+  "nombre": "Torta de chocolate",
+  "categoria": "Postres",
+  "palabras": "torta pastel chocolate",
+  "licencia": "CC0",
+  "fuente": "https://www.rawpixel.com/image/5916247/image-public-domain-food-chocolate",
+  "autor": ""
+ },
+ {
+  "slug": "tres-leches",
+  "nombre": "Tres leches",
+  "categoria": "Postres",
+  "palabras": "tres leches postre pastel",
+  "licencia": "CC0",
+  "fuente": "https://www.rawpixel.com/image/5953395/free-public-domain-cc0-photo",
+  "autor": ""
+ },
+ {
+  "slug": "cafe",
+  "nombre": "Café",
+  "categoria": "Bebidas",
+  "palabras": "cafe capuchino americano",
+  "licencia": "CC0",
+  "fuente": "https://www.flickr.com/photos/132795455@N08/17625638243",
+  "autor": "Image Catalog"
+ },
+ {
+  "slug": "jugo",
+  "nombre": "Jugo natural",
+  "categoria": "Bebidas",
+  "palabras": "jugo batido fruta natural",
+  "licencia": "CC0",
+  "fuente": "https://www.flickr.com/photos/157635012@N07/28164605967",
+  "autor": "Artem Beliaikin"
+ },
+ {
+  "slug": "limonada",
+  "nombre": "Limonada",
+  "categoria": "Bebidas",
+  "palabras": "limonada limon refresco",
+  "licencia": "CC0",
+  "fuente": "https://commons.wikimedia.org/w/index.php?curid=88939081",
+  "autor": "Obsidian Soul"
+ },
+ {
+  "slug": "cerveza",
+  "nombre": "Cerveza",
+  "categoria": "Bebidas",
+  "palabras": "cerveza pilsener club artesanal",
+  "licencia": "CC0",
+  "fuente": "https://www.rawpixel.com/image/5925051/photo-image-background-christmas-public-domain",
+  "autor": ""
+ },
+ {
+  "slug": "coctel",
+  "nombre": "Cóctel",
+  "categoria": "Bebidas",
+  "palabras": "coctel mojito trago",
+  "licencia": "PDM",
+  "fuente": "https://www.flickr.com/photos/31027007@N08/35441594065",
+  "autor": "Wine Dharma"
+ }
+]

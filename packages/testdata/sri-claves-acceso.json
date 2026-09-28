@@ -1,0 +1,15 @@
+{
+  "fuente": "docs/05 §4. El primer caso es el ejemplo publicado en la ficha técnica del SRI.",
+  "validas": [
+    {"clave": "2110201101179214673900110020010000000011234567813", "nota": "Ejemplo de la ficha técnica"}
+  ],
+  "digito": [
+    {"base48": "000000000000000000000000000000000000000000000000", "digito": 0, "nota": "d = 11 → 0"},
+    {"base48": "000000000000000000000000000000000000000000020000", "digito": 1, "nota": "d = 10 → 1"}
+  ],
+  "invalidas": [
+    {"clave": "2110201101179214673900110020010000000011234567814", "nota": "Dígito verificador alterado"},
+    {"clave": "211020110117921467390011002001000000001123456781", "nota": "48 dígitos (el error del documento fuente, L-01)"},
+    {"clave": "21102011011792146739001100200100000000112345678A3", "nota": "Contiene una letra"}
+  ]
+}

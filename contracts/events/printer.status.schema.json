@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://restpos/contracts/events/printer.status.json",
+  "title": "printer.status",
+  "description": "Cambió el estado de una impresora.",
+  "x-event-version": 1,
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "printer_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "name": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "OK",
+        "SIN_PAPEL",
+        "POCO_PAPEL",
+        "TAPA_ABIERTA",
+        "SIN_CONEXION",
+        "ERROR"
+      ]
+    },
+    "queue": {
+      "type": "integer",
+      "description": "Trabajos pendientes"
+    },
+    "station_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "format": "uuid"
+      }
+    }
+  },
+  "required": [
+    "printer_id",
+    "name",
+    "status",
+    "queue"
+  ]
+}

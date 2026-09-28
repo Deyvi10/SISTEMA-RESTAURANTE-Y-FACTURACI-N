@@ -1,0 +1,6 @@
+node_modules
+**/node_modules
+apps/backoffice-web/dist
+documentacion-proyecto
+.git
+**/.dart_tool

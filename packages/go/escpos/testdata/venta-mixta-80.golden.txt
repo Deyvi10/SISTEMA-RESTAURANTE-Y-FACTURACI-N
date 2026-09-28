@@ -1,0 +1,29 @@
+[abrir cajón]
+Cevichería Don Pepe
+DOCUMENTO INTERNO DE VENTA
+ SIN VALOR TRIBUTARIO 
+------------------------------------------------
+INT-000123                      24/09/2026 21:15
+Mesa 4                             Caja: Luis P.
+Cliente: CONSUMIDOR FINAL
+------------------------------------------------
+1 Ceviche mixto                           $15.00
+2 Cerveza                                  $5.00
+------------------------------------------------
+Subtotal                                  $17.39
+IVA                                        $2.61
+Servicio                                   $1.74
+TOTAL                                     $21.74
+------------------------------------------------
+Efectivo                                  $10.00
+Tarjeta débito ****4821                   $11.74
+Recibido                                  $20.00
+Vuelto                                    $10.00
+------------------------------------------------
+Este documento no reemplaza a la factura
+electrónica.
+¡Gracias por su visita!
+
+
+
+-------- corte --------

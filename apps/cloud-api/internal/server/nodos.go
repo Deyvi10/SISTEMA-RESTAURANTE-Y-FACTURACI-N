@@ -1,0 +1,141 @@
+package server
+
+import (
+	"context"
+	"errors"
+	"net"
+	"net/http"
+	"strconv"
+	"time"
+
+	"github.com/jackc/pgx/v5"
+
+	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/auth"
+	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/caja"
+	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/nodos"
+	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/platform/apperr"
+	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/platform/db"
+	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/platform/httpx"
+	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/edgesync"
+)
+
+func ipDe(r *http.Request) string {
+	ip, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	return ip
+}
+
+// POST /v1/nodos/activar (pública: el nodo aún no tiene identidad; la protege el código
+// de un solo uso y el bloqueo por intentos).
+func activarNodo(n *nodos.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var in nodos.Activacion
+		if err := httpx.Decode(w, r, &in); err != nil {
+			httpx.Error(w, r, err)
+			return
+		}
+		out, err := n.Activar(r.Context(), in, ipDe(r))
+		if err != nil {
+			httpx.Error(w, r, err)
+			return
+		}
+		w.Header().Set("Cache-Control", "no-store")
+		httpx.JSON(w, http.StatusOK, out)
+	}
+}
+
+// POST /v1/nodos/heartbeat
+func heartbeat(n *nodos.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var hb edgesync.Heartbeat
+		if err := httpx.DecodeNodo(w, r, &hb); err != nil {
+			httpx.Error(w, r, err)
+			return
+		}
+		out, err := n.Heartbeat(r.Context(), auth.MustNodo(r.Context()), hb)
+		if err != nil {
+			httpx.Error(w, r, err)
+			return
+		}
+		httpx.JSON(w, http.StatusOK, out)
+	}
+}
+
+var errOtroNodo = apperr.New(apperr.Forbidden, "NODO_AJENO", "El lote pertenece a otro nodo.")
+
+// POST /v1/sync/push: lotes del outbox del nodo, aplicados en orden y una sola vez
+// (ADR-0012) dentro del tenant del nodo autenticado.
+func syncPush(d *db.DB, svc *nodos.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		n := auth.MustNodo(r.Context())
+		var req edgesync.PushRequest
+		if err := httpx.DecodeNodo(w, r, &req); err != nil {
+			httpx.Error(w, r, err)
+			return
+		}
+		if req.NodeID != n.ID {
+			httpx.Error(w, r, errOtroNodo)
+			return
+		}
+		rec := &edgesync.Receiver{Apply: svc.Aplicador(n), Begin: func(ctx context.Context, fn func(pgx.Tx) error) error {
+			return d.InTenant(ctx, n.TenantID, fn)
+		}}
+		res, err := rec.Push(r.Context(), req)
+		if errors.Is(err, edgesync.ErrInvalidBatch) {
+			err = apperr.New(apperr.Invalid, "LOTE_INVALIDO", err.Error())
+		}
+		if err != nil {
+			httpx.Error(w, r, err)
+			return
+		}
+		httpx.JSON(w, http.StatusOK, res)
+	}
+}
+
+// GET /v1/sync/pull?desde=N&esperar=S[&volcado=1]: cambios de catálogo, salón y personal (F2-03).
+func syncPull(n *nodos.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query()
+		desde, err1 := strconv.ParseInt(q.Get("desde"), 10, 64)
+		esperar, err2 := strconv.Atoi(q.Get("esperar"))
+		if (q.Get("desde") != "" && (err1 != nil || desde < 0)) || (q.Get("esperar") != "" && err2 != nil) {
+			httpx.Error(w, r, apperr.New(apperr.Invalid, "PARAMETROS_INVALIDOS", "desde y esperar deben ser números enteros."))
+			return
+		}
+		res, err := n.Pull(r.Context(), auth.MustNodo(r.Context()), desde, q.Get("volcado") == "1", time.Duration(esperar)*time.Second)
+		if err != nil {
+			httpx.Error(w, r, err)
+			return
+		}
+		w.Header().Set("Cache-Control", "no-store")
+		httpx.JSON(w, http.StatusOK, res)
+	}
+}
+
+// GET /v1/nodos/secreto-pin: pepper de PIN del restaurante del nodo (F3-04).
+func secretoPIN(n *nodos.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-store")
+		httpx.JSON(w, http.StatusOK, n.SecretoPIN(auth.MustNodo(r.Context())))
+	}
+}
+
+// GET /v1/nodos/clientes?tipo=&identificacion=: la búsqueda en cascada del nodo (F4-07)
+// cuando el cliente no está en su base. 404 si el restaurante no lo tiene.
+func buscarClienteNodo(c *caja.Clientes) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query()
+		cli, err := c.Buscar(r.Context(), auth.MustNodo(r.Context()).TenantID, q.Get("tipo"), q.Get("identificacion"))
+		if err == nil && cli == nil {
+			err = apperr.ErrNotFound
+		}
+		if err != nil {
+			httpx.Error(w, r, err)
+			return
+		}
+		w.Header().Set("Cache-Control", "no-store")
+		httpx.JSON(w, http.StatusOK, cli)
+	}
+}

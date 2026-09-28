@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://restpos/contracts/events/table.lock.request.json",
+  "title": "table.lock.request",
+  "description": "Un dispositivo pide bloquear una mesa para tomar el pedido.",
+  "x-event-version": 1,
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "table_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Mesa"
+    },
+    "device_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Dispositivo que pide"
+    }
+  },
+  "required": [
+    "table_id",
+    "device_id"
+  ]
+}

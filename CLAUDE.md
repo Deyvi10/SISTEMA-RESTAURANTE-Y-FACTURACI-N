@@ -1,0 +1,69 @@
+# CLAUDE.md (raíz del monorepo)
+
+@documentacion-proyecto/CLAUDE.md
+
+## Rutas
+
+La documentación vive en `documentacion-proyecto/`: toda referencia a `docs/…` en el CLAUDE.md importado significa `documentacion-proyecto/docs/…`. El código vive en la raíz (`apps/`, `packages/`, `tools/`…).
+
+## Cómo trabajar aquí
+
+- Go está en `~/.local/go/bin` si no está en el PATH (el Makefile lo encuentra solo).
+- Un solo módulo Go en la raíz: `github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N`.
+- Antes de dar algo por terminado: `make lint test`.
+- Tickets de impresión: se prueban contra `tools/printer-sim` y con archivos golden (`make golden` y revisar el diff).
+- Vectores de prueba que deben coincidir entre Go, TS y Dart van en `packages/testdata/`, no dentro de una prueba.
+
+## Estado
+
+| Ticket | Estado |
+|---|---|
+| F0-02 Monorepo | ✅ |
+| F0-03 Tooling | ✅ Go (vet, golangci, gofumpt, ganchos). TS y Flutter se configuran al crear sus apps |
+| F0-04 CI | ✅ `.github/workflows/ci.yml` + nocturno |
+| F0-05 `make dev` | ✅ Postgres 17, VersityGW (S3 + Object Lock), Azurite (Azure Blob, ADR-0013), Mailpit, toxiproxy, simuladores |
+| F0-06 Simulador de impresoras | ✅ `tools/printer-sim` |
+| F0-07 Stub del SRI | ✅ `tools/sri-stub` |
+| F0-11 Dinero, IDs, reloj | ✅ Go. TS y Dart pendientes (usar `packages/testdata/`) |
+| F0-08 Spike SRI | 🟡 Clave de acceso lista. Falta XML + XSD + firma XAdES: requiere `.p12` de pruebas (DP-04) |
+| F0-09 Spike impresión | 🟡 Librería ESC/POS lista y probada con el simulador. Falta hardware real (DP-04) |
+| F0-10 Spike sync | ✅ 10 000 eventos con caos: 0 pérdidas, 0 duplicados (ADR-0012, `packages/go/edgesync`) |
+| F0-12 Sistema de diseño | ✅ Tokens únicos → CSS, Tailwind v4, TS y Flutter; contraste AA verificado en CI; componentes CSS; guía viva (`make ui-docs`) |
+| F0-01, F0-13, F0-14 | ⏳ Requieren decisiones, usuarios reales o descargar la ficha del SRI |
+| F1-01…F1-09, F1-13 | ✅ API Go (`apps/cloud-api`): RLS forzado + QA-06 en 16 tablas, QA-11, auth completa, catálogo, salón, personal, imágenes WebP + galería de 24 fotos CC0 |
+| F1-10…F1-12 | ✅ Backoffice React (`apps/backoffice-web`): login promocional, guía de 5 pasos, menú con fotos, salón, personal con PIN, ajustes |
+| F2-01 | ✅ Nodo Local (`apps/edge-node`): servicio de Windows/systemd, SQLite con un solo escritor, watchdog, prueba kill -9 |
+| F2-02 | ✅ Activación por código (nube + nodo + pantalla en el backoffice y en el nodo), ADR-0014 |
+| F2-03 | ✅ Nube → Nodo: feed de cambios por tenant, long-poll con NOTIFY (33 ms medido), volcado consistente, réplica tolerante a columnas nuevas (ADR-0015) |
+| F2-05 | ✅ Página `/estado` del nodo (estilo Ajustes › Información): nube, cola, reloj, impresoras, disco; sin datos personales; «Buscar impresoras» solo desde la PC del nodo. El PIN de Admin para acciones llega con F3-04 |
+| F2-06 | ✅ Hub WebSocket (`/v1/ws`): 60 dispositivos con p95 de 6 ms, cliente lento aislado, contratos de 16 eventos → Go/TS/Dart (`make contracts`), mDNS `_restpos._tcp`, semáforo `/v1/conectividad`. Por ahora solo acepta conexiones locales (loopback): los teléfonos entran con el emparejamiento de F3-02 |
+| F2-08 | ✅ Descubrimiento: mDNS `_pdl-datastream._tcp` + barrido TCP 9100 de la subred (hasta /22) + tabla ARP; informa lo nuevo y reubica por MAC al cambiar la IP; cada 30 min, tras una caída o con «Buscar impresoras». Impresoras ya instaladas en Windows (USB, red, WSD): el nodo las lista por el spooler, el backoffice las muestra en «En la PC de caja» y al conectarlas imprime directo por IP si Windows la conoce, o por el spooler en RAW. Probado con spooler simulado; falta la prueba en una PC Windows real |
+| F2-09 | ✅ Plantillas ESC/POS (comanda, ANULACIÓN, REIMPRESIÓN, 58/80 mm) desde F0-09 |
+| F2-10 | ✅ Impresoras en la nube (manual por IP o detectadas por el nodo), asignación N:M a estaciones, ruteo de categorías/productos; pantalla «Impresoras» con arrastrar y soltar e «Imprimir prueba» vía el nodo |
+| F2-11 | ✅ `POST /v1/comandas` en el nodo: idempotente, separa por estación, cola persistente por impresora, envío en paralelo (p95 49 ms en prueba; 23 ms contra printer-sim) |
+| F2-12 | ✅ DLE EOT cada 2 s: sin papel/tapa/sin conexión → `printer.status` + heartbeat inmediato; lo pendiente espera y sale solo; redirección de estación con re-render al ancho nuevo |
+| F2-13 | ✅ Reimpresión (sin platos anulados, con marca y hora original) y anulación de líneas, auditadas |
+| F2-15 | ✅ Caché de fotos del menú en el nodo (WebP sm/md, descarga atómica en segundo plano, limpieza de lo que ya no se usa, `/media/…` en la LAN) |
+| F2-07, F2-14 | ⏳ TLS en la LAN depende del dominio (DP-10); el MSI firmado necesita certificado de firma de código (F0-01) |
+| F2-04 | ✅ Push del outbox con tenant/RLS, heartbeat con telemetría y alerta de reloj |
+| F1-14 | 🟡 Imagen Docker lista (`deploy/docker/cloud-api.Dockerfile`, `-tags nodynamic`). Falta IaC (Terraform en `deploy/azure/`, ADR-0013) y despliegue a `dev` |
+| F2-01…F2-06, F2-08…F2-13, F2-15 | ✅ Nodo Local (`apps/edge-node`): SQLite WAL de un escritor, activación, réplica por long-poll, outbox, página de estado, hub WebSocket, impresoras de red (mDNS/barrido/ARP) y las ya instaladas en Windows (spooler RAW), colas ESC/POS por estación con redirección y reimpresión, caché de fotos |
+| F2-07, F2-14 | ⏳ TLS en la LAN (DP-10) e instalador MSI firmado. Falta probar el spooler en un Windows real |
+| F3-01…F3-15 | ✅ App de meseros Flutter (`apps/waiter-app`) + backend en el nodo: QR/código, PIN con pepper por restaurante, salón en vivo, bloqueos con latido, pedido con modificadores, cola sin conexión, pre-cuenta, mover/unir/transferir, anular con supervisor. E2E en emulador; prueba Go de 8 teléfonos sin internet; flujo completo en CI (`make waiter`). Falta: cámara/QR y arranque ≤ 2 s en un teléfono real |
+| F4-01 | ✅ Caja web React (`apps/pos-web`) embebida en el nodo (`go:embed`, `/pos/`, `make pos`): PIN por teclado, mesas en vivo con navegación por flechas, atajos con `?`, semáforo 🟢🟡🔴. Otras PCs se emparejan con WebCrypto, que exige el TLS del nodo (F2-07) |
+| F4-02, F4-03, F4-11 | ✅ Jornada (se abre sola con el primer pedido, cruza la medianoche, se cierra sin turnos ni órdenes o transfiriéndolas, cierra las sesiones de meseros), turnos por caja con fondo inicial (hoja con teclado de importes), retiros/ingresos/gastos append-only e idempotentes. Pestaña «Turno» en la caja (F9/F10, F3, F4, F6–F8) |
+| F4-12 | ✅ Cierre ciego: asistente por denominación (contadores `− n +`, teclado) y vouchers por método; el nodo calcula esperado = fondo + efectivo cobrado + ingresos − retiros − gastos y da Cuadrado/Sobrante/Faltante por método. Cierre Z inmutable (`cierres_z`, numerado por caja, hash encadenado verificable, paquete `packages/go/cierrez`), impreso en la estación de la caja e idempotente. La nube lo guarda (append-only + RLS) y envía el correo con PDF a los dueños; alerta crítica si una diferencia supera el umbral del local (Ajustes, USD 5 por defecto). |
+| F4-04 | ✅ Venta en mostrador: Para llevar, Barra y Delivery con número del día y nombre corto en la comanda («Llevar #12 · Ana»); búsqueda predictiva con la misma regla que los meseros (vectores compartidos Dart/TS en `packages/testdata/busqueda-productos.json`), modificadores obligatorios, carrito, «Enviar y cobrar» (F2) o «sin cobrar» (F3); órdenes sin mesa junto al salón y «Agregar platos» (A) |
+| F4-05 | ✅ Cobro «Zero-Click» de mesas: billetes dinámicos ($14.50 → exacto, $15, $20, $50; teclas 1–4 y «O» para otro monto), otros métodos por el total exacto; un toque registra el pago en el turno, emite el documento interno `INT-000123` (sin valor tributario, append-only; F5 lo cambia por el comprobante), cierra la orden, libera la mesa en vivo e imprime con el pulso del cajón delante. Idempotente; p95 del nodo 15 ms. Sobre el límite de consumidor final (DP-07) exige comprador identificado. |
+| F4-06 | ✅ Pago mixto (M): varios métodos que suman exacto el total, un solo pago en efectivo (el que da vuelto), lote/referencia/últimos 4 opcionales en tarjetas (tocar un método con voucher abre el detalle con el total listo). Un pago por método en `pagos`; el documento y el ticket detallan cada uno; el Cierre Z los separa por método |
+| F4-07 | ✅ Comprador: campo único «Cédula / RUC / Pasaporte» validado en la caja con `@restpos/sri` (`packages/ts/sri`, mismos vectores que `packages/go/sri`), búsqueda en cascada nodo → nube (tope 250 ms; medido: nodo < 1 ms, nube 8 ms) y caché en el nodo, formulario mínimo (nombre y correo), consentimiento LOPDP desmarcado por defecto (sin él solo va en el documento). `clientes` en nodo y nube con last-writer-wins por campo (`campos_at`). El proveedor externo (cascada c) es opcional y no hay ninguno configurado |
+| F4-10 | ✅ Servicio 10 % sobre la base sin IVA (sin gravar IVA), activable por local; el cajero lo quita o repone en el cobro (S) con motivo opcional, auditado (`PROPINA_RETIRADA`/`PROPINA_REPUESTA`); cada propina cobrada queda en `propinas` (append-only) por orden y mesero para el reparto (F8-03) y viaja en el evento de venta. **Criterio a confirmar:** no se cobra servicio en Para llevar ni Delivery (sí en Mesa y Barra) |
+| F4-06, F4-09 (config) | 🟡 En la nube y el backoffice (pantalla «Caja»): cajas por local con estación de tipo Caja, métodos de pago con código SRI (efectivo único = 01) y motivos de descuento/cortesía; se replican al nodo con `parametros_globales` (límite de consumidor final, DP-07). Falta el cobro que los usa (F4-05+) |
+
+Notas para seguir:
+- Detrás de un proxy (VM con Caddy/Nginx) el bloqueo por IP de login y de activación de nodos debe leer la IP real desde un proxy de confianza (pendiente del despliegue).
+- `make nodo` corre un Nodo Local en http://localhost:7080 contra la API local.
+- El cliente TS del backoffice está escrito a mano (`src/api/types.ts`); generarlo desde OpenAPI queda pendiente (contrato en `contracts/openapi/`).
+- Flutter corre en Docker: `tools/flutter.sh <dir> "<cmd>"` (volúmenes de pub, Gradle y llave de debug). El código de la app se formatea con `dart format -l 160 lib`.
+- Demo: el dueño (demo@donpepe.ec) también entra con PIN 4826 en los teléfonos y autoriza anulaciones; `cloud-api demo -pines` repone los PIN.
+- Refresh con periodo de gracia de 30 s para carreras benignas (recarga durante la renovación, peticiones simultáneas); fuera de la gracia es robo y revoca la familia.

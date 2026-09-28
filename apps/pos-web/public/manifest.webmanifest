@@ -1,0 +1,10 @@
+{
+  "name": "RestPOS Caja",
+  "short_name": "Caja",
+  "start_url": "/pos/",
+  "scope": "/pos/",
+  "display": "standalone",
+  "background_color": "#F2F2F7",
+  "theme_color": "#F2F2F7",
+  "icons": [{ "src": "/pos/icono.svg", "sizes": "any", "type": "image/svg+xml" }]
+}

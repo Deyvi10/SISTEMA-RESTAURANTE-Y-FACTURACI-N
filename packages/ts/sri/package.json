@@ -1,0 +1,15 @@
+{
+  "name": "@restpos/sri",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Validación de identificaciones del SRI (cédula, RUC, pasaporte): la misma regla que packages/go/sri, con los vectores de packages/testdata.",
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --test src/*.test.ts"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.0"
+  }
+}

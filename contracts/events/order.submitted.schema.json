@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://restpos/contracts/events/order.submitted.json",
+  "title": "order.submitted",
+  "description": "Se envió una comanda a producción.",
+  "x-event-version": 1,
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "order_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "comanda_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "table_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "number": {
+      "type": "integer",
+      "description": "Número de comanda de la jornada"
+    },
+    "lines": {
+      "type": "integer",
+      "description": "Líneas enviadas"
+    },
+    "by_user_id": {
+      "type": "string",
+      "format": "uuid"
+    }
+  },
+  "required": [
+    "order_id",
+    "comanda_id",
+    "number",
+    "lines",
+    "by_user_id"
+  ]
+}

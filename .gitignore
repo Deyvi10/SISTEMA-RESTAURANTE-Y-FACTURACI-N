@@ -1,0 +1,42 @@
+# Binarios y cobertura
+/bin/
+*.exe
+*.test
+coverage.out
+coverage.html
+
+# Node / web
+node_modules/
+dist/
+.vite/
+*.tsbuildinfo
+
+# Flutter / Dart
+.dart_tool/
+build/
+.flutter-plugins*
+*.iml
+
+# Entorno y secretos (nunca al repositorio)
+.env
+.env.*
+!.env.example
+*.p12
+*.pfx
+*.pem
+*.key
+
+# Editores y SO
+.idea/
+.vscode/*
+!.vscode/extensions.json
+.DS_Store
+Thumbs.db
+
+# Paquetes Dart: el lockfile solo se versiona en apps
+packages/dart/**/pubspec.lock
+.nodo-data/
+
+# Caja web compilada que embebe el nodo (`make pos`); .gitkeep permite compilar el nodo sin ella
+/apps/edge-node/internal/web/pos/*
+!/apps/edge-node/internal/web/pos/.gitkeep

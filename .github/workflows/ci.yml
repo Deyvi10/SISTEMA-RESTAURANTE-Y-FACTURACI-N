@@ -1,0 +1,169 @@
+# CI base (F0-04, docs/08 §3). Cada job corre solo si cambió su parte del monorepo.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  cambios:
+    runs-on: ubuntu-latest
+    outputs:
+      go: ${{ steps.f.outputs.go }}
+      ui: ${{ steps.f.outputs.ui }}
+      web: ${{ steps.f.outputs.web }}
+      waiter: ${{ steps.f.outputs.waiter }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: f
+        with:
+          filters: |
+            go:
+              - 'go.mod'
+              - 'go.sum'
+              - 'packages/go/**'
+              - 'packages/testdata/**'
+              - 'db/**'
+              - 'tools/**'
+              - 'apps/cloud-api/**'
+              - 'apps/edge-node/**'
+              - 'contracts/**'
+              - '.golangci.yml'
+              - 'packages/design/**'
+            web:
+              - 'apps/backoffice-web/**'
+              - 'apps/pos-web/**'
+              - 'packages/ts/**'
+              - 'package.json'
+              - 'package-lock.json'
+            ui:
+              - 'packages/design/**'
+              - 'packages/ts/**'
+              - 'packages/dart/**'
+            waiter:
+              - 'apps/waiter-app/**'
+              - 'packages/dart/**'
+              - 'contracts/**'
+
+  go:
+    needs: cambios
+    if: needs.cambios.outputs.go == 'true'
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: restpos
+          POSTGRES_USER: restpos_owner
+          POSTGRES_PASSWORD: restpos_ci
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U restpos_owner -d restpos"
+          --health-interval 3s --health-timeout 3s --health-retries 20
+      azurite:
+        image: mcr.microsoft.com/azure-storage/azurite:latest
+        ports: ["10000:10000"]
+    env:
+      TEST_DATABASE_URL: postgres://restpos_owner:restpos_ci@localhost:5432/restpos
+      # Clave pública y documentada del emulador Azurite (no es un secreto).
+      TEST_AZURE_STORAGE: DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Formato
+        run: test -z "$(gofmt -l packages tools apps)" || (gofmt -l packages tools apps; exit 1)
+      - name: Sin float en dominio
+        run: make check-float
+      - name: go vet
+        run: go vet ./...
+      - uses: golangci/golangci-lint-action@v8
+        with:
+          version: latest
+      - name: Pruebas con detector de carreras
+        run: go test -race -count=1 -coverprofile=coverage.out ./...
+      - name: Cobertura de dominios críticos
+        run: go tool cover -func=coverage.out | tail -1
+      - name: Vulnerabilidades (govulncheck)
+        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+      - name: Tokens de diseño al día y contraste AA
+        run: go run ./tools/design-tokens -check
+      - name: Contratos de eventos al día (Go, TS, Dart)
+        run: go run ./tools/contracts-gen -check
+      - name: Golden de tickets sin cambios
+        run: go test ./packages/go/escpos -update && git diff --exit-code packages/go/escpos/testdata
+
+  ui:
+    needs: cambios
+    if: needs.cambios.outputs.ui == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Tipos y pruebas de @restpos/ui
+        working-directory: packages/ts/ui
+        run: npx -y -p typescript@5.9 tsc --noEmit -p . && node --experimental-strip-types --test src/*.test.ts
+      - name: Tipos y pruebas de @restpos/sri (mismos vectores que Go)
+        working-directory: packages/ts/sri
+        run: npx -y -p typescript@5.9 tsc --noEmit -p . && node --experimental-strip-types --test src/*.test.ts
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - name: Análisis y pruebas de restpos_ui (Flutter)
+        working-directory: packages/dart/restpos_ui
+        run: flutter pub get && flutter analyze && flutter test
+
+  waiter:
+    needs: cambios
+    if: needs.cambios.outputs.waiter == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - name: Análisis y pruebas de la app de meseros (incluye el flujo emparejar → enviar)
+        working-directory: apps/waiter-app
+        run: flutter pub get && flutter analyze && flutter test
+
+  backoffice:
+    needs: cambios
+    if: needs.cambios.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Tipos
+        run: npm run typecheck -w @restpos/backoffice-web
+      - name: Pruebas
+        run: npm test -w @restpos/backoffice-web
+      - name: Build
+        run: npm run build -w @restpos/backoffice-web
+      - name: Caja web (tipos, pruebas y build dentro del nodo)
+        run: npm run typecheck -w @restpos/pos-web && npm test -w @restpos/pos-web && npm run build -w @restpos/pos-web
+
+  secretos:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,8 @@
+{
+  "name": "@restpos/contracts",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Tipos de los eventos de tiempo real del Nodo Local, generados desde contracts/events.",
+  "exports": { ".": "./src/index.ts" }
+}

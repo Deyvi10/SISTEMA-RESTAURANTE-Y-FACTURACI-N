@@ -1,0 +1,15 @@
+ ANULACIÓN 
+COCINA CALIENTE
+Mesa 4
+Comanda #27                                21:15
+Mesero: Carlos M.                     24/09/2026
+================================================
+-- ENTRADA --
+1 x Ceviche mixto
+    * Sin cebolla
+------------------------------------------------
+Motivo: Cliente cambió de plato
+================================================
+
+
+-------- corte --------

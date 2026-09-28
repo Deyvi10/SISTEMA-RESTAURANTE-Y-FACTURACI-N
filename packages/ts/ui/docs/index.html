@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sistema de diseño · RestPOS</title>
+<link rel="stylesheet" href="../src/tokens.css">
+<link rel="stylesheet" href="../src/components.css">
+<style>
+  .doc { max-width: 1100px; margin: 0 auto; padding: 0 0 80px; }
+  .doc h2 { margin: 44px 16px 4px; font: 700 24px/1.2 var(--rp-font-display); letter-spacing: -0.02em; }
+  .doc .lead { margin: 0 16px 14px; color: var(--rp-color-label-secondary); max-width: 70ch; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; padding: 0 16px; }
+  .card { background: var(--rp-color-surface); border-radius: var(--rp-radius-widget); padding: 18px; box-shadow: var(--rp-shadow-card); display: flex; flex-direction: column; gap: 12px; }
+  .card h3 { margin: 0; font: 600 15px/1.3 var(--rp-font-text); color: var(--rp-color-label-secondary); text-transform: uppercase; letter-spacing: .05em; font-size: 12px; }
+  .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  .swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 12px; padding: 0 16px; }
+  .sw { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--rp-color-label-secondary); }
+  .sw i { height: 56px; border-radius: 14px; box-shadow: inset 0 0 0 .5px var(--rp-color-separator); }
+  .sw b { color: var(--rp-color-label); font-weight: 600; }
+  .mesas { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; max-width: 620px; }
+  .grid--lists { grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); }
+  .grid .rp-group { margin: 0; }
+  .grid .rp-section-header, .grid .rp-section-footer { margin-left: 16px; margin-right: 16px; }
+  .widgets { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; padding: 0 16px; }
+  .icons { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 16px 8px; padding: 0 16px; }
+  .icons figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 11px; color: var(--rp-color-label-secondary); text-align: center; }
+  .pinbox { display: flex; flex-direction: column; align-items: center; gap: 18px; padding: 10px 0; }
+  .avatar { width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; font: 700 22px/1 var(--rp-font-display); color: #fff; background: linear-gradient(160deg, var(--rp-tint-orange), var(--rp-tint-pink)); }
+  .theme-switch { width: 260px; margin-left: auto; }
+  .alert-stage { display: grid; place-items: center; padding: 18px; border-radius: 16px; background: var(--rp-color-scrim); }
+  .phone-note { font-size: 13px; color: var(--rp-color-label-secondary); }
+  @media (max-width: 640px) { .grid--lists { grid-template-columns: 1fr; } .mesas { grid-template-columns: repeat(3, minmax(0, 1fr)); } .theme-switch { width: 100%; } }
+</style>
+</head>
+<body class="rp-app">
+<nav class="rp-navbar" id="nav">
+  <span class="rp-conn" data-estado="online"><i data-lucide="wifi"></i>En línea</span>
+  <span class="rp-navbar__title">Sistema de diseño</span>
+  <div class="rp-segmented theme-switch" role="radiogroup" aria-label="Tema">
+    <label><input type="radio" name="tema" value="system" checked><span>Sistema</span></label>
+    <label><input type="radio" name="tema" value="light"><span>Claro</span></label>
+    <label><input type="radio" name="tema" value="dark"><span>Oscuro</span></label>
+  </div>
+</nav>
+
+<main class="doc">
+  <h1 class="rp-large-title rp-t-large-title">Sistema de diseño</h1>
+  <p class="lead">Lenguaje visual estilo iPhone para la app de meseros, la caja, el backoffice, el KDS y el menú QR. Todo sale de <code class="rp-mono">packages/design/tokens.json</code>; cada texto cumple WCAG AA en claro y en oscuro, verificado en el CI.</p>
+
+  <h2>Colores</h2>
+  <p class="lead">Los tintes de iOS se usan para fondos, iconos y mosaicos. Para texto y botones se usan sus variantes accesibles.</p>
+  <div class="swatches" id="swatches"></div>
+
+  <h2>Estados de mesa</h2>
+  <p class="lead">Color, texto e icono dicen el estado sin tener que leer. El texto de cada mosaico supera 4,5:1.</p>
+  <div class="grid"><div class="card" style="grid-column: 1 / -1">
+    <div class="mesas">
+      <button class="rp-mesa" data-estado="libre">1<small><i data-lucide="users"></i>4 pers.</small></button>
+      <button class="rp-mesa" data-estado="ocupada" data-nueva="true">2<small><i data-lucide="clock"></i>18 min</small><span class="rp-mesa__aviso"><i data-lucide="chef-hat"></i></span></button>
+      <button class="rp-mesa" data-estado="porPagar">3<small><i data-lucide="receipt"></i>Cuenta</small></button>
+      <button class="rp-mesa" data-estado="bloqueada" aria-disabled="true">4<small><i data-lucide="lock"></i>Ana</small></button>
+      <button class="rp-mesa rp-mesa--redonda" data-estado="demorada">5</button>
+    </div>
+    <p class="phone-note">Libre · Ocupada (late al enviar comanda, plato listo arriba) · Por pagar · Bloqueada por otro mesero · Esperando la cuenta más de 10 min.</p>
+  </div></div>
+
+  <h2>Tipografía</h2>
+  <div class="grid"><div class="card" style="grid-column: 1 / -1">
+    <span class="rp-t-large-title">Salón</span>
+    <span class="rp-t-title2">Mesa 4 · Carlos M.</span>
+    <span class="rp-t-headline">Ceviche mixto</span>
+    <span class="rp-t-body">Sin cebolla, extra limón. Enviado a Cocina caliente.</span>
+    <span class="rp-t-footnote rp-secondary">Comanda #27 · hace 3 min</span>
+    <span class="rp-t-amount">$14.50</span>
+  </div></div>
+
+  <h2>Listas agrupadas</h2>
+  <div class="grid grid--lists">
+    <div>
+      <div class="rp-section-header">Impresoras</div>
+      <div class="rp-group">
+        <button class="rp-cell"><span class="rp-app-icon" style="--tint: var(--rp-tint-red)"><i data-lucide="flame"></i></span><span class="rp-cell__body"><span class="rp-cell__title">Cocina caliente</span><span class="rp-cell__subtitle">TCP 192.168.1.101 · 80 mm</span></span><span class="rp-status rp-status--success">Lista</span><i class="rp-cell__chevron" data-lucide="chevron-right"></i></button>
+        <button class="rp-cell"><span class="rp-app-icon" style="--tint: var(--rp-tint-purple)"><i data-lucide="wine"></i></span><span class="rp-cell__body"><span class="rp-cell__title">Bar</span><span class="rp-cell__subtitle">TCP 192.168.1.102 · 80 mm</span></span><span class="rp-status rp-status--danger">Sin papel</span><i class="rp-cell__chevron" data-lucide="chevron-right"></i></button>
+        <button class="rp-cell"><span class="rp-app-icon" style="--tint: var(--rp-tint-gray)"><i data-lucide="receipt"></i></span><span class="rp-cell__body"><span class="rp-cell__title">Caja</span><span class="rp-cell__subtitle">USB · 80 mm · cajón conectado</span></span><span class="rp-status rp-status--warning">Poco papel</span><i class="rp-cell__chevron" data-lucide="chevron-right"></i></button>
+      </div>
+      <div class="rp-section-footer">Reserva la IP de cada impresora en el router para que no cambie.</div>
+    </div>
+    <div>
+      <div class="rp-section-header">Permisos de Carlos M.</div>
+      <div class="rp-group">
+        <label class="rp-cell"><span class="rp-cell__body">Anular platos enviados</span><input class="rp-toggle" type="checkbox" role="switch"></label>
+        <label class="rp-cell"><span class="rp-cell__body">Dar descuentos</span><input class="rp-toggle" type="checkbox" role="switch" checked></label>
+        <label class="rp-cell"><span class="rp-cell__body">Cobrar y facturar</span><input class="rp-toggle" type="checkbox" role="switch" checked></label>
+        <div class="rp-cell"><span class="rp-cell__body">Descuento máximo</span><span class="rp-stepper"><button aria-label="Menos">−</button><output>10</output><button aria-label="Más">+</button></span></div>
+      </div>
+      <div class="rp-section-footer">Si no tiene el permiso, un supervisor puede autorizar con su PIN.</div>
+    </div>
+  </div>
+
+  <h2>Botones y controles</h2>
+  <div class="grid">
+    <div class="card"><h3>Botones</h3>
+      <button class="rp-btn rp-btn--primary rp-btn--block"><i data-lucide="send"></i>Enviar comanda</button>
+      <div class="row"><button class="rp-btn rp-btn--tinted">Pre-cuenta</button><button class="rp-btn rp-btn--gray">Dividir</button><button class="rp-btn rp-btn--plain">Cancelar</button></div>
+      <button class="rp-btn rp-btn--destructive rp-btn--block"><i data-lucide="scissors"></i>Anular plato</button>
+      <button class="rp-btn rp-btn--primary rp-btn--block" disabled>Consumidor final (supera el límite)</button>
+    </div>
+    <div class="card"><h3>Búsqueda y filtros</h3>
+      <label class="rp-search"><i data-lucide="search"></i><input type="search" placeholder="Buscar: cev, sec pol, CM…"></label>
+      <div class="rp-chips"><button class="rp-chip" aria-pressed="true"><i data-lucide="flame" style="width:16px"></i>Platos</button><button class="rp-chip">Bebidas</button><button class="rp-chip">Postres</button><button class="rp-chip">Entradas</button></div>
+      <div class="rp-segmented" role="radiogroup" aria-label="Zona"><label><input type="radio" name="zona" checked><span>Salón</span></label><label><input type="radio" name="zona"><span>Terraza</span></label><label><input type="radio" name="zona"><span>Barra</span></label></div>
+    </div>
+    <div class="card"><h3>Campos con validación</h3>
+      <div class="rp-field"><label for="ced">Cédula / RUC / Pasaporte</label><input id="ced" inputmode="numeric" value="1710034065"></div>
+      <div class="rp-field" data-invalid="true"><label for="ced2">Cédula / RUC / Pasaporte</label><input id="ced2" inputmode="numeric" value="171003406" aria-invalid="true" aria-describedby="ced2e"><span class="rp-field__error" id="ced2e">Tiene 9 dígitos. Una cédula tiene 10 y un RUC 13.</span></div>
+      <div class="rp-field"><label for="ruc">RUC</label><input id="ruc" value="1790011675001" aria-describedby="ruch"><span class="rp-field__hint" id="ruch">El dígito verificador no cumple el módulo 11; el SRI hará la validación final.</span></div>
+    </div>
+  </div>
+
+  <h2>Acceso por PIN</h2>
+  <div class="grid"><div class="card">
+    <div class="pinbox">
+      <div class="avatar">CM</div>
+      <b>Carlos M.</b>
+      <div class="rp-pin-dots" id="dots"><i></i><i></i><i></i><i></i></div>
+      <div class="rp-keypad" id="keypad"></div>
+      <span class="phone-note">Prueba: escribe 8899. Otro PIN sacude los puntos.</span>
+    </div>
+  </div>
+  <div class="card"><h3>Swipe para borrar</h3>
+    <div class="rp-group" style="margin:0">
+      <div class="rp-swipe" id="swipe"><div class="rp-swipe__actions"><button class="rp-swipe__action"><i data-lucide="trash-2"></i>Borrar</button></div>
+        <button class="rp-cell rp-swipe__content"><span class="rp-cell__body"><span class="rp-cell__title">2 × Cerveza Club</span><span class="rp-cell__subtitle">Por enviar</span></span><span class="rp-cell__value">$5.00</span></button></div>
+      <div class="rp-cell"><span class="rp-cell__body"><span class="rp-cell__title">1 × Ceviche mixto</span><span class="rp-cell__subtitle">Enviado · Cocina caliente</span></span><span class="rp-cell__value">$15.00</span></div>
+    </div>
+    <span class="phone-note">Toca la primera fila para revelar la acción (en el móvil se desliza con el dedo).</span>
+    <h3 style="margin-top:8px">Alerta</h3>
+    <div class="alert-stage"><div class="rp-alert" role="alertdialog" aria-labelledby="at"><div class="rp-alert__body"><p class="rp-alert__title" id="at">¿Anular Ceviche mixto?</p><p class="rp-alert__msg">Ya se envió a cocina. Se imprimirá un ticket de anulación.</p></div><div class="rp-alert__actions"><button>Cancelar</button><button class="rp-alert__destructive rp-alert__primary">Anular</button></div></div></div>
+  </div>
+  <div class="card"><h3>Notificación y hoja</h3>
+    <div class="rp-toast"><span class="rp-toast__icon"><i data-lucide="check"></i></span><span><b>Factura 001-002-000000123</b><br>Impresa · pendiente de autorización del SRI</span></div>
+    <div class="row"><span class="rp-conn" data-estado="online"><i data-lucide="wifi"></i>En línea</span><span class="rp-conn" data-estado="local"><i data-lucide="wifi-off"></i>Sin internet</span><span class="rp-conn" data-estado="sinNodo"><i data-lucide="server-off"></i>Sin Nodo Local</span></div>
+    <button class="rp-btn rp-btn--tinted" id="openSheet">Abrir hoja de modificadores</button>
+  </div></div>
+
+  <h2>Widgets del dashboard</h2>
+  <div class="widgets">
+    <div class="rp-widget"><span class="rp-widget__label" style="color:var(--rp-color-success-text)"><i data-lucide="trending-up"></i>Ventas de hoy</span><span class="rp-widget__value">$1,250</span><span class="rp-widget__delta rp-widget__delta--up">▲ 15 % vs jueves pasado</span></div>
+    <div class="rp-widget"><span class="rp-widget__label"><i data-lucide="receipt"></i>Tickets</span><span class="rp-widget__value">86</span><span class="rp-widget__delta rp-secondary">Promedio $14.53</span></div>
+    <div class="rp-widget"><span class="rp-widget__label" style="color:var(--rp-color-warning-text)"><i data-lucide="clock"></i>Sin autorizar</span><span class="rp-widget__value">3</span><span class="rp-widget__delta rp-widget__delta--down">1 lleva más de 12 h</span></div>
+    <div class="rp-widget"><span class="rp-widget__label"><i data-lucide="users"></i>Comensales</span><span class="rp-widget__value">142</span><span class="rp-widget__delta rp-widget__delta--up">▲ 8 %</span></div>
+  </div>
+
+  <h2>Iconos semánticos</h2>
+  <p class="lead">Cada concepto tiene un nombre semántico que apunta a Lucide en la web y a SF Symbols / CupertinoIcons en la app. Las pantallas nunca usan un nombre de librería directo.</p>
+  <div class="icons" id="icons"></div>
+
+  <h2>Barra de pestañas</h2>
+  <div class="grid"><div class="card" style="padding:0;overflow:hidden">
+    <div class="rp-tabbar" style="position:static">
+      <button class="rp-tab" aria-current="page"><i data-lucide="layout-grid"></i>Salón</button>
+      <button class="rp-tab"><i data-lucide="clipboard-list"></i>Orden</button>
+      <button class="rp-tab"><i data-lucide="bell"></i>Avisos<span class="rp-badge">2</span></button>
+    </div>
+  </div>
+  <div class="card"><div class="rp-empty" style="padding:20px"><span class="rp-app-icon rp-app-icon--lg" style="--tint:var(--rp-tint-orange)"><i data-lucide="clipboard-list"></i></span><p class="rp-empty__title">Todavía no hay platos</p><p>Busca un plato o toca una categoría para empezar el pedido de la Mesa 4.</p><button class="rp-btn rp-btn--primary rp-btn--sm">Ver menú</button></div></div></div>
+</main>
+
+<div class="rp-scrim" id="scrim" hidden></div>
+<div class="rp-sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="st" hidden>
+  <div class="rp-sheet__grabber"></div>
+  <div class="rp-sheet__header"><button class="rp-btn rp-btn--plain" data-close>Cancelar</button><span class="rp-sheet__title" id="st">Hamburguesa doble</span><button class="rp-btn rp-btn--plain" style="font-weight:600" data-close>Listo</button></div>
+  <div class="rp-sheet__body">
+    <div class="rp-section-header">Término de la carne · obligatorio</div>
+    <div class="rp-group"><div class="rp-segmented" style="margin:10px" role="radiogroup" aria-label="Término"><label><input type="radio" name="t"><span>Azul</span></label><label><input type="radio" name="t" checked><span>Medio</span></label><label><input type="radio" name="t"><span>3/4</span></label><label><input type="radio" name="t"><span>Bien</span></label></div></div>
+    <div class="rp-section-header">Extras · hasta 3</div>
+    <div class="rp-group">
+      <label class="rp-cell"><span class="rp-cell__body">Tocino</span><span class="rp-cell__value">+$1.00</span><input class="rp-toggle" type="checkbox" role="switch" checked></label>
+      <label class="rp-cell"><span class="rp-cell__body">Queso cheddar</span><span class="rp-cell__value">+$0.75</span><input class="rp-toggle" type="checkbox" role="switch"></label>
+    </div>
+    <div style="padding:16px"><button class="rp-btn rp-btn--primary rp-btn--block" data-close>Agregar · <span class="rp-num">$13.50</span></button></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/lucide@0.460.0/dist/umd/lucide.min.js" integrity="sha384-ieG+IKD0d/ZPXyCBTMVAbqsQdns8QGJR/e26WMw7M4fkaI/rHcS/YIoi+ah9WGge" crossorigin="anonymous"></script>
+<script>
+  // Colores (valores leídos de las variables CSS, así la guía siempre refleja tokens.css)
+  const colores = [["accent","Acento"],["accentFill","Botón"],["successText","Éxito"],["warningText","Aviso"],["dangerText","Error"],["label","Texto"],["labelSecondary","Secundario"],["background","Fondo"],["surface","Superficie"]];
+  const tintes = ["blue","green","orange","red","yellow","indigo","purple","teal","pink","gray"];
+  const kebab = s => s.replace(/[A-Z]/g, m => "-" + m.toLowerCase());
+  const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  function drawSwatches() {
+    document.getElementById("swatches").innerHTML =
+      colores.map(([k, l]) => `<div class="sw"><i style="background:var(--rp-color-${kebab(k)})"></i><b>${l}</b>${css("--rp-color-" + kebab(k))}</div>`).join("") +
+      tintes.map(k => `<div class="sw"><i style="background:var(--rp-tint-${k})"></i><b>${k}</b>${css("--rp-tint-" + k)} · tinte</div>`).join("");
+  }
+  // Iconos: mismo mapa que tokens.ts (duplicado aquí porque un file:// no puede importar TS)
+  const ICONOS = {salon:["layout-grid","blue"],orden:["clipboard-list","orange"],avisos:["bell","red"],cocina:["flame","red"],bar:["wine","purple"],cocinaFria:["snowflake","teal"],impresora:["printer","gray"],kds:["monitor","indigo"],factura:["receipt","pink"],caja:["banknote","green"],tarjeta:["credit-card","blue"],transferencia:["smartphone","purple"],cliente:["user","blue"],personal:["users","indigo"],descuento:["tag","orange"],cortesia:["gift","pink"],anulacion:["scissors","red"],inventario:["package","orange"],reportes:["chart-column","teal"],qr:["qr-code","gray"],platoListo:["chef-hat","green"],bloqueo:["lock","gray"],sinInternet:["wifi-off","orange"],ajustes:["settings","gray"]};
+  document.getElementById("icons").innerHTML = Object.entries(ICONOS).map(([k,[n,t]]) => `<figure><span class="rp-app-icon rp-app-icon--lg" style="--tint:var(--rp-tint-${t})"><i data-lucide="${n}"></i></span>${k}</figure>`).join("");
+
+  // Teclado de PIN
+  const keys = [["1",""],["2","ABC"],["3","DEF"],["4","GHI"],["5","JKL"],["6","MNO"],["7","PQRS"],["8","TUV"],["9","WXYZ"],["",""],["0",""],["⌫",""]];
+  document.getElementById("keypad").innerHTML = keys.map(([n,l]) => n === "" ? `<span class="rp-key rp-key--blank"></span>` : `<button class="rp-key ${n==="⌫"?"rp-key--text":""}" data-k="${n}" aria-label="${n==="⌫"?"Borrar":n}">${n}${l?`<small>${l}</small>`:""}</button>`).join("");
+  let pin = "";
+  const dots = document.getElementById("dots");
+  const drawDots = () => [...dots.children].forEach((d, i) => d.dataset.filled = i < pin.length);
+  document.getElementById("keypad").addEventListener("click", e => {
+    const k = e.target.closest("[data-k]")?.dataset.k; if (!k) return;
+    pin = k === "⌫" ? pin.slice(0, -1) : (pin + k).slice(0, 4); drawDots();
+    if (pin.length === 4) setTimeout(() => {
+      if (pin !== "8899") { dots.dataset.error = "true"; setTimeout(() => dots.dataset.error = "false", 450); }
+      pin = ""; drawDots();
+    }, 180);
+  });
+
+  // Swipe, hoja y tema
+  document.getElementById("swipe").addEventListener("click", e => { const s = e.currentTarget; s.dataset.open = s.dataset.open !== "true"; });
+  const sheet = document.getElementById("sheet"), scrim = document.getElementById("scrim");
+  const open = v => { if (v) { sheet.hidden = scrim.hidden = false; requestAnimationFrame(() => { sheet.dataset.open = scrim.dataset.open = "true"; }); } else { sheet.dataset.open = scrim.dataset.open = "false"; setTimeout(() => sheet.hidden = scrim.hidden = true, 420); } };
+  document.getElementById("openSheet").onclick = () => open(true);
+  scrim.onclick = () => open(false);
+  sheet.addEventListener("click", e => { if (e.target.closest("[data-close]")) open(false); });
+  document.addEventListener("keydown", e => { if (e.key === "Escape") open(false); });
+  document.querySelectorAll('input[name="tema"]').forEach(r => r.addEventListener("change", () => {
+    if (r.value === "system") document.documentElement.removeAttribute("data-theme"); else document.documentElement.dataset.theme = r.value;
+    drawSwatches();
+  }));
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", drawSwatches);
+  const nav = document.getElementById("nav");
+  addEventListener("scroll", () => nav.dataset.scrolled = scrollY > 40, { passive: true });
+  drawSwatches();
+  window.lucide && lucide.createIcons();
+</script>
+</body>
+</html>

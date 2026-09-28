@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- El Nodo Local habla HTTP en la red del restaurante; su IP cambia de local a local y Android
+     no permite limitar el tráfico sin cifrar a rangos privados. La app solo habla con el nodo
+     (credenciales firmadas por dispositivo); al llegar TLS en la LAN (F2-07) esto pasa a false. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true"/>
+</network-security-config>
