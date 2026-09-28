@@ -43,12 +43,12 @@ describe("pantalla de cobro", () => {
     recargar: () => {},
   });
   const totales = (total: string) => ({ subtotal: "12.61", iva: "1.89", propina: "0.00", total });
-  const orden = { id: "o1", mesaId: "m1", mesa: "Mesa 4", meseroNombre: "Carlos M.", numero: 7, estado: "PRECUENTA", lineas: [] };
+  const orden = { id: "o1", mesaId: "m1", mesa: "Mesa 4", tipo: "MESA" as const, etiqueta: "", meseroNombre: "Carlos M.", numero: 7, estado: "PRECUENTA", lineas: [] };
 
   function montar(turno = true) {
     return render(
       <AtajosProvider>
-        <Cobro mesa={mesa} caja={caja(turno)} volver={() => {}} irATurno={() => {}} />
+        <Cobro orden={{ ordenId: mesa.ordenId!, nombre: mesa.nombre }} caja={caja(turno)} volver={() => {}} irATurno={() => {}} />
       </AtajosProvider>,
     );
   }

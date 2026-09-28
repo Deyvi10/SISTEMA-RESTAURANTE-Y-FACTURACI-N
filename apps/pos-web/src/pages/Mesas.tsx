@@ -1,9 +1,9 @@
 // Mesas y órdenes abiertas (F4-04 empieza aquí): en vivo por WebSocket, búsqueda por número o
 // nombre con «/», flechas para moverse e Intro para abrir.
 import { formatMoney } from "@restpos/ui";
-import { Clock, Lock, Receipt, Search, Users } from "lucide-react";
+import { Bike, Clock, Coffee, Lock, Plus, Receipt, Search, ShoppingBag, Users } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ApiError, type Mesa, nodo, type Salon } from "../api/nodo";
+import { ApiError, type Mesa, nodo, type OrdenSinMesa, type Salon } from "../api/nodo";
 import { useSesion } from "../api/sesion";
 import { useAtajo } from "../components/atajos";
 
@@ -14,6 +14,13 @@ export function filtrarMesas(mesas: Mesa[], q: string): Mesa[] {
   const t = q.trim().toLowerCase();
   if (!t) return mesas;
   return mesas.filter((m) => String(m.numeroOrden ?? "") === t.replace(/^#/, "") || m.nombre.toLowerCase().includes(t) || (m.meseroNombre ?? "").toLowerCase().includes(t));
+}
+
+/** Órdenes sin mesa que coinciden con la búsqueda (número o nombre corto). */
+export function filtrarSinMesa(ordenes: OrdenSinMesa[], q: string): OrdenSinMesa[] {
+  const t = q.trim().toLowerCase().replace(/^#/, "");
+  if (!t) return ordenes;
+  return ordenes.filter((o) => String(o.numero) === t || o.nombre.toLowerCase().includes(t));
 }
 
 const natural = new Intl.Collator("es", { numeric: true, sensitivity: "base" });
@@ -28,9 +35,12 @@ export function minutosDesde(iso: string | null, ahora = Date.now()): number | n
   return iso ? Math.max(0, Math.floor((ahora - Date.parse(iso)) / 60_000)) : null;
 }
 
-export function Mesas({ abrir }: { abrir: (m: Mesa) => void }) {
+const ICONO_TIPO = { LLEVAR: ShoppingBag, BARRA: Coffee, DELIVERY: Bike, MESA: Users } as const;
+
+export function Mesas({ abrir, abrirOrden, nuevaVenta }: { abrir: (m: Mesa) => void; abrirOrden: (o: OrdenSinMesa) => void; nuevaVenta: () => void }) {
   const { tiempoReal } = useSesion();
   const [salon, setSalon] = useState<Salon | null>(null);
+  const [sinMesa, setSinMesa] = useState<OrdenSinMesa[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [zona, setZona] = useState<string | "todas">("todas");
   const [q, setQ] = useState("");
@@ -39,6 +49,10 @@ export function Mesas({ abrir }: { abrir: (m: Mesa) => void }) {
   const rejilla = useRef<HTMLDivElement>(null);
 
   const cargar = useCallback(() => {
+    nodo
+      .ordenesSinMesa()
+      .then(setSinMesa)
+      .catch(() => {});
     nodo
       .salon()
       .then((s) => {
@@ -72,6 +86,7 @@ export function Mesas({ abrir }: { abrir: (m: Mesa) => void }) {
     setFoco((f) => Math.min(visibles.length - 1, Math.max(0, f + (Math.abs(d) === 1 ? d : Math.sign(d) * cols))));
   };
   useAtajo("/", "Buscar mesa u orden", () => buscador.current?.focus(), "Mesas");
+  useAtajo("n", "Nueva venta en mostrador", nuevaVenta, "Mesas");
   useAtajo("ArrowRight", "Mesa siguiente", () => mover(1), "Mesas");
   useAtajo("ArrowLeft", "Mesa anterior", () => mover(-1), "Mesas");
   useAtajo("ArrowDown", "Mesa de abajo", () => mover(2), "Mesas");
@@ -113,6 +128,26 @@ export function Mesas({ abrir }: { abrir: (m: Mesa) => void }) {
             </label>
           ))}
         </div>
+      </div>
+      <div className="sin-mesa">
+        <button className="rp-btn rp-btn--primary nueva-venta" onClick={nuevaVenta} data-testid="nueva-venta">
+          <Plus aria-hidden="true" /> Nueva venta <kbd className="tecla">N</kbd>
+        </button>
+        {filtrarSinMesa(sinMesa, q).map((o) => {
+          const Icono = ICONO_TIPO[o.tipo];
+          const min = minutosDesde(o.abiertaAt);
+          return (
+            <button key={o.id} className="orden-sin-mesa" onClick={() => abrirOrden(o)} data-testid={`orden-${o.nombre}`}>
+              <Icono aria-hidden="true" />
+              <span className="orden-sin-mesa__nombre">{o.nombre}</span>
+              <span className="rp-num">{formatMoney(o.total)}</span>
+              <small>
+                {o.platos} {o.platos === 1 ? "plato" : "platos"}
+                {min != null && ` · ${min} min`}
+              </small>
+            </button>
+          );
+        })}
       </div>
       <p className="leyenda">
         <span data-estado="libre">{cuenta("LIBRE")} libres</span>

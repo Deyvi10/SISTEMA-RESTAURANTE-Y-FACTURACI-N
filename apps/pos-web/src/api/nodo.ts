@@ -229,14 +229,82 @@ export interface LineaOrden {
   total: string;
 }
 
+export type TipoOrden = "MESA" | "LLEVAR" | "BARRA" | "DELIVERY";
+
 export interface Orden {
   id: string;
   mesaId: string | null;
-  mesa: string;
+  mesa: string; // nombre visible: «Mesa 4» o «Llevar #12 · Ana»
+  tipo: TipoOrden;
+  etiqueta: string;
   meseroNombre: string;
   numero: number;
   estado: string;
   lineas: LineaOrden[];
+}
+
+/** Orden abierta sin mesa (para llevar, barra o delivery). */
+export interface OrdenSinMesa {
+  id: string;
+  tipo: TipoOrden;
+  nombre: string;
+  etiqueta: string;
+  numero: number;
+  estado: string;
+  meseroNombre: string;
+  abiertaAt: string;
+  platos: number;
+  total: string;
+}
+
+export interface Categoria {
+  id: string;
+  nombre: string;
+  icono: string;
+  color: string;
+  orden: number;
+}
+
+export interface Modificador {
+  id: string;
+  nombre: string;
+  precioAdicional: string;
+}
+
+export interface GrupoModificadores {
+  id: string;
+  nombre: string;
+  obligatorio: boolean;
+  min: number;
+  max: number;
+  modificadores: Modificador[];
+}
+
+export interface Producto {
+  id: string;
+  categoriaId: string;
+  nombre: string;
+  alias: string;
+  precio: string;
+  foto: string | null;
+  grupos: string[];
+  vendidos: number;
+  orden: number;
+}
+
+export interface Catalogo {
+  version: string;
+  categorias: Categoria[];
+  productos: Producto[];
+  grupos: GrupoModificadores[];
+}
+
+export interface LineaNueva {
+  id: string;
+  productoId: string;
+  cantidad: string;
+  modificadores: string[];
+  nota: string;
 }
 
 export interface Totales {
@@ -311,6 +379,10 @@ export const nodo = {
   movimiento: (b: { cajaId: string; tipo: TipoMovimiento; monto: string; motivo: string; idempotencyKey: string }) => api<Movimiento>("POST", "/v1/caja/movimientos", b),
   cerrarTurno: (b: { cajaId: string; conteo: { clave: string; cantidad: number }[]; declarado: { metodoId: string; monto: string }[]; idempotencyKey: string }) =>
     api<CierreOut>("POST", "/v1/turnos/cerrar", b),
+  catalogo: () => api<Catalogo>("GET", "/v1/catalogo"),
+  ordenesSinMesa: () => api<OrdenSinMesa[]>("GET", "/v1/ordenes/sin-mesa"),
+  enviarOrden: (b: { idempotencyKey: string; ordenId: string; tipo: TipoOrden; etiqueta: string; lineas: LineaNueva[] }) =>
+    api<{ orden: Orden; comandaNumero: number }>("POST", "/v1/ordenes/enviar", b),
   orden: (id: string) => api<{ orden: Orden; totales: Totales }>("GET", `/v1/ordenes/${id}`),
   cobrar: (ordenId: string, b: { cajaId: string; metodoId: string; recibido: string; consumidorFinal: boolean; idempotencyKey: string }) =>
     api<CobroOut>("POST", `/v1/ordenes/${ordenId}/cobrar`, b),

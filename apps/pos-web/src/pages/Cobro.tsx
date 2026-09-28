@@ -4,7 +4,7 @@ import { formatMoney } from "@restpos/ui";
 import { ArrowLeft, Check, CreditCard, Landmark, Smartphone, UserRound, Wallet } from "lucide-react";
 import { type Dispatch, type SetStateAction, useCallback, useEffect, useRef, useState } from "react";
 import { uuidv7 } from "../api/identidad";
-import { ApiError, type CobroOut, type Mesa, type MetodoPago, nodo, type Orden, type Totales } from "../api/nodo";
+import { ApiError, type CobroOut, type MetodoPago, nodo, type Orden, type Totales } from "../api/nodo";
 import { useAtajo } from "../components/atajos";
 import { montoDe, TecladoMonto } from "../components/TecladoMonto";
 import { opcionesBillete, vueltoCentavos } from "../lib/billetes";
@@ -31,7 +31,13 @@ function useConteo(objetivo: number, ms = 600): number {
   return v;
 }
 
-export function Cobro({ mesa, caja, volver, irATurno }: { mesa: Mesa; caja: Caja; volver: () => void; irATurno: () => void }) {
+/** Qué se cobra: la orden abierta de una mesa o una orden sin mesa. */
+export interface ACobrar {
+  ordenId: string;
+  nombre: string;
+}
+
+export function Cobro({ orden: aCobrar, caja, volver, irATurno, agregar }: { orden: ACobrar; caja: Caja; volver: () => void; irATurno: () => void; agregar?: (o: Orden) => void }) {
   const [datos, setDatos] = useState<{ orden: Orden; totales: Totales } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
@@ -41,12 +47,11 @@ export function Cobro({ mesa, caja, volver, irATurno }: { mesa: Mesa; caja: Caja
   const clave = useRef(uuidv7());
 
   useEffect(() => {
-    if (!mesa.ordenId) return;
     nodo
-      .orden(mesa.ordenId)
+      .orden(aCobrar.ordenId)
       .then(setDatos)
       .catch((e) => setError(e instanceof ApiError ? e.message : "No se pudo leer la orden."));
-  }, [mesa.ordenId]);
+  }, [aCobrar.ordenId]);
 
   const config = caja.config;
   const turno = caja.estado?.turno ?? null;
@@ -81,21 +86,27 @@ export function Cobro({ mesa, caja, volver, irATurno }: { mesa: Mesa; caja: Caja
   useAtajo("3", "Cobrar con el tercer billete", () => billetes[2] && cobrar(efectivo, billetes[2]), "Cobro", libre && billetes.length > 2);
   useAtajo("4", "Cobrar con el cuarto billete", () => billetes[3] && cobrar(efectivo, billetes[3]), "Cobro", libre && billetes.length > 3);
   useAtajo("o", "Otro monto en efectivo", () => setOtroMonto(""), "Cobro", libre);
+  useAtajo("a", "Agregar platos a la orden", () => datos && agregar?.(datos.orden), "Cobro", !!datos && datos.orden.tipo !== "MESA" && !!agregar && !hecho && otroMonto === null);
   useAtajo("Escape", hecho ? "Siguiente cliente" : "Volver a las mesas", volver, "Cobro", otroMonto === null);
   useAtajo("Enter", "Siguiente cliente", volver, "Cobro", !!hecho);
 
-  if (hecho) return <Listo out={hecho} volver={volver} />;
+  if (hecho) return <Listo out={hecho} conMesa={datos?.orden.tipo === "MESA"} volver={volver} />;
 
   return (
     <section className="cobro" data-testid="cobro">
       <div className="cobro__detalle">
         <button className="rp-btn rp-btn--plain rp-btn--sm" onClick={volver}>
-          <ArrowLeft aria-hidden="true" /> Mesas <kbd className="tecla">Esc</kbd>
+          <ArrowLeft aria-hidden="true" /> Volver <kbd className="tecla">Esc</kbd>
         </button>
-        <h1 className="rp-large-title">{mesa.nombre}</h1>
+        <h1 className="rp-large-title">{datos?.orden.mesa ?? aCobrar.nombre}</h1>
         <p className="rp-secondary">
           {datos ? `Orden #${datos.orden.numero} · ${datos.orden.meseroNombre}` : error ? "" : "Cargando…"}
         </p>
+        {datos && datos.orden.tipo !== "MESA" && agregar && !hecho && (
+          <button className="rp-btn rp-btn--gray rp-btn--sm cobro__agregar" onClick={() => agregar(datos.orden)} data-testid="agregar-platos">
+            Agregar platos <kbd className="tecla">A</kbd>
+          </button>
+        )}
         {datos && (
           <div className="rp-group cobro__lineas">
             {datos.orden.lineas
@@ -251,7 +262,7 @@ function OtroMonto({
   );
 }
 
-function Listo({ out, volver }: { out: CobroOut; volver: () => void }) {
+function Listo({ out, conMesa, volver }: { out: CobroOut; conMesa: boolean; volver: () => void }) {
   const d = out.documento;
   const vuelto = useConteo(centavos(d.vuelto));
   // Caja libre para el siguiente cliente: vuelve sola a las mesas.
@@ -278,7 +289,7 @@ function Listo({ out, volver }: { out: CobroOut; volver: () => void }) {
         <p className="cobro__total rp-num">{formatMoney(d.totales.total)}</p>
       )}
       <p className="rp-secondary">
-        {d.metodo} · {d.codigo} · {d.mesa} libre
+        {d.metodo} · {d.codigo} · {d.mesa} {conMesa ? "libre" : "cobrada"}
         {d.abreCajon ? " · cajón abierto" : ""}
       </p>
       {out.aviso && <p className="cobro__aviso">{out.aviso}</p>}

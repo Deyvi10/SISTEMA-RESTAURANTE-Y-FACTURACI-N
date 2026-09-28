@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:cryptography/cryptography.dart';
 import 'package:decimal/decimal.dart';
@@ -18,29 +19,19 @@ Producto prod(String nombre, {String alias = '', int vendidos = 0}) => Producto(
 
 void main() {
   group('Búsqueda predictiva (F3-08)', () {
+    // Los mismos casos que la caja web (packages/testdata/busqueda-productos.json).
+    final vectores = jsonDecode(File('../../packages/testdata/busqueda-productos.json').readAsStringSync()) as Map<String, dynamic>;
     final menu = [
-      prod('Ceviche Mixto', alias: 'CM', vendidos: 50),
-      prod('Ceviche de Camarón', vendidos: 90),
-      prod('Seco de Pollo', alias: 'SP', vendidos: 30),
-      prod('Encebollado', vendidos: 70),
-      prod('Jugo de Maracuyá'),
+      for (final p in (vectores['menu'] as List).cast<Map<String, dynamic>>())
+        prod(p['nombre'] as String, alias: p['alias'] as String, vendidos: p['vendidos'] as int),
     ];
     final idx = IndiceBusqueda<Producto>(menu, nombre: (p) => p.nombre, alias: (p) => p.alias, vendidos: (p) => p.vendidos);
 
-    test('«cev» encuentra los ceviches, primero el más vendido', () {
-      expect(idx.buscar('cev').map((p) => p.nombre), ['Ceviche de Camarón', 'Ceviche Mixto']);
-    });
-    test('sin tildes ni mayúsculas', () {
-      expect(idx.buscar('MARACUYA').single.nombre, 'Jugo de Maracuyá');
-      expect(idx.buscar('camaron').single.nombre, 'Ceviche de Camarón');
-    });
-    test('prefijos de varias palabras: «sec pol» → Seco de Pollo', () {
-      expect(idx.buscar('sec pol').single.nombre, 'Seco de Pollo');
-    });
-    test('alias exacto gana: «cm»', () {
-      expect(idx.buscar('cm').first.nombre, 'Ceviche Mixto');
-    });
-    test('nada coincide', () => expect(idx.buscar('pizza'), isEmpty));
+    for (final c in (vectores['casos'] as List).cast<Map<String, dynamic>>()) {
+      test('«${c['consulta']}»', () {
+        expect(idx.buscar(c['consulta'] as String).map((p) => p.nombre).toList(), (c['resultado'] as List).cast<String>());
+      });
+    }
 
     test('p95 ≤ 50 ms por pulsación con 500 productos', () {
       final grande = [for (var i = 0; i < 500; i++) prod('Plato número $i de la casa ${i % 7 == 0 ? 'ceviche' : 'seco'}', alias: 'P$i', vendidos: i)];

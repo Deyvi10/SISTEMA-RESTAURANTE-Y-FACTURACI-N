@@ -21,9 +21,14 @@ export function nombreTecla(t: string): string {
   return ({ Enter: "Intro", Escape: "Esc", ArrowUp: "↑", ArrowDown: "↓", ArrowLeft: "←", ArrowRight: "→", " ": "Espacio" } as Record<string, string>)[t] ?? t;
 }
 
+const NO_ES_TEXTO = new Set(["checkbox", "radio", "button", "submit", "reset", "range", "color", "file"]);
+
+/** ¿El foco está en un campo donde se escribe? (una casilla o un radio no cuentan) */
 function escribiendo(e: KeyboardEvent): boolean {
   const el = e.target as HTMLElement | null;
-  return !!el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable);
+  if (!el) return false;
+  if (el.tagName === "INPUT") return !NO_ES_TEXTO.has((el as HTMLInputElement).type);
+  return el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable;
 }
 
 export function AtajosProvider({ children }: { children: ReactNode }) {

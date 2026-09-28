@@ -52,7 +52,8 @@ type Orden struct {
 	ID           ids.ID       `json:"id"`
 	MesaID       *ids.ID      `json:"mesaId"`
 	Mesa         string       `json:"mesa"`
-	Tipo         string       `json:"tipo"`
+	Tipo         string       `json:"tipo"`     // MESA, LLEVAR, BARRA, DELIVERY
+	Etiqueta     string       `json:"etiqueta"` // nombre corto del cliente (órdenes sin mesa)
 	MeseroID     ids.ID       `json:"meseroId"`
 	MeseroNombre string       `json:"meseroNombre"`
 	Numero       int          `json:"numero"`
@@ -62,6 +63,24 @@ type Orden struct {
 	Lineas       []LineaOrden `json:"lineas"`
 	Total        string       `json:"total"`
 	Version      int          `json:"version"`
+}
+
+// tiposSinMesa y cómo se nombran en pantalla y en la comanda (RF-03-11).
+var tiposSinMesa = map[string]string{"LLEVAR": "Llevar", "BARRA": "Barra", "DELIVERY": "Delivery"}
+
+// nombreOrden: «Mesa 4» o, sin mesa, «Llevar #12 · Ana».
+func nombreOrden(tipo, mesa string, numero int, etiqueta string) string {
+	if tipo == "MESA" || tipo == "" {
+		if mesa == "" {
+			return fmt.Sprintf("Orden %d", numero)
+		}
+		return mesa
+	}
+	n := fmt.Sprintf("%s #%d", tiposSinMesa[tipo], numero)
+	if etiqueta != "" {
+		n += " · " + etiqueta
+	}
+	return n
 }
 
 var errOrdenNoExiste = problema(http.StatusNotFound, "NO_ENCONTRADO", "Esa orden ya no existe o está cerrada.")
@@ -88,12 +107,12 @@ func totalLinea(precio string, mods []ModLinea, cantidad string) (money.Money, e
 
 func leerOrden(ctx context.Context, q queryer, id ids.ID) (Orden, error) {
 	var o Orden
-	var mesa sql.NullString
+	var mesa, mesaNombre, etiqueta sql.NullString
 	var abierta, mesero string
 	var com sql.NullInt64
-	err := q.QueryRowContext(ctx, `SELECT o.mesa_id, coalesce(m.nombre, 'Orden ' || o.numero_corto), o.tipo, o.mesero_id, o.mesero_nombre, o.numero_corto, o.estado, o.comensales, o.abierta_at, o.version
+	err := q.QueryRowContext(ctx, `SELECT o.mesa_id, m.nombre, o.etiqueta, o.tipo, o.mesero_id, o.mesero_nombre, o.numero_corto, o.estado, o.comensales, o.abierta_at, o.version
 		FROM ordenes o LEFT JOIN mesas m ON m.id = o.mesa_id WHERE o.id = ?`, id.String()).
-		Scan(&mesa, &o.Mesa, &o.Tipo, &mesero, &o.MeseroNombre, &o.Numero, &o.Estado, &com, &abierta, &o.Version)
+		Scan(&mesa, &mesaNombre, &etiqueta, &o.Tipo, &mesero, &o.MeseroNombre, &o.Numero, &o.Estado, &com, &abierta, &o.Version)
 	if errors.Is(err, sql.ErrNoRows) {
 		return o, errOrdenNoExiste
 	}
@@ -101,6 +120,8 @@ func leerOrden(ctx context.Context, q queryer, id ids.ID) (Orden, error) {
 		return o, err
 	}
 	o.ID = id
+	o.Etiqueta = etiqueta.String
+	o.Mesa = nombreOrden(o.Tipo, mesaNombre.String, o.Numero, o.Etiqueta)
 	o.MeseroID, _ = ids.Parse(mesero)
 	if mesa.Valid {
 		m, _ := ids.Parse(mesa.String)
@@ -195,6 +216,55 @@ func (a *App) OrdenDeMesa(ctx context.Context, mesa ids.ID) (Orden, error) {
 	return leerOrden(ctx, a.Store.Read(), oid)
 }
 
+// OrdenSinMesa es el resumen de una orden para llevar, de barra o delivery (F4-04).
+type OrdenSinMesa struct {
+	ID           ids.ID    `json:"id"`
+	Tipo         string    `json:"tipo"`
+	Nombre       string    `json:"nombre"` // «Llevar #12 · Ana»
+	Etiqueta     string    `json:"etiqueta"`
+	Numero       int       `json:"numero"`
+	Estado       string    `json:"estado"`
+	MeseroNombre string    `json:"meseroNombre"`
+	AbiertaAt    time.Time `json:"abiertaAt"`
+	Platos       int       `json:"platos"`
+	Total        string    `json:"total"` // suma de los platos (los totales con IVA y servicio salen al cobrar)
+}
+
+// OrdenesSinMesa: las órdenes abiertas sin mesa, de la más antigua a la más nueva.
+func (a *App) OrdenesSinMesa(ctx context.Context) ([]OrdenSinMesa, error) {
+	q := a.Store.Read()
+	rows, err := q.QueryContext(ctx, `SELECT id FROM ordenes WHERE mesa_id IS NULL AND estado IN ('ABIERTA','PRECUENTA') ORDER BY abierta_at`)
+	if err != nil {
+		return nil, err
+	}
+	var idsOrd []ids.ID
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			_ = rows.Close()
+			return nil, err
+		}
+		oid, _ := ids.Parse(id)
+		idsOrd = append(idsOrd, oid)
+	}
+	_ = rows.Close()
+	out := []OrdenSinMesa{}
+	for _, id := range idsOrd {
+		o, err := leerOrden(ctx, q, id)
+		if err != nil {
+			return nil, err
+		}
+		r := OrdenSinMesa{ID: o.ID, Tipo: o.Tipo, Nombre: o.Mesa, Etiqueta: o.Etiqueta, Numero: o.Numero, Estado: o.Estado, MeseroNombre: o.MeseroNombre, AbiertaAt: o.AbiertaAt, Total: o.Total}
+		for _, l := range o.Lineas {
+			if l.Estado != "ANULADA" {
+				r.Platos++
+			}
+		}
+		out = append(out, r)
+	}
+	return out, nil
+}
+
 // ---------- Enviar (F3-08…F3-10) ----------
 
 type LineaNueva struct {
@@ -209,8 +279,10 @@ type LineaNueva struct {
 
 type EnviarOrdenIn struct {
 	IdempotencyKey string       `json:"idempotencyKey"`
-	OrdenID        ids.ID       `json:"ordenId"` // UUID v7 del teléfono si la mesa está libre
+	OrdenID        ids.ID       `json:"ordenId"` // UUID v7 del teléfono si la mesa está libre (o de la orden sin mesa)
 	MesaID         ids.ID       `json:"mesaId"`
+	Tipo           string       `json:"tipo"`     // MESA (por defecto), LLEVAR, BARRA, DELIVERY
+	Etiqueta       string       `json:"etiqueta"` // nombre corto del cliente en órdenes sin mesa
 	Comensales     *int         `json:"comensales"`
 	Lineas         []LineaNueva `json:"lineas"`
 }
@@ -287,8 +359,29 @@ func (in *EnviarOrdenIn) validar() error {
 	if len(in.IdempotencyKey) < 8 || len(in.IdempotencyKey) > 100 {
 		return invalido("Falta la clave de idempotencia (8 a 100 caracteres).")
 	}
-	if in.MesaID == ids.Nil {
-		return invalido("Indica la mesa.")
+	in.Tipo = strings.ToUpper(strings.TrimSpace(in.Tipo))
+	if in.Tipo == "" {
+		in.Tipo = "MESA"
+	}
+	in.Etiqueta = strings.Join(strings.Fields(in.Etiqueta), " ")
+	switch _, sinMesa := tiposSinMesa[in.Tipo]; {
+	case in.Tipo == "MESA":
+		if in.MesaID == ids.Nil {
+			return invalido("Indica la mesa.")
+		}
+		in.Etiqueta = ""
+	case sinMesa:
+		if in.MesaID != ids.Nil {
+			return invalido("Una orden para llevar, de barra o delivery no lleva mesa.")
+		}
+		if in.OrdenID.Version() != 7 {
+			return invalido("Falta el identificador de la orden.")
+		}
+		if len([]rune(in.Etiqueta)) > 20 {
+			return invalido("El nombre corto va hasta 20 caracteres.")
+		}
+	default:
+		return invalido("El tipo de orden es Mesa, Para llevar, Barra o Delivery.")
 	}
 	if len(in.Lineas) == 0 || len(in.Lineas) > 100 {
 		return invalido("Agrega entre 1 y 100 platos.")
@@ -338,14 +431,16 @@ func (a *App) EnviarOrden(ctx context.Context, d Dispositivo, u Usuario, in Envi
 		if !errors.Is(err, sql.ErrNoRows) {
 			return err
 		}
-		mesaNombre, err := mesaExiste(ctx, tx, in.MesaID)
-		if err != nil {
-			return err
-		}
-		if b, err := leerBloqueo(ctx, tx, in.MesaID, now); err != nil {
-			return err
-		} else if b != nil && (b.UsuarioID != u.ID || b.DispositivoID != d.ID) {
-			return errOcupada(b)
+		var mesaNombre string
+		if in.Tipo == "MESA" {
+			if mesaNombre, err = mesaExiste(ctx, tx, in.MesaID); err != nil {
+				return err
+			}
+			if b, err := leerBloqueo(ctx, tx, in.MesaID, now); err != nil {
+				return err
+			} else if b != nil && (b.UsuarioID != u.ID || b.DispositivoID != d.ID) {
+				return errOcupada(b)
+			}
 		}
 		// El día de negocio es el de la jornada abierta (cruza la medianoche); si no hay, se abre.
 		jornada, err := jornadaParaOperar(ctx, tx, u, now, loc)
@@ -353,27 +448,49 @@ func (a *App) EnviarOrden(ctx context.Context, d Dispositivo, u Usuario, in Envi
 			return err
 		}
 		fecha := jornada.FechaNegocio
-		// Orden abierta de la mesa o una nueva.
-		var abierta, estado string
-		err = tx.QueryRowContext(ctx, `SELECT id, estado FROM ordenes WHERE mesa_id = ? AND estado IN ('ABIERTA','PRECUENTA')`, in.MesaID.String()).Scan(&abierta, &estado)
+		// Orden abierta de la mesa (o la orden sin mesa indicada) o una nueva.
+		var abierta, estado, tipoAbierta string
+		var numero int
+		if in.Tipo == "MESA" {
+			err = tx.QueryRowContext(ctx, `SELECT id, estado, tipo, numero_corto FROM ordenes WHERE mesa_id = ? AND estado IN ('ABIERTA','PRECUENTA')`, in.MesaID.String()).Scan(&abierta, &estado, &tipoAbierta, &numero)
+		} else {
+			err = tx.QueryRowContext(ctx, `SELECT id, estado, tipo, numero_corto FROM ordenes WHERE id = ?`, in.OrdenID.String()).Scan(&abierta, &estado, &tipoAbierta, &numero)
+			if err == nil && estado != "ABIERTA" && estado != "PRECUENTA" {
+				return problema(http.StatusConflict, "ORDEN_CERRADA", "Esa orden ya se cobró o se cerró. Empieza una venta nueva.")
+			}
+		}
 		switch {
 		case errors.Is(err, sql.ErrNoRows):
 			ordenID = in.OrdenID
 			if ordenID.Version() != 7 {
 				ordenID = ids.New()
 			}
-			var numero int
 			if err := tx.QueryRowContext(ctx, `INSERT INTO contadores (clave, valor) VALUES (?, 1) ON CONFLICT (clave) DO UPDATE SET valor = valor + 1 RETURNING valor`, "orden:"+fecha).Scan(&numero); err != nil {
 				return err
 			}
-			if _, err := tx.ExecContext(ctx, `INSERT INTO ordenes (id, mesa_id, tipo, mesero_id, mesero_nombre, numero_corto, fecha_negocio, jornada_id, comensales, abierta_at) VALUES (?, ?, 'MESA', ?, ?, ?, ?, ?, ?, ?)`,
-				ordenID.String(), in.MesaID.String(), u.ID.String(), u.Nombre, numero, fecha, jornada.ID.String(), in.Comensales, now.Format(time.RFC3339Nano)); err != nil {
+			var mesa, etiqueta any
+			if in.Tipo == "MESA" {
+				mesa = in.MesaID.String()
+			} else if in.Etiqueta != "" {
+				etiqueta = in.Etiqueta
+			}
+			if _, err := tx.ExecContext(ctx, `INSERT INTO ordenes (id, mesa_id, tipo, etiqueta, mesero_id, mesero_nombre, numero_corto, fecha_negocio, jornada_id, comensales, abierta_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+				ordenID.String(), mesa, in.Tipo, etiqueta, u.ID.String(), u.Nombre, numero, fecha, jornada.ID.String(), in.Comensales, now.Format(time.RFC3339Nano)); err != nil {
 				return err
 			}
+			mesaNombre = nombreOrden(in.Tipo, mesaNombre, numero, in.Etiqueta)
 		case err != nil:
 			return err
 		default:
 			ordenID, _ = ids.Parse(abierta)
+			if tipoAbierta != in.Tipo {
+				return invalido("Esa orden es de otro tipo.")
+			}
+			if in.Tipo != "MESA" {
+				var et sql.NullString
+				_ = tx.QueryRowContext(ctx, `SELECT etiqueta FROM ordenes WHERE id = ?`, abierta).Scan(&et)
+				mesaNombre = nombreOrden(in.Tipo, "", numero, et.String)
+			}
 			if estado == "PRECUENTA" {
 				// Pidieron algo más tras la pre-cuenta: la mesa vuelve a ocupada.
 				if _, err := tx.ExecContext(ctx, `UPDATE ordenes SET estado = 'ABIERTA', precuenta_at = NULL, version = version + 1 WHERE id = ?`, abierta); err != nil {
@@ -455,10 +572,12 @@ func (a *App) EnviarOrden(ctx context.Context, d Dispositivo, u Usuario, in Envi
 		if _, err := tx.ExecContext(ctx, `UPDATE ordenes SET version = version + 1 WHERE id = ?`, ordenID.String()); err != nil {
 			return err
 		}
-		if err := liberarEnTx(ctx, tx, in.MesaID); err != nil {
-			return err
+		if in.Tipo == "MESA" {
+			if err := liberarEnTx(ctx, tx, in.MesaID); err != nil {
+				return err
+			}
 		}
-		ev, err := edgesync.NewEvent("orden.lineas_enviadas", 1, ordenID, map[string]any{"ordenId": ordenID, "mesaId": in.MesaID, "comandaId": comanda, "lineas": in.Lineas, "meseroId": u.ID}, now)
+		ev, err := edgesync.NewEvent("orden.lineas_enviadas", 1, ordenID, map[string]any{"ordenId": ordenID, "mesaId": in.MesaID, "tipo": in.Tipo, "comandaId": comanda, "lineas": in.Lineas, "meseroId": u.ID}, now)
 		if err != nil {
 			return err
 		}
@@ -476,10 +595,14 @@ func (a *App) EnviarOrden(ctx context.Context, d Dispositivo, u Usuario, in Envi
 	}
 	out.Orden = o
 	if !out.Repetida {
-		_ = a.hub.Difundir(eventos.TableUnlocked{TableID: in.MesaID, Reason: "RELEASED"})
-		mesa := in.MesaID
-		_ = a.hub.Difundir(eventos.OrderSubmitted{OrderID: ordenID, ComandaID: ordenID, TableID: &mesa, Number: int64(out.Numero), Lines: int64(len(in.Lineas)), ByUserID: u.ID})
-		a.avisarMesa(ctx, in.MesaID)
+		if in.Tipo == "MESA" {
+			_ = a.hub.Difundir(eventos.TableUnlocked{TableID: in.MesaID, Reason: "RELEASED"})
+			mesa := in.MesaID
+			_ = a.hub.Difundir(eventos.OrderSubmitted{OrderID: ordenID, ComandaID: ordenID, TableID: &mesa, Number: int64(out.Numero), Lines: int64(len(in.Lineas)), ByUserID: u.ID})
+			a.avisarMesa(ctx, in.MesaID)
+		} else {
+			_ = a.hub.Difundir(eventos.OrderSubmitted{OrderID: ordenID, ComandaID: ordenID, Number: int64(out.Numero), Lines: int64(len(in.Lineas)), ByUserID: u.ID})
+		}
 	}
 	return out, nil
 }

@@ -1,0 +1,26 @@
+{
+  "descripcion": "Búsqueda predictiva del menú (RF-03-05): insensible a tildes y mayúsculas, por prefijos de palabras, alias exacto primero y, a igual relevancia, lo más vendido. La implementan la app de meseros (Dart) y la caja (TypeScript).",
+  "menu": [
+    { "nombre": "Ceviche Mixto", "alias": "CM", "vendidos": 50 },
+    { "nombre": "Ceviche de Camarón", "alias": "", "vendidos": 90 },
+    { "nombre": "Seco de Pollo", "alias": "SP", "vendidos": 30 },
+    { "nombre": "Encebollado", "alias": "", "vendidos": 70 },
+    { "nombre": "Jugo de Maracuyá", "alias": "", "vendidos": 0 },
+    { "nombre": "Cerveza Club", "alias": "CC", "vendidos": 120 },
+    { "nombre": "Arroz con Camarón", "alias": "", "vendidos": 40 },
+    { "nombre": "Ñoquis al pesto", "alias": "", "vendidos": 5 }
+  ],
+  "casos": [
+    { "consulta": "cev", "resultado": ["Ceviche de Camarón", "Ceviche Mixto"], "nota": "prefijo; a igual relevancia, el más vendido primero" },
+    { "consulta": "MARACUYA", "resultado": ["Jugo de Maracuyá"], "nota": "sin tildes ni mayúsculas" },
+    { "consulta": "camaron", "resultado": ["Ceviche de Camarón", "Arroz con Camarón"], "nota": "palabra exacta; la posición y lo vendido ordenan" },
+    { "consulta": "sec pol", "resultado": ["Seco de Pollo"], "nota": "prefijos de varias palabras" },
+    { "consulta": "cm", "resultado": ["Ceviche Mixto"], "nota": "alias exacto" },
+    { "consulta": "c", "resultado": ["Cerveza Club", "Ceviche de Camarón", "Ceviche Mixto", "Arroz con Camarón"], "nota": "una letra: prefijo en la primera palabra pesa más" },
+    { "consulta": "boll", "resultado": ["Encebollado"], "nota": "tres letras o más: también dentro de la palabra" },
+    { "consulta": "noq", "resultado": ["Ñoquis al pesto"], "nota": "la ñ se busca como n" },
+    { "consulta": "ce  ", "resultado": ["Cerveza Club", "Ceviche de Camarón", "Ceviche Mixto"], "nota": "espacios de sobra no cambian nada; con menos de 3 letras no se busca dentro de la palabra (Encebollado no sale)" },
+    { "consulta": "pizza", "resultado": [] },
+    { "consulta": "   ", "resultado": [] }
+  ]
+}

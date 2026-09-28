@@ -6,6 +6,7 @@ Casos que **todas** las implementaciones (Go, TypeScript, Dart) deben pasar igua
 |---|---|
 | `sri-claves-acceso.json` | Claves de 49 dígitos válidas e inválidas, incluidos los casos borde del módulo 11 |
 | `identificaciones.json` | Cédulas, RUC (natural, sociedad, público), pasaportes y consumidor final |
+| `busqueda-productos.json` | Búsqueda predictiva del menú (RF-03-05): la misma regla en la app de meseros y en la caja |
 
 Reglas:
 

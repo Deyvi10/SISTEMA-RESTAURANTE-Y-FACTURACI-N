@@ -1,15 +1,15 @@
 import { LockKeyhole } from "lucide-react";
 import { useState } from "react";
-import type { Mesa } from "./api/nodo";
 import { useSesion } from "./api/sesion";
 import { useAtajo } from "./components/atajos";
 import { Avatar } from "./components/Avatar";
 import { Indicador } from "./components/Indicador";
 import { Emparejar } from "./pages/Emparejar";
 import { Mesas } from "./pages/Mesas";
-import { Cobro } from "./pages/Cobro";
+import { type ACobrar, Cobro } from "./pages/Cobro";
 import { Personal } from "./pages/Personal";
 import { Turno, useCaja } from "./pages/Turno";
+import { type OrdenExistente, Venta } from "./pages/Venta";
 
 export function App() {
   const { fase } = useSesion();
@@ -27,13 +27,26 @@ export function App() {
 
 function Caja() {
   const { usuario, salir } = useSesion();
-  const [mesa, setMesa] = useState<Mesa | null>(null);
-  const [seccion, setSeccion] = useState<"mesas" | "turno" | "cobro">("mesas");
+  const [cobrando, setCobrando] = useState<ACobrar | null>(null);
+  const [venta, setVenta] = useState<{ existente?: OrdenExistente } | null>(null);
+  const [seccion, setSeccion] = useState<"mesas" | "turno" | "cobro" | "venta">("mesas");
   const [aviso, setAviso] = useState<string | null>(null);
   const caja = useCaja();
   const turno = caja.estado?.turno ?? null;
   useAtajo("F12", "Bloquear la caja", () => void salir(), "General");
   useAtajo("F9", "Ver las mesas", () => setSeccion("mesas"), "General");
+  const alSalon = () => {
+    setCobrando(null);
+    setVenta(null);
+    setAviso(null);
+    setSeccion("mesas");
+    caja.recargar();
+  };
+  const aCobrar = (o: ACobrar) => {
+    setVenta(null);
+    setCobrando(o);
+    setSeccion("cobro");
+  };
   useAtajo("F10", "Ver el turno de caja", () => setSeccion("turno"), "General");
 
   return (
@@ -47,7 +60,7 @@ function Caja() {
               ["turno", "Turno", "F10"],
             ] as const
           ).map(([id, nombre, tecla]) => (
-            <button key={id} className="barra__tab" aria-current={seccion === id || (seccion === "cobro" && id === "mesas") ? "page" : undefined} onClick={() => setSeccion(id)} title={`${nombre} (${tecla})`} data-testid={`tab-${id}`}>
+            <button key={id} className="barra__tab" aria-current={seccion === id || (seccion !== "turno" && id === "mesas") ? "page" : undefined} onClick={() => setSeccion(id)} title={`${nombre} (${tecla})`} data-testid={`tab-${id}`}>
               {nombre}
             </button>
           ))}
@@ -67,23 +80,32 @@ function Caja() {
         </button>
       </header>
       <main className="contenido">
-        {seccion === "cobro" && mesa ? (
+        {seccion === "cobro" && cobrando ? (
           <Cobro
-            key={mesa.id}
-            mesa={mesa}
+            key={cobrando.ordenId}
+            orden={cobrando}
             caja={caja}
-            volver={() => {
-              setMesa(null);
-              setSeccion("mesas");
-              caja.recargar();
-            }}
+            volver={alSalon}
             irATurno={() => setSeccion("turno")}
+            agregar={(o) => {
+              setVenta({ existente: { ordenId: o.id, tipo: o.tipo as OrdenExistente["tipo"], etiqueta: o.etiqueta, nombre: o.mesa } });
+              setSeccion("venta");
+            }}
           />
+        ) : seccion === "venta" && venta ? (
+          <Venta existente={venta.existente} volver={alSalon} cobrar={(ordenId, nombre) => aCobrar({ ordenId, nombre })} />
         ) : seccion === "turno" ? (
           <Turno caja={caja} />
         ) : (
           <>
-            <Mesas abrir={(m) => (m.ordenId ? (setMesa(m), setSeccion("cobro")) : setAviso(`${m.nombre} está libre: no hay nada que cobrar.`))} />
+            <Mesas
+              abrir={(m) => (m.ordenId ? aCobrar({ ordenId: m.ordenId, nombre: m.nombre }) : setAviso(`${m.nombre} está libre: no hay nada que cobrar.`))}
+              abrirOrden={(o) => aCobrar({ ordenId: o.id, nombre: o.nombre })}
+              nuevaVenta={() => {
+                setVenta({});
+                setSeccion("venta");
+              }}
+            />
             {aviso && (
               <p className="rp-secondary" role="status">
                 {aviso}
