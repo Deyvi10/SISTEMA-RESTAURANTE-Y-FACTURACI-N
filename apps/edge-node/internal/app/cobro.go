@@ -255,6 +255,17 @@ func (a *App) Cobrar(ctx context.Context, u Usuario, orden ids.ID, in CobrarIn) 
 				return err
 			}
 		}
+		// La propina queda registrada por orden y mesero para el reparto (RF-04-08.4, F8-03).
+		if propina.GreaterThan(money.Money{}) {
+			var fecha string
+			if err := tx.QueryRowContext(ctx, `SELECT fecha_negocio FROM ordenes WHERE id = ?`, o.ID.String()).Scan(&fecha); err != nil {
+				return err
+			}
+			if _, err := tx.ExecContext(ctx, `INSERT INTO propinas (id, orden_id, documento_id, mesero_id, mesero_nombre, fecha_negocio, monto, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+				ids.New().String(), o.ID.String(), doc.ID.String(), o.MeseroID.String(), o.MeseroNombre, fecha, propina.String(), ts); err != nil {
+				return err
+			}
+		}
 		// La orden se cierra y la mesa queda libre; se suelta cualquier bloqueo vencido.
 		if _, err := tx.ExecContext(ctx, `UPDATE ordenes SET estado = 'CERRADA', cerrada_at = ?, version = version + 1 WHERE id = ?`, ts, o.ID.String()); err != nil {
 			return err
@@ -308,7 +319,8 @@ func (a *App) Cobrar(ctx context.Context, u Usuario, orden ids.ID, in CobrarIn) 
 			return err
 		}
 		out.Documento = doc
-		return a.eventoCaja(ctx, tx, EventoVentaCobrada, doc.ID, map[string]any{"documento": doc, "lineas": o.Lineas}, now)
+		return a.eventoCaja(ctx, tx, EventoVentaCobrada, doc.ID, map[string]any{"documento": doc, "lineas": o.Lineas,
+			"meseroId": o.MeseroID, "meseroNombre": o.MeseroNombre, "propina": propina.String(), "propinaRetirada": o.PropinaRetirada}, now)
 	})
 	if err != nil {
 		return CobroOut{}, err

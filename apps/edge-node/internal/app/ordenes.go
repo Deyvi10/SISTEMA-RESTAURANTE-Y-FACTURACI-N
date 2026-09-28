@@ -63,6 +63,8 @@ type Orden struct {
 	Lineas       []LineaOrden `json:"lineas"`
 	Total        string       `json:"total"`
 	Version      int          `json:"version"`
+	// PropinaRetirada: el cliente rechazó el servicio y el cajero lo quitó (RF-04-08.3).
+	PropinaRetirada bool `json:"propinaRetirada"`
 }
 
 // tiposSinMesa y cómo se nombran en pantalla y en la comanda (RF-03-11).
@@ -110,9 +112,9 @@ func leerOrden(ctx context.Context, q queryer, id ids.ID) (Orden, error) {
 	var mesa, mesaNombre, etiqueta sql.NullString
 	var abierta, mesero string
 	var com sql.NullInt64
-	err := q.QueryRowContext(ctx, `SELECT o.mesa_id, m.nombre, o.etiqueta, o.tipo, o.mesero_id, o.mesero_nombre, o.numero_corto, o.estado, o.comensales, o.abierta_at, o.version
+	err := q.QueryRowContext(ctx, `SELECT o.mesa_id, m.nombre, o.etiqueta, o.tipo, o.mesero_id, o.mesero_nombre, o.numero_corto, o.estado, o.comensales, o.abierta_at, o.version, o.propina_retirada
 		FROM ordenes o LEFT JOIN mesas m ON m.id = o.mesa_id WHERE o.id = ?`, id.String()).
-		Scan(&mesa, &mesaNombre, &etiqueta, &o.Tipo, &mesero, &o.MeseroNombre, &o.Numero, &o.Estado, &com, &abierta, &o.Version)
+		Scan(&mesa, &mesaNombre, &etiqueta, &o.Tipo, &mesero, &o.MeseroNombre, &o.Numero, &o.Estado, &com, &abierta, &o.Version, &o.PropinaRetirada)
 	if errors.Is(err, sql.ErrNoRows) {
 		return o, errOrdenNoExiste
 	}
@@ -723,6 +725,10 @@ type Totales struct {
 	IVA      string `json:"iva"`
 	Propina  string `json:"propina"`
 	Total    string `json:"total"`
+	// El local cobra servicio y cuánto; PropinaRetirada si el cajero la quitó en esta orden.
+	PropinaActiva     bool   `json:"propinaActiva"`
+	PropinaPorcentaje string `json:"propinaPorcentaje"`
+	PropinaRetirada   bool   `json:"propinaRetirada"`
 }
 
 func (a *App) calcularTotales(ctx context.Context, q queryer, o Orden) (Totales, money.Money, money.Money, money.Money, money.Money, error) {
@@ -730,6 +736,10 @@ func (a *App) calcularTotales(ctx context.Context, q queryer, o Orden) (Totales,
 	var propPct string
 	if err := q.QueryRowContext(ctx, `SELECT precios_incluyen_iva, propina_legal_activa, propina_porcentaje FROM locales LIMIT 1`).Scan(&incluye, &propActiva, &propPct); err != nil {
 		incluye, propActiva, propPct = 1, 0, "0"
+	}
+	// El servicio se cobra por atender en el local: no aplica a lo que se lleva ni al delivery.
+	if o.Tipo == "LLEVAR" || o.Tipo == "DELIVERY" {
+		propActiva = 0
 	}
 	porTarifa := map[string]money.Money{}
 	for _, l := range o.Lineas {
@@ -767,14 +777,16 @@ func (a *App) calcularTotales(ctx context.Context, q queryer, o Orden) (Totales,
 		}
 	}
 	propina := money.Money{}
-	if propActiva == 1 {
+	// 10 % de la base imponible (sin IVA; los descuentos de F4-09 ya la reducen) y sin gravar IVA.
+	if propActiva == 1 && !o.PropinaRetirada {
 		p, err := decimal.NewFromString(propPct)
 		if err == nil {
 			propina = base.Mul(p.Div(decimal.NewFromInt(100))).Round2()
 		}
 	}
 	total := base.Add(iva).Add(propina)
-	return Totales{Subtotal: base.String(), IVA: iva.String(), Propina: propina.String(), Total: total.String()}, base, iva, propina, total, nil
+	return Totales{Subtotal: base.String(), IVA: iva.String(), Propina: propina.String(), Total: total.String(),
+		PropinaActiva: propActiva == 1, PropinaPorcentaje: propPct, PropinaRetirada: o.PropinaRetirada}, base, iva, propina, total, nil
 }
 
 type PrecuentaIn struct {

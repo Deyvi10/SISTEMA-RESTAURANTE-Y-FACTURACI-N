@@ -265,3 +265,9 @@ button { font: inherit; }
 .comprador__pasaporte, .comprador__consentimiento { grid-column: 1 / -1; display: flex; gap: 8px; align-items: flex-start; font-size: 14px; cursor: pointer; }
 .comprador__pasaporte input, .comprador__consentimiento input { width: 18px; height: 18px; accent-color: var(--rp-color-accent); flex: none; margin-top: 1px; }
 .comprador__consentimiento small { display: block; color: var(--rp-color-label-secondary); font-size: 12px; margin-top: 2px; }
+
+/* ---------- Servicio (F4-10) ---------- */
+.cobro__servicio { display: flex; align-items: center; gap: 6px; }
+.cobro__servicio .rp-btn { padding: 0 6px; min-height: 0; font-size: 13px; }
+.alerta__campo { width: 100%; box-sizing: border-box; margin-top: 12px; min-height: 38px; padding: 0 10px; border-radius: 10px; border: 1px solid var(--rp-color-separator);
+  background: var(--rp-color-surface); color: var(--rp-color-label); font: inherit; }

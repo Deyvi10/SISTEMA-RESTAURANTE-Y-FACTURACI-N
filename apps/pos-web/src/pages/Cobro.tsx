@@ -15,6 +15,9 @@ import type { Caja } from "./Turno";
 
 const esEfectivoM = (m: MetodoPago) => m.tipo === "EFECTIVO";
 
+/** "10.00" → "10", "12.50" → "12.5" (texto, sin pasar por coma flotante). */
+export const porcentaje = (p: string) => (p.includes(".") ? p.replace(/0+$/, "").replace(/\.$/, "") : p);
+
 const ICONO: Record<string, typeof Wallet> = { tarjeta: CreditCard, transferencia: Landmark, billetera: Smartphone };
 
 /** El vuelto «cuenta» hasta su valor, como una caja registradora (≈ 0,6 s). */
@@ -49,6 +52,7 @@ export function Cobro({ orden: aCobrar, caja, volver, irATurno, agregar }: { ord
   const [otroMonto, setOtroMonto] = useState<string | null>(null);
   const [hojaPago, setHojaPago] = useState<{ inicial?: MetodoPago } | null>(null);
   const [comprador, setComprador] = useState<EstadoComprador>(compradorInicial);
+  const [quitandoServicio, setQuitandoServicio] = useState(false);
   const campoId = useRef<HTMLInputElement>(null);
   // Una clave por intento de cobro: un doble toque o un reintento no cobra dos veces.
   const clave = useRef(uuidv7());
@@ -99,13 +103,26 @@ export function Cobro({ orden: aCobrar, caja, volver, irATurno, agregar }: { ord
   );
 
   const billetes = opcionesBillete(total);
-  const libre = puedeCobrar && otroMonto === null && hojaPago === null;
+  const libre = puedeCobrar && otroMonto === null && hojaPago === null && !quitandoServicio;
+  const cambiarServicio = (retirar: boolean, motivo = "") => {
+    if (!datos) return;
+    nodo
+      .propina(datos.orden.id, retirar, motivo)
+      .then((t) => {
+        setDatos((d) => (d ? { ...d, totales: t } : d));
+        setQuitandoServicio(false);
+        clave.current = uuidv7(); // el total cambió: es otro cobro
+      })
+      .catch((e) => setError(e instanceof ApiError ? e.message : "No se pudo cambiar el servicio."));
+  };
+  const servicio = datos?.totales.propinaActiva && !hecho;
   useAtajo("1", "Cobrar el monto exacto en efectivo", () => cobrar(efectivo, billetes[0]!), "Cobro", libre);
   useAtajo("2", "Cobrar con el segundo billete", () => billetes[1] && cobrar(efectivo, billetes[1]), "Cobro", libre && billetes.length > 1);
   useAtajo("3", "Cobrar con el tercer billete", () => billetes[2] && cobrar(efectivo, billetes[2]), "Cobro", libre && billetes.length > 2);
   useAtajo("4", "Cobrar con el cuarto billete", () => billetes[3] && cobrar(efectivo, billetes[3]), "Cobro", libre && billetes.length > 3);
   useAtajo("o", "Otro monto en efectivo", () => setOtroMonto(""), "Cobro", libre);
   useAtajo("m", "Pago mixto (varios métodos)", () => setHojaPago({}), "Cobro", libre);
+  useAtajo("s", "Quitar o reponer el servicio (propina)", () => (datos?.totales.propinaRetirada ? cambiarServicio(false) : setQuitandoServicio(true)), "Cobro", !!servicio && otroMonto === null && hojaPago === null && !quitandoServicio);
   useAtajo("c", "Datos del comprador", () => {
     setComprador((x) => ({ ...x, modo: "ID" }));
     requestAnimationFrame(() => campoId.current?.focus());
@@ -153,10 +170,21 @@ export function Cobro({ orden: aCobrar, caja, volver, irATurno, agregar }: { ord
             <dd className="rp-num">{formatMoney(datos.totales.subtotal)}</dd>
             <dt>IVA</dt>
             <dd className="rp-num">{formatMoney(datos.totales.iva)}</dd>
-            {centavos(datos.totales.propina) > 0 && (
+            {datos.totales.propinaActiva && (
               <>
-                <dt>Servicio</dt>
-                <dd className="rp-num">{formatMoney(datos.totales.propina)}</dd>
+                <dt className="cobro__servicio">
+                  Servicio {porcentaje(datos.totales.propinaPorcentaje ?? "10")} %
+                  {!hecho && (
+                    <button
+                      className="rp-btn rp-btn--plain rp-btn--sm"
+                      onClick={() => (datos.totales.propinaRetirada ? cambiarServicio(false) : setQuitandoServicio(true))}
+                      data-testid="servicio"
+                    >
+                      {datos.totales.propinaRetirada ? "Reponer" : "Quitar"} <kbd className="tecla">S</kbd>
+                    </button>
+                  )}
+                </dt>
+                <dd className="rp-num">{datos.totales.propinaRetirada ? <s>{formatMoney("0")}</s> : formatMoney(datos.totales.propina)}</dd>
               </>
             )}
           </dl>
@@ -234,6 +262,7 @@ export function Cobro({ orden: aCobrar, caja, volver, irATurno, agregar }: { ord
         )}
       </div>
 
+      {quitandoServicio && <AlertaServicio monto={datos?.totales.propina ?? "0"} cerrar={() => setQuitandoServicio(false)} quitar={(m) => cambiarServicio(true, m)} />}
       {hojaPago && config && (
         <HojaPagos
           total={total}
@@ -358,5 +387,41 @@ function Listo({ out, conMesa, volver }: { out: CobroOut; conMesa: boolean; volv
         Siguiente cliente <kbd className="tecla">Intro</kbd>
       </button>
     </section>
+  );
+}
+
+/** El cliente rechaza el servicio: se quita con un motivo opcional (queda en la auditoría). */
+function AlertaServicio({ monto, cerrar, quitar }: { monto: string; cerrar: () => void; quitar: (motivo: string) => void }) {
+  const [motivo, setMotivo] = useState("");
+  useAtajo("Escape", "Cancelar", cerrar, "Servicio");
+  return (
+    <div className="rp-scrim centrado-fijo" data-open="true">
+      <form
+        className="rp-alert"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="quitar-servicio"
+        onSubmit={(e) => {
+          e.preventDefault();
+          quitar(motivo.trim());
+        }}
+      >
+        <div className="rp-alert__body">
+          <p className="rp-alert__title" id="quitar-servicio">
+            ¿Quitar el servicio de {formatMoney(monto)}?
+          </p>
+          <p className="rp-alert__msg">El cliente puede rechazarlo. Queda registrado con tu usuario.</p>
+          <input className="alerta__campo" value={motivo} onChange={(e) => setMotivo(e.target.value)} maxLength={200} placeholder="Motivo (opcional)" autoFocus data-testid="motivo-servicio" />
+        </div>
+        <div className="rp-alert__actions">
+          <button type="button" onClick={cerrar}>
+            Cancelar
+          </button>
+          <button type="submit" className="rp-alert__primary rp-alert__destructive" data-testid="quitar-servicio">
+            Quitar
+          </button>
+        </div>
+      </form>
+    </div>
   );
 }

@@ -65,6 +65,17 @@ func (a *App) rutasCaja() {
 	m.Handle("GET /v1/ordenes/sin-mesa", a.enCaja(func(ctx context.Context, _ Dispositivo, _ Usuario, _ *http.Request) (any, error) {
 		return a.OrdenesSinMesa(ctx)
 	}))
+	m.Handle("POST /v1/ordenes/{id}/propina", a.enCaja(func(ctx context.Context, _ Dispositivo, u Usuario, r *http.Request) (any, error) {
+		id, err := idRuta(r)
+		if err != nil {
+			return nil, err
+		}
+		in, err := leer[PropinaIn](nil, r)
+		if err != nil {
+			return nil, err
+		}
+		return a.CambiarPropina(ctx, u, id, in)
+	}))
 	m.Handle("POST /v1/ordenes/{id}/cobrar", a.enCaja(func(ctx context.Context, _ Dispositivo, u Usuario, r *http.Request) (any, error) {
 		id, err := idRuta(r)
 		if err != nil {

@@ -312,6 +312,9 @@ export interface Totales {
   iva: string;
   propina: string;
   total: string;
+  propinaActiva?: boolean; // el local cobra servicio
+  propinaPorcentaje?: string;
+  propinaRetirada?: boolean; // el cliente lo rechazó y el cajero lo quitó
 }
 
 export interface ClienteRegistrado {
@@ -420,6 +423,7 @@ export const nodo = {
     api<{ orden: Orden; comandaNumero: number }>("POST", "/v1/ordenes/enviar", b),
   buscarCliente: (identificacion: string, tipo = "") =>
     api<BusquedaCliente>("GET", `/v1/clientes/buscar?${new URLSearchParams({ identificacion, tipo })}`),
+  propina: (ordenId: string, retirar: boolean, motivo = "") => api<Totales>("POST", `/v1/ordenes/${ordenId}/propina`, { retirar, motivo }),
   orden: (id: string) => api<{ orden: Orden; totales: Totales }>("GET", `/v1/ordenes/${id}`),
   cobrar: (
     ordenId: string,

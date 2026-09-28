@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { type EstadoCaja, type Mesa, nodo } from "../api/nodo";
 import { AtajosProvider } from "../components/atajos";
 import { opcionesBillete, vueltoCentavos } from "../lib/billetes";
-import { Cobro } from "../pages/Cobro";
+import { Cobro, porcentaje } from "../pages/Cobro";
 import { aEnvio, type FilaPago, problemaPagos, restante } from "../pages/PagoMixto";
 import type { Caja } from "../pages/Turno";
 
@@ -139,5 +139,26 @@ describe("pago mixto", () => {
     expect(screen.getByRole("dialog", { name: "Detalle del pago" })).toBeInTheDocument();
     expect(screen.getByLabelText("Monto de Tarjeta crédito")).toHaveValue("14.50");
     expect(screen.getByTestId("cobrar-mixto")).toBeEnabled();
+  });
+});
+
+describe("servicio (propina legal)", () => {
+  it("muestra el porcentaje sin ceros de sobra", () => {
+    expect(["10.00", "12.50", "10", "8.25"].map(porcentaje)).toEqual(["10", "12.5", "10", "8.25"]);
+  });
+
+  it("el cajero lo quita con un motivo y los billetes se recalculan", async () => {
+    const conServicio = { subtotal: "16.09", iva: "2.41", propina: "1.61", total: "20.11", propinaActiva: true, propinaPorcentaje: "10", propinaRetirada: false };
+    vi.spyOn(nodo, "orden").mockResolvedValue({ orden, totales: conServicio });
+    const cambiar = vi.spyOn(nodo, "propina").mockResolvedValue({ ...conServicio, propina: "0.00", total: "18.50", propinaRetirada: true });
+    montar();
+    await waitFor(() => expect(screen.getByTestId("total")).toHaveTextContent("$20.11"));
+    fireEvent.keyDown(window, { key: "s" });
+    fireEvent.change(screen.getByTestId("motivo-servicio"), { target: { value: "No quiere pagar servicio" } });
+    fireEvent.click(screen.getByTestId("quitar-servicio"));
+    expect(cambiar).toHaveBeenCalledWith("o1", true, "No quiere pagar servicio");
+    await waitFor(() => expect(screen.getByTestId("total")).toHaveTextContent("$18.50"));
+    expect(screen.getByTestId("billete-18.50")).toBeInTheDocument();
+    expect(screen.getByTestId("servicio")).toHaveTextContent("Reponer");
   });
 });
