@@ -22,10 +22,14 @@ import (
 )
 
 const (
-	colaPorCliente = 256
-	pingCada       = 20 * time.Second
-	escrituraMax   = 10 * time.Second
-	mensajeMax     = 64 << 10
+	// Un cliente es lento cuando su mensaje pendiente más antiguo lleva lentoTras sin salir
+	// (no por el tamaño de la cola: una ráfaga legítima no debe tumbar a un teléfono sano).
+	lentoTras = 3 * time.Second
+	// Tope de memoria por cliente mientras se decide si está lento.
+	maxBytesCliente = 16 << 20
+	pingCada        = 20 * time.Second
+	escrituraMax    = 10 * time.Second
+	mensajeMax      = 64 << 10
 )
 
 // Cliente es un dispositivo conectado.
@@ -35,8 +39,54 @@ type Cliente struct {
 	DispositivoID *ids.ID
 	UsuarioID     *ids.ID
 
-	cola   chan []byte
-	cerrar func(websocket.StatusCode, string)
+	mu         sync.Mutex
+	pendientes []pendiente
+	bytes      int
+	senal      chan struct{} // hay mensajes para el escritor
+	cerrar     func(websocket.StatusCode, string)
+}
+
+type pendiente struct {
+	msg []byte
+	at  time.Time
+}
+
+// encolar agrega un mensaje sin bloquear; false si el cliente superó su tope de memoria.
+func (c *Cliente) encolar(msg []byte, now time.Time) bool {
+	c.mu.Lock()
+	if c.bytes+len(msg) > maxBytesCliente {
+		c.mu.Unlock()
+		return false
+	}
+	c.pendientes = append(c.pendientes, pendiente{msg: msg, at: now})
+	c.bytes += len(msg)
+	c.mu.Unlock()
+	select {
+	case c.senal <- struct{}{}:
+	default:
+	}
+	return true
+}
+
+// siguiente saca el mensaje más antiguo (nil si no hay).
+func (c *Cliente) siguiente() []byte {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if len(c.pendientes) == 0 {
+		return nil
+	}
+	p := c.pendientes[0]
+	c.pendientes[0] = pendiente{}
+	c.pendientes = c.pendientes[1:]
+	c.bytes -= len(p.msg)
+	return p.msg
+}
+
+// atascado: el pendiente más antiguo lleva demasiado sin salir.
+func (c *Cliente) atascado(now time.Time) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return len(c.pendientes) > 0 && now.Sub(c.pendientes[0].at) > lentoTras
 }
 
 // Autenticar decide si una conexión entra y quién es. Devuelve error para rechazarla.
@@ -86,9 +136,7 @@ func (h *Hub) DifundirA(e eventos.Evento, filtro func(*Cliente) bool) error {
 		if filtro != nil && !filtro(c) {
 			continue
 		}
-		select {
-		case c.cola <- msg:
-		default:
+		if !c.encolar(msg, time.Now()) {
 			go c.cerrar(websocket.StatusPolicyViolation, "cliente lento: reconecta")
 		}
 	}
@@ -139,7 +187,7 @@ func (h *Hub) Handler(auth Autenticar) http.Handler {
 		conn.SetReadLimit(mensajeMax)
 		c := &cli
 		c.ID = ids.New()
-		c.cola = make(chan []byte, colaPorCliente)
+		c.senal = make(chan struct{}, 1)
 		var once sync.Once
 		c.cerrar = func(code websocket.StatusCode, motivo string) {
 			once.Do(func() { _ = conn.Close(code, motivo) })
@@ -151,6 +199,7 @@ func (h *Hub) Handler(auth Autenticar) http.Handler {
 		ctx, cancel := context.WithCancel(r.Context())
 		defer cancel()
 		go h.escribir(ctx, conn, c, cancel)
+		go vigilar(ctx, c)
 		h.leer(ctx, conn, c)
 		c.cerrar(websocket.StatusNormalClosure, "")
 		h.Log.Info("dispositivo desconectado", "cliente", c.ID)
@@ -165,18 +214,38 @@ func (h *Hub) escribir(ctx context.Context, conn *websocket.Conn, c *Cliente, ca
 		select {
 		case <-ctx.Done():
 			return
-		case msg := <-c.cola:
-			wctx, wcancel := context.WithTimeout(ctx, escrituraMax)
-			err := conn.Write(wctx, websocket.MessageText, msg)
-			wcancel()
-			if err != nil {
-				return
+		case <-c.senal:
+			for msg := c.siguiente(); msg != nil; msg = c.siguiente() {
+				wctx, wcancel := context.WithTimeout(ctx, escrituraMax)
+				err := conn.Write(wctx, websocket.MessageText, msg)
+				wcancel()
+				if err != nil {
+					return
+				}
 			}
 		case <-ping.C:
 			pctx, pcancel := context.WithTimeout(ctx, escrituraMax)
 			err := conn.Ping(pctx)
 			pcancel()
 			if err != nil {
+				return
+			}
+		}
+	}
+}
+
+// vigilar desconecta al cliente cuyo pendiente más antiguo no sale a tiempo: así un teléfono
+// que dejó de leer no acumula memoria ni frena la difusión a los demás.
+func vigilar(ctx context.Context, c *Cliente) {
+	t := time.NewTicker(lentoTras / 6)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case now := <-t.C:
+			if c.atascado(now) {
+				c.cerrar(websocket.StatusPolicyViolation, "cliente lento: reconecta")
 				return
 			}
 		}
@@ -220,10 +289,7 @@ func (h *Hub) responder(c *Cliente, v any) {
 	if err != nil {
 		return
 	}
-	select {
-	case c.cola <- b:
-	default:
-	}
+	c.encolar(b, time.Now())
 }
 
 // ErrNoAutorizado es el error de Autenticar para conexiones rechazadas.

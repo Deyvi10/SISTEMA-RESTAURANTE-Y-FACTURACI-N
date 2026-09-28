@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -90,10 +91,12 @@ func TestDifusionA60Dispositivos(t *testing.T) {
 	}
 }
 
-// Un teléfono que no lee (mala señal) se desconecta sin frenar a los demás.
+// Un teléfono que no lee (mala señal) se desconecta sin frenar a los demás: se difunde sin
+// parar mientras el lento no lee; el rápido recibe todo y el lento sale cuando su cola deja
+// de avanzar (cuando ya no caben más datos en los búferes de red).
 func TestClienteLentoNoFrenaALosDemas(t *testing.T) {
 	h, url := servidor(t, todos)
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 	lento, _, err := websocket.Dial(ctx, url, nil)
 	if err != nil {
@@ -105,27 +108,58 @@ func TestClienteLentoNoFrenaALosDemas(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = rapido.CloseNow() }()
+	rapido.SetReadLimit(1 << 20)
 	esperarConectados(t, h, 2)
-	total := colaPorCliente * 8
-	recibidos := make(chan int, 1)
+	var leidos atomic.Int64
 	go func() {
-		n := 0
-		for n < total {
+		for {
 			if _, _, err := rapido.Read(ctx); err != nil {
-				break
+				return
 			}
-			n++
+			leidos.Add(1)
 		}
-		recibidos <- n
 	}()
-	grande := strings.Repeat("x", 4000)
-	for range total {
-		_ = h.Difundir(eventos.PrinterStatus{PrinterID: ids.New(), Name: grande, Status: "OK"})
+	grande := strings.Repeat("x", 16000)
+	enviados := int64(0)
+	for h.Conectados() == 2 {
+		if ctx.Err() != nil {
+			t.Fatal("el cliente lento nunca se desconectó")
+		}
+		for range 64 { // ráfagas mucho más grandes que cualquier cola fija
+			_ = h.Difundir(eventos.PrinterStatus{PrinterID: ids.New(), Name: grande, Status: "OK"})
+			enviados++
+		}
+		time.Sleep(5 * time.Millisecond)
 	}
-	if n := <-recibidos; n != total {
-		t.Fatalf("el cliente rápido recibió %d de %d", n, total)
+	for fin := time.Now().Add(10 * time.Second); leidos.Load() < enviados; time.Sleep(10 * time.Millisecond) {
+		if time.Now().After(fin) {
+			t.Fatalf("el cliente rápido recibió %d de %d", leidos.Load(), enviados)
+		}
 	}
-	esperarConectados(t, h, 1) // el lento quedó fuera
+	if h.Conectados() != 1 {
+		t.Fatalf("conectados = %d", h.Conectados())
+	}
+}
+
+// El vigilante saca al cliente cuyo pendiente más antiguo pasa de lentoTras, y solo a ese.
+func TestVigilanteDeClienteAtascado(t *testing.T) {
+	now := time.Now()
+	c := &Cliente{senal: make(chan struct{}, 1)}
+	c.encolar([]byte("a"), now)
+	if c.atascado(now.Add(lentoTras / 2)) {
+		t.Fatal("aún no debería estar atascado")
+	}
+	if !c.atascado(now.Add(lentoTras + time.Millisecond)) {
+		t.Fatal("debería estar atascado")
+	}
+	c.siguiente()
+	if c.atascado(now.Add(time.Hour)) {
+		t.Fatal("sin pendientes no hay atasco")
+	}
+	// El tope de memoria protege mientras se decide.
+	if c.encolar(make([]byte, maxBytesCliente+1), now) {
+		t.Fatal("superó el tope de memoria")
+	}
 }
 
 func TestMensajesEntrantes(t *testing.T) {
