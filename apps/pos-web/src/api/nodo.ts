@@ -220,6 +220,49 @@ export interface Movimiento {
   createdAt: string;
 }
 
+export interface LineaOrden {
+  id: string;
+  producto: string;
+  cantidad: string;
+  modificadores: { nombre: string }[];
+  estado: string; // EN_ESPERA, ENVIADA, ANULADA
+  total: string;
+}
+
+export interface Orden {
+  id: string;
+  mesaId: string | null;
+  mesa: string;
+  meseroNombre: string;
+  numero: number;
+  estado: string;
+  lineas: LineaOrden[];
+}
+
+export interface Totales {
+  subtotal: string;
+  iva: string;
+  propina: string;
+  total: string;
+}
+
+export interface DocumentoVenta {
+  id: string;
+  codigo: string; // INT-000123
+  mesa: string;
+  totales: Totales;
+  metodo: string;
+  recibido: string;
+  vuelto: string;
+  abreCajon: boolean;
+}
+
+export interface CobroOut {
+  documento: DocumentoVenta;
+  impresoras: string[];
+  aviso?: string;
+}
+
 export type ResultadoCierre = "CUADRADO" | "SOBRANTE" | "FALTANTE";
 
 export interface LineaCierre {
@@ -268,5 +311,8 @@ export const nodo = {
   movimiento: (b: { cajaId: string; tipo: TipoMovimiento; monto: string; motivo: string; idempotencyKey: string }) => api<Movimiento>("POST", "/v1/caja/movimientos", b),
   cerrarTurno: (b: { cajaId: string; conteo: { clave: string; cantidad: number }[]; declarado: { metodoId: string; monto: string }[]; idempotencyKey: string }) =>
     api<CierreOut>("POST", "/v1/turnos/cerrar", b),
+  orden: (id: string) => api<{ orden: Orden; totales: Totales }>("GET", `/v1/ordenes/${id}`),
+  cobrar: (ordenId: string, b: { cajaId: string; metodoId: string; recibido: string; consumidorFinal: boolean; idempotencyKey: string }) =>
+    api<CobroOut>("POST", `/v1/ordenes/${ordenId}/cobrar`, b),
   movimientos: (turnoId: string) => api<Movimiento[]>("GET", `/v1/turnos/${turnoId}/movimientos`),
 };

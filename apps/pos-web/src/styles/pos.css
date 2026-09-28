@@ -145,3 +145,46 @@ button { font: inherit; }
 .cierre-resultado__titulo { margin: 0; }
 .cierre-resultado [data-tono="amarillo"] .rp-cell__subtitle { color: var(--rp-color-warning-text); }
 .cierre-resultado [data-tono="rojo"] .rp-cell__subtitle { color: var(--rp-color-danger-text); }
+
+/* ---------- Cobro «Zero-Click» (F4-05) ---------- */
+.cobro { display: grid; grid-template-columns: minmax(0, 1fr) minmax(420px, 1.15fr); gap: 24px; max-width: 1180px; margin: 0 auto; }
+.cobro__detalle { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.cobro__detalle > .rp-btn { align-self: flex-start; }
+.cobro__detalle .rp-btn svg { width: 16px; height: 16px; }
+.cobro__detalle p { margin: 0; }
+.cobro__lineas { margin: 8px 0 0; }
+.cobro__cant { min-width: 28px; font-weight: 700; color: var(--rp-color-label-secondary); }
+.cobro__totales { display: grid; grid-template-columns: 1fr auto; gap: 4px 16px; margin: 8px 4px 0; color: var(--rp-color-label-secondary); }
+.cobro__totales dd { margin: 0; text-align: right; }
+.cobro__panel { display: flex; flex-direction: column; gap: 10px; padding: 24px; border-radius: 22px; background: var(--rp-color-surface); align-self: start; }
+.cobro__panel p { margin: 0; }
+.cobro__rotulo { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; color: var(--rp-color-label-secondary); margin-top: 6px !important; }
+.cobro__total { font: 700 64px/1 var(--rp-font-display, inherit); letter-spacing: -1px; }
+.cobro__cf { align-self: flex-start; display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 999px; font: 600 16px/1 inherit; cursor: default;
+  border: 2px solid var(--rp-color-accent); background: var(--rp-color-accent-soft); color: var(--rp-color-accent); }
+.cobro__cf svg { width: 18px; height: 18px; }
+.cobro__cf:disabled { border-color: var(--rp-color-separator); background: none; color: var(--rp-color-label-tertiary); text-decoration: line-through; }
+.cobro__aviso { color: var(--rp-color-warning-text); display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.billetes { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 10px; }
+.billete {
+  position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-height: 92px; padding: 14px; border-radius: 16px; cursor: pointer;
+  border: 1px solid color-mix(in srgb, var(--rp-color-success-text) 35%, transparent);
+  background: color-mix(in srgb, var(--rp-color-success-soft) 80%, var(--rp-color-surface)); color: var(--rp-color-label);
+  transition: transform var(--rp-duration-fast) var(--rp-ease-standard);
+}
+.billete:active:not(:disabled) { transform: scale(0.97); }
+.billete:focus-visible { outline: 3px solid var(--rp-color-accent); outline-offset: 2px; }
+.billete:disabled { opacity: 0.4; cursor: default; }
+.billete__monto { font: 700 24px/1.1 var(--rp-font-display, inherit); white-space: nowrap; }
+.billete small { color: var(--rp-color-success-text); font-weight: 600; }
+.billete--otro { background: var(--rp-color-fill); border-color: transparent; }
+.billete--otro small { color: var(--rp-color-label-secondary); }
+.metodos { display: flex; flex-wrap: wrap; gap: 8px; }
+.metodo svg { width: 18px; height: 18px; }
+.cobro-listo { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; min-height: 60vh; text-align: center; }
+.cobro-listo p { margin: 0; }
+.cobro-listo__check { display: grid; place-items: center; width: 96px; height: 96px; border-radius: 50%; background: var(--rp-color-success-text); color: #fff;
+  animation: aparecer 0.35s var(--rp-ease-standard) both; }
+.cobro-listo__check svg { width: 56px; height: 56px; stroke-width: 3; }
+@keyframes aparecer { from { transform: scale(0.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .cobro-listo__check { animation: none; } }

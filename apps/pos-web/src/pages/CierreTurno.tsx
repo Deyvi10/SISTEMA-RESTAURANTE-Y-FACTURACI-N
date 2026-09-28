@@ -6,16 +6,7 @@ import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react"
 import { uuidv7 } from "../api/identidad";
 import { ApiError, type CierreOut, type ConfigCaja, type Denominacion, type MetodoPago, nodo, type ResultadoCierre } from "../api/nodo";
 import { useAtajo } from "../components/atajos";
-
-/** "0.25" → 25. Los importes se suman en centavos enteros, nunca en coma flotante. */
-export function centavos(valor: string): number {
-  const [ent = "0", dec = ""] = valor.split(".");
-  return Number(ent) * 100 + Number((dec + "00").slice(0, 2));
-}
-
-export function verCentavos(c: number): string {
-  return `${Math.floor(c / 100)}.${String(c % 100).padStart(2, "0")}`;
-}
+import { centavos, verCentavos } from "../lib/dinero";
 
 /** Total del efectivo contado, en texto decimal. */
 export function totalContado(dens: Denominacion[], conteo: Record<string, number>): string {

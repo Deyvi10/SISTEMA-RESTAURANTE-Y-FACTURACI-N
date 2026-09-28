@@ -7,6 +7,7 @@ import { Avatar } from "./components/Avatar";
 import { Indicador } from "./components/Indicador";
 import { Emparejar } from "./pages/Emparejar";
 import { Mesas } from "./pages/Mesas";
+import { Cobro } from "./pages/Cobro";
 import { Personal } from "./pages/Personal";
 import { Turno, useCaja } from "./pages/Turno";
 
@@ -27,7 +28,8 @@ export function App() {
 function Caja() {
   const { usuario, salir } = useSesion();
   const [mesa, setMesa] = useState<Mesa | null>(null);
-  const [seccion, setSeccion] = useState<"mesas" | "turno">("mesas");
+  const [seccion, setSeccion] = useState<"mesas" | "turno" | "cobro">("mesas");
+  const [aviso, setAviso] = useState<string | null>(null);
   const caja = useCaja();
   const turno = caja.estado?.turno ?? null;
   useAtajo("F12", "Bloquear la caja", () => void salir(), "General");
@@ -45,7 +47,7 @@ function Caja() {
               ["turno", "Turno", "F10"],
             ] as const
           ).map(([id, nombre, tecla]) => (
-            <button key={id} className="barra__tab" aria-current={seccion === id ? "page" : undefined} onClick={() => setSeccion(id)} title={`${nombre} (${tecla})`} data-testid={`tab-${id}`}>
+            <button key={id} className="barra__tab" aria-current={seccion === id || (seccion === "cobro" && id === "mesas") ? "page" : undefined} onClick={() => setSeccion(id)} title={`${nombre} (${tecla})`} data-testid={`tab-${id}`}>
               {nombre}
             </button>
           ))}
@@ -65,14 +67,26 @@ function Caja() {
         </button>
       </header>
       <main className="contenido">
-        {seccion === "turno" ? (
+        {seccion === "cobro" && mesa ? (
+          <Cobro
+            key={mesa.id}
+            mesa={mesa}
+            caja={caja}
+            volver={() => {
+              setMesa(null);
+              setSeccion("mesas");
+              caja.recargar();
+            }}
+            irATurno={() => setSeccion("turno")}
+          />
+        ) : seccion === "turno" ? (
           <Turno caja={caja} />
         ) : (
           <>
-            <Mesas abrir={setMesa} />
-            {mesa && (
+            <Mesas abrir={(m) => (m.ordenId ? (setMesa(m), setSeccion("cobro")) : setAviso(`${m.nombre} está libre: no hay nada que cobrar.`))} />
+            {aviso && (
               <p className="rp-secondary" role="status">
-                {turno ? `${mesa.nombre} elegida. El cobro llega en la siguiente entrega (F4-05).` : `${mesa.nombre} elegida. Abre el turno de caja para poder cobrar.`}
+                {aviso}
               </p>
             )}
           </>

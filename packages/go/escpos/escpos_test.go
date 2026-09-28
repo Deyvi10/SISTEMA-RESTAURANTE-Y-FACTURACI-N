@@ -260,3 +260,19 @@ func TestGoldenCierreZ(t *testing.T) {
 	golden(t, "cierre-z-80", doc.Text())
 	golden(t, "cierre-z-58", Decode(ImprimirCierreZ(Paper58, c, time.UTC)).Text())
 }
+
+func TestGoldenDocumentoVenta(t *testing.T) {
+	d := DocumentoVenta{
+		Local: "Cevichería Don Pepe", Numero: 123, Hora: hora, Mesa: "Mesa 4", Cajero: "Luis P.", Comprador: "CONSUMIDOR FINAL",
+		Lineas:   []LineaCuenta{{Cantidad: "1", Producto: "Ceviche mixto", Total: money.MustParse("15.00")}, {Cantidad: "2", Producto: "Cerveza", Total: money.MustParse("5.00")}},
+		Subtotal: money.MustParse("17.39"), IVA: money.MustParse("2.61"), Propina: money.MustParse("1.74"), Total: money.MustParse("21.74"),
+		Metodo: "Efectivo", Recibido: money.MustParse("50"), Vuelto: money.MustParse("28.26"), AbrirCajon: true,
+	}
+	raw := ImprimirDocumentoVenta(Paper80, d)
+	if !bytes.HasPrefix(raw, New(Paper80).OpenDrawer().Bytes()) {
+		t.Fatal("el pulso del cajón debe ir antes que el texto")
+	}
+	golden(t, "venta-80", Decode(raw).Text())
+	d.AbrirCajon, d.Metodo, d.Recibido, d.Vuelto = false, "Tarjeta crédito", money.Money{}, money.Money{}
+	golden(t, "venta-tarjeta-58", Decode(ImprimirDocumentoVenta(Paper58, d)).Text())
+}

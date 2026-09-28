@@ -109,18 +109,25 @@ func (a *App) ConfigCaja(ctx context.Context) (ConfigCaja, error) {
 		c.Motivos = append(c.Motivos, m)
 	}
 	_ = rows.Close()
-	var v string
-	if err := q.QueryRowContext(ctx, `SELECT valor FROM parametros_globales WHERE clave = 'consumidor_final_maximo'`).Scan(&v); err == nil {
-		if m, err := money.Parse(v); err == nil {
-			c.ConsumidorFinalMaximo = m.String()
-		}
-	}
+	c.ConsumidorFinalMaximo = consumidorFinalMaximo(ctx, q).String()
 	var activa int
 	var pct string
 	if err := q.QueryRowContext(ctx, `SELECT propina_legal_activa, propina_porcentaje FROM locales LIMIT 1`).Scan(&activa, &pct); err == nil {
 		c.PropinaActiva, c.PropinaPorcentaje = activa == 1, pct
 	}
 	return c, nil
+}
+
+// consumidorFinalMaximo: límite vigente de una venta a consumidor final (parámetro global que
+// llega de la nube; mientras no llegue, el valor por defecto).
+func consumidorFinalMaximo(ctx context.Context, q queryer) money.Money {
+	var v string
+	if err := q.QueryRowContext(ctx, `SELECT valor FROM parametros_globales WHERE clave = 'consumidor_final_maximo'`).Scan(&v); err == nil {
+		if m, err := money.Parse(v); err == nil {
+			return m
+		}
+	}
+	return money.MustParse(consumidorFinalPorDefecto)
 }
 
 // ---------- Jornada (F4-02) ----------
