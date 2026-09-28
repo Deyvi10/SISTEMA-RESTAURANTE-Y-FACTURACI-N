@@ -285,3 +285,11 @@ func TestGoldenDocumentoVenta(t *testing.T) {
 	d.Comprador, d.CompradorID = "Distribuidora de Mariscos del Pacífico Hermanos Andrade S.A.", "1790011674001"
 	golden(t, "venta-ruc-58", Decode(ImprimirDocumentoVenta(Paper58, d)).Text())
 }
+
+func TestGoldenAperturaCajon(t *testing.T) {
+	raw := ImprimirAperturaCajon(Paper58, AperturaCajon{Local: "Cevichería Don Pepe", Caja: "Caja 1", Usuario: "Luis P.", AutorizadoPor: "Pepe Andrade", Motivo: "Cambio de monedas para la barra", Hora: hora})
+	if !bytes.HasPrefix(raw, New(Paper58).OpenDrawer().Bytes()) {
+		t.Fatal("el pulso del cajón debe ir primero")
+	}
+	golden(t, "cajon-58", Decode(raw).Text())
+}

@@ -438,5 +438,9 @@ export const nodo = {
     },
   ) =>
     api<CobroOut>("POST", `/v1/ordenes/${ordenId}/cobrar`, b),
+  autorizar: (b: { usuarioId: string; pin: string; accion: string; referencia: string }) =>
+    api<{ token: string; expiraAt: string; autorizadoPor: string }>("POST", "/v1/autorizaciones", b),
+  abrirCajon: (b: { cajaId: string; motivo: string; autorizacion: string }) =>
+    api<{ impresora: string; autorizadoPor?: string; aviso?: string }>("POST", "/v1/caja/cajon", b),
   movimientos: (turnoId: string) => api<Movimiento[]>("GET", `/v1/turnos/${turnoId}/movimientos`),
 };

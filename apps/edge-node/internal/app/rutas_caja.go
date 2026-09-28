@@ -87,6 +87,13 @@ func (a *App) rutasCaja() {
 		}
 		return a.Cobrar(ctx, u, id, in)
 	}))
+	m.Handle("POST /v1/caja/cajon", a.enCaja(func(ctx context.Context, d Dispositivo, u Usuario, r *http.Request) (any, error) {
+		in, err := leer[AbrirCajonIn](nil, r)
+		if err != nil {
+			return nil, err
+		}
+		return a.AbrirCajon(ctx, d, u, in)
+	}))
 	m.Handle("POST /v1/caja/movimientos", a.enCaja(func(ctx context.Context, _ Dispositivo, u Usuario, r *http.Request) (any, error) {
 		in, err := leer[MovimientoIn](nil, r)
 		if err != nil {

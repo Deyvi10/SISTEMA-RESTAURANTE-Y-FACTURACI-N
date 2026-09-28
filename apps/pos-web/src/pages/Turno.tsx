@@ -1,12 +1,13 @@
 // Jornada (F4-02), turno de caja (F4-03) y movimientos de efectivo (F4-11). La pantalla nunca
 // muestra el efectivo esperado: el cierre es ciego (F4-12).
 import { formatHour, formatMoney } from "@restpos/ui";
-import { ArrowDownToLine, ArrowUpFromLine, CalendarCheck, CalendarX, Receipt, Wallet } from "lucide-react";
+import { ArrowDownToLine, ArrowUpFromLine, CalendarCheck, CalendarX, Inbox, Receipt, Wallet } from "lucide-react";
 import { type FormEvent, type ReactNode, useCallback, useEffect, useState } from "react";
 import { uuidv7 } from "../api/identidad";
 import { ApiError, type ConfigCaja, type EstadoCaja, type Movimiento, nodo, type TipoMovimiento } from "../api/nodo";
 import { useSesion } from "../api/sesion";
 import { useAtajo } from "../components/atajos";
+import { Supervisor } from "../components/Supervisor";
 import { montoDe, TecladoMonto } from "../components/TecladoMonto";
 import { CierreTurno } from "./CierreTurno";
 
@@ -104,10 +105,10 @@ const MOVIMIENTO: Record<TipoMovimiento, { titulo: string; ayuda: string; signo:
   GASTO: { titulo: "Gasto menor", ayuda: "Compra pagada con el efectivo del cajón (hielo, gas, un repuesto).", signo: "−" },
 };
 
-type Hoja = { tipo: "abrir" } | { tipo: "movimiento"; mov: TipoMovimiento } | { tipo: "cerrarJornada" } | { tipo: "cerrarTurno" } | null;
+type Hoja = { tipo: "abrir" } | { tipo: "movimiento"; mov: TipoMovimiento } | { tipo: "cerrarJornada" } | { tipo: "cerrarTurno" } | { tipo: "cajon" } | null;
 
 export function Turno({ caja }: { caja: Caja }) {
-  const { puede } = useSesion();
+  const { puede, usuario } = useSesion();
   const { config, cajaId, elegir, estado, error, recargar } = caja;
   const [hoja, setHoja] = useState<Hoja>(null);
   const [movs, setMovs] = useState<Movimiento[]>([]);
@@ -135,6 +136,7 @@ export function Turno({ caja }: { caja: Caja }) {
   useAtajo("F7", "Ingreso de efectivo", () => setHoja({ tipo: "movimiento", mov: "INGRESO" }), "Turno", libre && !!turno);
   useAtajo("F8", "Gasto menor", () => setHoja({ tipo: "movimiento", mov: "GASTO" }), "Turno", libre && !!turno);
   useAtajo("F4", "Cerrar el turno (cierre ciego)", () => setHoja({ tipo: "cerrarTurno" }), "Turno", libre && !!turno);
+  useAtajo("k", "Abrir el cajón sin venta", () => setHoja({ tipo: "cajon" }), "Turno", hoja === null && !!cajaId);
 
   if (config && !cajaId) {
     return (
@@ -158,6 +160,9 @@ export function Turno({ caja }: { caja: Caja }) {
     <section className="turno">
       <div className="turno__cabecera">
         <h1 className="rp-large-title">{estado?.caja.nombre ?? "Caja"}</h1>
+        <button className="rp-btn rp-btn--gray rp-btn--sm" onClick={() => setHoja({ tipo: "cajon" })} disabled={!cajaId} data-testid="abrir-cajon">
+          <Inbox aria-hidden="true" /> Abrir cajón <kbd className="tecla">K</kbd>
+        </button>
         {config && config.cajas.length > 1 && (
           <div className="rp-segmented" role="radiogroup" aria-label="Caja de esta PC">
             {config.cajas.map((c) => (
@@ -283,6 +288,15 @@ export function Turno({ caja }: { caja: Caja }) {
             setAviso(`Turno cerrado con el Cierre Z ${String(r.cierre.numero).padStart(4, "0")}. Abre un turno nuevo para volver a cobrar.`);
             recargar();
           }} />}
+      {hoja?.tipo === "cajon" && cajaId && (
+        <HojaCajon
+          cajaId={cajaId}
+          conPermiso={puede("ABRIR_CAJON")}
+          usuarioId={usuario?.id}
+          cerrar={() => setHoja(null)}
+          listo={(r) => hecho(`Cajón abierto por «${r.impresora}»${r.autorizadoPor ? `, autorizó ${r.autorizadoPor}` : ""}. Quedó registrado.${r.aviso ? ` ${r.aviso}` : ""}`)}
+        />
+      )}
       {hoja?.tipo === "cerrarJornada" && <AlertaCerrarJornada cerrar={() => setHoja(null)} listo={(msg) => hecho(msg)} />}
     </section>
   );
@@ -423,5 +437,66 @@ function AlertaCerrarJornada({ cerrar, listo }: { cerrar: () => void; listo: (ms
         </div>
       </div>
     </div>
+  );
+}
+
+/** Abrir el cajón sin venta (F4-13): motivo y, si hace falta, el PIN de un supervisor. */
+function HojaCajon({
+  cajaId,
+  conPermiso,
+  usuarioId,
+  cerrar,
+  listo,
+}: {
+  cajaId: string;
+  conPermiso: boolean;
+  usuarioId?: string;
+  cerrar: () => void;
+  listo: (r: { impresora: string; autorizadoPor?: string; aviso?: string }) => void;
+}) {
+  const [motivo, setMotivo] = useState("");
+  const [paso, setPaso] = useState<"motivo" | "supervisor">("motivo");
+  const [error, setError] = useState<string | null>(null);
+  const [ocupado, setOcupado] = useState(false);
+  const abrir = async (autorizacion = ""): Promise<string | null> => {
+    try {
+      listo(await nodo.abrirCajon({ cajaId, motivo: motivo.trim(), autorizacion }));
+      return null;
+    } catch (e) {
+      const msg = e instanceof ApiError ? e.message : "No se pudo abrir el cajón.";
+      if (e instanceof ApiError && e.code === "REQUIERE_SUPERVISOR") setPaso("supervisor");
+      else setError(msg);
+      return msg;
+    }
+  };
+  const continuar = (e?: FormEvent) => {
+    e?.preventDefault();
+    if (motivo.trim().length < 3 || ocupado) return;
+    if (!conPermiso) return setPaso("supervisor");
+    setOcupado(true);
+    void abrir().finally(() => setOcupado(false));
+  };
+  return (
+    <Hoja titulo="Abrir cajón sin venta" cerrar={cerrar}>
+      {paso === "motivo" ? (
+        <form className="hoja-caja__pie" onSubmit={continuar}>
+          <p className="rp-secondary">El pulso sale por la impresora de la caja con un comprobante. Queda registrado con tu usuario.</p>
+          <div className="rp-field">
+            <label htmlFor="motivo-cajon">Motivo</label>
+            <input id="motivo-cajon" value={motivo} onChange={(e) => setMotivo(e.target.value)} maxLength={200} placeholder="Ej.: cambio de monedas" autoFocus data-testid="motivo-cajon" />
+          </div>
+          {error && (
+            <p className="aviso-error" role="alert">
+              {error}
+            </p>
+          )}
+          <button className="rp-btn rp-btn--primary rp-btn--block" disabled={motivo.trim().length < 3 || ocupado} data-testid="continuar-cajon">
+            {conPermiso ? "Abrir cajón" : "Pedir autorización"}
+          </button>
+        </form>
+      ) : (
+        <Supervisor accion="ABRIR_CAJON" referencia={cajaId} excepto={usuarioId} alAutorizar={(token) => abrir(token)} volver={() => setPaso("motivo")} />
+      )}
+    </Hoja>
   );
 }

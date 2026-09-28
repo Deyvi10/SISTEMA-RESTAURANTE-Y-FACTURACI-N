@@ -81,3 +81,29 @@ func ImprimirDocumentoVenta(p Paper, d DocumentoVenta) []byte {
 	b.Line("¡Gracias por su visita!")
 	return b.Feed(3).Cut(true).Bytes()
 }
+
+// AperturaCajon es el comprobante de una apertura del cajón sin venta (RF-02-07): el pulso
+// va primero y el papel deja constancia de quién, cuándo y por qué.
+type AperturaCajon struct {
+	Local         string
+	Caja          string
+	Usuario       string
+	AutorizadoPor string // supervisor que autorizó con su PIN (vacío si fue el mismo usuario)
+	Motivo        string
+	Hora          time.Time
+}
+
+func ImprimirAperturaCajon(p Paper, a AperturaCajon) []byte {
+	b := New(p).OpenDrawer()
+	b.Align(Center).Bold(true).Line(a.Local)
+	b.Line("APERTURA DE CAJÓN SIN VENTA").Bold(false)
+	b.Align(Left).Separator('-')
+	b.Columns(a.Caja, a.Hora.Format("02/01/2006 15:04"))
+	b.Line("Usuario: " + a.Usuario)
+	if a.AutorizadoPor != "" && a.AutorizadoPor != a.Usuario {
+		b.Line("Autorizó: " + a.AutorizadoPor)
+	}
+	b.Wrapped("Motivo: "+a.Motivo, "")
+	b.Separator('-')
+	return b.Feed(3).Cut(true).Bytes()
+}

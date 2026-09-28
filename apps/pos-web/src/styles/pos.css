@@ -271,3 +271,11 @@ button { font: inherit; }
 .cobro__servicio .rp-btn { padding: 0 6px; min-height: 0; font-size: 13px; }
 .alerta__campo { width: 100%; box-sizing: border-box; margin-top: 12px; min-height: 38px; padding: 0 10px; border-radius: 10px; border: 1px solid var(--rp-color-separator);
   background: var(--rp-color-surface); color: var(--rp-color-label); font: inherit; }
+
+/* ---------- Supervisor y cajón (F4-13) ---------- */
+.turno__cabecera .rp-btn svg { width: 16px; height: 16px; }
+.supervisor { display: flex; flex-direction: column; gap: 10px; padding: 0 20px 8px; }
+.supervisor--pin { align-items: center; }
+.supervisor__gente { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; }
+.supervisor__gente .persona { padding: 14px 8px 12px; }
+.supervisor__gente .persona b { font-size: 15px; margin-top: 2px; }
