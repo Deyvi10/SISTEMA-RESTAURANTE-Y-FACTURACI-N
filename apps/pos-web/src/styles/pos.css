@@ -113,7 +113,7 @@ button { font: inherit; }
 
 /* Hoja con teclado de importe: centrada en la caja (pantalla ancha), no pegada abajo. */
 .rp-scrim:has(.hoja-caja), .centrado-fijo { display: grid; place-items: center; }
-.hoja-caja { position: static; transform: none; width: min(420px, 92vw); max-height: 92vh; border-radius: 22px; }
+.hoja-caja { position: static; transform: none; width: min(420px, 92vw); max-height: 92vh; border-radius: 22px; border: 0.5px solid var(--rp-color-separator); }
 .hoja-caja .rp-sheet__grabber { display: none; }
 .hoja-caja__ayuda { margin: 0 20px; text-align: center; color: var(--rp-color-label-secondary); }
 .hoja-caja__pie { display: flex; flex-direction: column; gap: 12px; padding: 12px 20px 0; }
@@ -229,3 +229,23 @@ button { font: inherit; }
 .mods__grupo { border: 0; margin: 0 0 10px; padding: 0; }
 .mods__grupo .rp-group { margin: 0 20px; }
 .mods__grupo .rp-cell input { width: 20px; height: 20px; accent-color: var(--rp-color-accent); }
+
+/* ---------- Pago mixto (F4-06) ---------- */
+.hoja-pagos { width: min(560px, 94vw); }
+.pagos__total { display: flex; align-items: baseline; gap: 10px; margin: 0 20px 12px; }
+.pagos__total b { font: 700 28px/1 var(--rp-font-display, inherit); }
+.pagos__falta { margin-left: auto; font-weight: 600; color: var(--rp-color-warning-text); }
+.pagos__falta--ok { color: var(--rp-color-success-text); }
+.pago { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 0 20px 12px; padding: 12px 14px; border: 0; border-radius: 14px; background: var(--rp-color-surface); }
+.pago__metodo { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 0; font-weight: 700; float: left; grid-column: 1 / -1; }
+.pago__metodo svg { width: 16px; height: 16px; }
+.pago .rp-field span { font-size: 13px; color: var(--rp-color-label-secondary); }
+.pago .rp-field input { min-height: 42px; }
+.pago__vuelto { color: var(--rp-color-success-text); font-weight: 600; }
+.pago__voucher { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1.4fr 0.8fr; gap: 10px; }
+.pagos__agregar { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 20px; }
+.pagos__agregar svg { width: 14px; height: 14px; }
+/* Un fieldset crece hasta su contenido: en la hoja se ajusta al ancho disponible. */
+.hoja-pagos .rp-sheet__body { overflow-x: hidden; }
+.pago, .pago .rp-field, .pago__voucher { min-width: 0; }
+.pago input { width: 100%; min-width: 0; box-sizing: border-box; }

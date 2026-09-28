@@ -9,7 +9,10 @@ import { useAtajo } from "../components/atajos";
 import { montoDe, TecladoMonto } from "../components/TecladoMonto";
 import { opcionesBillete, vueltoCentavos } from "../lib/billetes";
 import { centavos, verCentavos } from "../lib/dinero";
+import { HojaPagos, type PagoEnvio } from "./PagoMixto";
 import type { Caja } from "./Turno";
+
+const esEfectivoM = (m: MetodoPago) => m.tipo === "EFECTIVO";
 
 const ICONO: Record<string, typeof Wallet> = { tarjeta: CreditCard, transferencia: Landmark, billetera: Smartphone };
 
@@ -43,6 +46,7 @@ export function Cobro({ orden: aCobrar, caja, volver, irATurno, agregar }: { ord
   const [ocupado, setOcupado] = useState(false);
   const [hecho, setHecho] = useState<CobroOut | null>(null);
   const [otroMonto, setOtroMonto] = useState<string | null>(null);
+  const [hojaPago, setHojaPago] = useState<{ inicial?: MetodoPago } | null>(null);
   // Una clave por intento de cobro: un doble toque o un reintento no cobra dos veces.
   const clave = useRef(uuidv7());
 
@@ -62,13 +66,13 @@ export function Cobro({ orden: aCobrar, caja, volver, irATurno, agregar }: { ord
   const otros = config?.metodos.filter((m) => m.tipo !== "EFECTIVO") ?? [];
   const puedeCobrar = !!turno && !!datos && !excedeCF && centavos(total) > 0 && !ocupado && !hecho;
 
-  const cobrar = useCallback(
-    (metodo: MetodoPago | undefined, recibido: string) => {
-      if (!metodo || !caja.cajaId || !datos || ocupado) return;
+  const enviarCobro = useCallback(
+    (pago: { metodoId: string; recibido: string } | { pagos: PagoEnvio[] }) => {
+      if (!caja.cajaId || !datos || ocupado) return;
       setOcupado(true);
       setError(null);
       nodo
-        .cobrar(datos.orden.id, { cajaId: caja.cajaId, metodoId: metodo.id, recibido, consumidorFinal: true, idempotencyKey: clave.current })
+        .cobrar(datos.orden.id, { cajaId: caja.cajaId, consumidorFinal: true, idempotencyKey: clave.current, ...pago })
         .then(setHecho)
         .catch((e) => {
           setOcupado(false);
@@ -78,16 +82,26 @@ export function Cobro({ orden: aCobrar, caja, volver, irATurno, agregar }: { ord
     },
     [caja.cajaId, datos, ocupado],
   );
+  const cobrar = useCallback(
+    (metodo: MetodoPago | undefined, recibido: string) => {
+      if (!metodo) return;
+      // Los métodos con voucher abren el detalle para anotar lote y últimos 4 (Intro cobra).
+      if (!esEfectivoM(metodo) && metodo.pideReferencia && !recibido) setHojaPago({ inicial: metodo });
+      else enviarCobro({ metodoId: metodo.id, recibido });
+    },
+    [enviarCobro],
+  );
 
   const billetes = opcionesBillete(total);
-  const libre = puedeCobrar && otroMonto === null;
+  const libre = puedeCobrar && otroMonto === null && hojaPago === null;
   useAtajo("1", "Cobrar el monto exacto en efectivo", () => cobrar(efectivo, billetes[0]!), "Cobro", libre);
   useAtajo("2", "Cobrar con el segundo billete", () => billetes[1] && cobrar(efectivo, billetes[1]), "Cobro", libre && billetes.length > 1);
   useAtajo("3", "Cobrar con el tercer billete", () => billetes[2] && cobrar(efectivo, billetes[2]), "Cobro", libre && billetes.length > 2);
   useAtajo("4", "Cobrar con el cuarto billete", () => billetes[3] && cobrar(efectivo, billetes[3]), "Cobro", libre && billetes.length > 3);
   useAtajo("o", "Otro monto en efectivo", () => setOtroMonto(""), "Cobro", libre);
+  useAtajo("m", "Pago mixto (varios métodos)", () => setHojaPago({}), "Cobro", libre);
   useAtajo("a", "Agregar platos a la orden", () => datos && agregar?.(datos.orden), "Cobro", !!datos && datos.orden.tipo !== "MESA" && !!agregar && !hecho && otroMonto === null);
-  useAtajo("Escape", hecho ? "Siguiente cliente" : "Volver a las mesas", volver, "Cobro", otroMonto === null);
+  useAtajo("Escape", hecho ? "Siguiente cliente" : "Volver a las mesas", volver, "Cobro", otroMonto === null && hojaPago === null);
   useAtajo("Enter", "Siguiente cliente", volver, "Cobro", !!hecho);
 
   if (hecho) return <Listo out={hecho} conMesa={datos?.orden.tipo === "MESA"} volver={volver} />;
@@ -195,11 +209,28 @@ export function Cobro({ orden: aCobrar, caja, volver, irATurno, agregar }: { ord
                   </button>
                 );
               })}
+              <button className="rp-btn rp-btn--tinted metodo" disabled={!puedeCobrar} onClick={() => setHojaPago({})} data-testid="pago-mixto">
+                Pago mixto <kbd className="tecla">M</kbd>
+              </button>
             </div>
           </>
         )}
       </div>
 
+      {hojaPago && config && (
+        <HojaPagos
+          total={total}
+          metodos={config.metodos}
+          inicial={hojaPago.inicial}
+          ocupado={ocupado}
+          error={error}
+          cerrar={() => {
+            setHojaPago(null);
+            setError(null);
+          }}
+          cobrar={(pagos) => enviarCobro({ pagos })}
+        />
+      )}
       {otroMonto !== null && (
         <OtroMonto
           total={total}
@@ -282,11 +313,18 @@ function Listo({ out, conMesa, volver }: { out: CobroOut; conMesa: boolean; volv
             {formatMoney(verCentavos(vuelto))}
           </p>
           <p className="rp-secondary">
-            Recibido {formatMoney(d.recibido)} · total {formatMoney(d.totales.total)}
+            {d.pagos.length > 1
+              ? `Recibido ${formatMoney(d.recibido)} para ${formatMoney(d.pagos.find((p) => p.tipo === "EFECTIVO")?.monto ?? d.totales.total)} en efectivo`
+              : `Recibido ${formatMoney(d.recibido)} · total ${formatMoney(d.totales.total)}`}
           </p>
         </>
       ) : (
         <p className="cobro__total rp-num">{formatMoney(d.totales.total)}</p>
+      )}
+      {d.pagos.length > 1 && (
+        <p className="rp-secondary rp-num" data-testid="detalle-pagos">
+          {d.pagos.map((p) => `${p.metodo} ${formatMoney(p.monto)}`).join(" · ")}
+        </p>
       )}
       <p className="rp-secondary">
         {d.metodo} · {d.codigo} · {d.mesa} {conMesa ? "libre" : "cobrada"}

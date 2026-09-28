@@ -1,6 +1,6 @@
 // Marco de atajos de teclado (F4-01): cada pantalla registra los suyos y la tecla «?» los muestra.
 // Mientras se escribe en un campo solo responden Escape y las teclas de función.
-import { createContext, type ReactNode, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, type ReactNode, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 export interface Atajo {
   tecla: string; // «F2», «Enter», «/», «?», «Escape», «1»…
@@ -79,12 +79,16 @@ export function AtajosProvider({ children }: { children: ReactNode }) {
   );
 }
 
-/** Registra un atajo mientras el componente está montado. */
+/**
+ * Registra un atajo mientras el componente está montado. Con useLayoutEffect el atajo existe
+ * en el mismo commit en que aparece su elemento: una tecla pulsada justo después de ver el
+ * botón nunca se pierde.
+ */
 export function useAtajo(tecla: string, descripcion: string, accion: () => void, grupo = "General", activo = true) {
   const r = useContext(Ctx);
   const fn = useRef(accion);
   fn.current = accion;
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!r || !activo) return;
     return r.registrar({ tecla, descripcion, grupo, accion: () => fn.current() });
   }, [r, tecla, descripcion, grupo, activo]);

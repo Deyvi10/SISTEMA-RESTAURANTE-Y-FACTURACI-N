@@ -21,10 +21,17 @@ type DocumentoVenta struct {
 	IVA        money.Money
 	Propina    money.Money
 	Total      money.Money
-	Metodo     string
+	Pagos      []PagoTicket
 	Recibido   money.Money // efectivo entregado (cero si no aplica)
 	Vuelto     money.Money
 	AbrirCajon bool // pulso al cajón antes de imprimir: se abre al instante
+}
+
+// PagoTicket es una línea de la forma de pago (un cobro puede combinar métodos).
+type PagoTicket struct {
+	Metodo   string
+	Monto    money.Money
+	Ultimos4 string
 }
 
 // NumeroInterno formatea el número del documento interno: INT-000123.
@@ -54,7 +61,13 @@ func ImprimirDocumentoVenta(p Paper, d DocumentoVenta) []byte {
 	}
 	b.Bold(true).Size(1, 2).Columns("TOTAL", "$"+d.Total.String()).Size(1, 1).Bold(false)
 	b.Separator('-')
-	b.Columns(d.Metodo, "$"+d.Total.String())
+	for _, p := range d.Pagos {
+		nombre := p.Metodo
+		if p.Ultimos4 != "" {
+			nombre += " ****" + p.Ultimos4
+		}
+		b.Columns(nombre, "$"+p.Monto.String())
+	}
 	if !d.Recibido.IsZero() {
 		b.Columns("Recibido", "$"+d.Recibido.String())
 		b.Bold(true).Columns("Vuelto", "$"+d.Vuelto.String()).Bold(false)

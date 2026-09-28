@@ -172,3 +172,71 @@ func TestCobroP95(t *testing.T) {
 		t.Fatalf("p95 = %s", p95)
 	}
 }
+
+// F4-06: una cuenta pagada con varios métodos ($10 en efectivo + el resto con tarjeta).
+func TestPagoMixto(t *testing.T) {
+	c := nuevaCaja(t, nocheDel25)
+	var tarjeta string
+	if err := c.a.Store.Read().QueryRow(`SELECT id FROM metodos_pago WHERE tipo = 'TARJETA_CREDITO'`).Scan(&tarjeta); err != nil {
+		t.Fatal(err)
+	}
+	efectivo := c.efectivo.String()
+	tel := c.emparejar(t, "Tablet")
+	tel.entrar(c.carlos, pinCarlos)
+	c.pos.req("POST", "/v1/turnos", map[string]any{"cajaId": c.caja1, "fondoInicial": "0"})
+	orden, total := c.ordenEnMesa(t, tel, "orden-mixta", c.mesa1, plato(c.cerveza, "2"), plato(c.ceviche, "1")) // 20.11
+	pagar := func(clave string, pagos ...map[string]any) (int, CobroOut, map[string]any) {
+		st, raw := c.pos.req("POST", "/v1/ordenes/"+orden+"/cobrar", map[string]any{"cajaId": c.caja1, "consumidorFinal": true, "idempotencyKey": clave, "pagos": pagos})
+		var out CobroOut
+		b, _ := json.Marshal(raw)
+		_ = json.Unmarshal(b, &out)
+		return st, out, raw
+	}
+	ef := func(monto, recibido string) map[string]any {
+		return map[string]any{"metodoId": efectivo, "monto": monto, "recibido": recibido}
+	}
+	tj := func(monto, ultimos4 string) map[string]any {
+		return map[string]any{"metodoId": tarjeta, "monto": monto, "ultimos4": ultimos4, "lote": "L-017", "referencia": "123456"}
+	}
+	for nombre, pagos := range map[string][]map[string]any{
+		"no suman el total":       {ef("10", ""), tj("10", "")},
+		"se pasan del total":      {ef("10", ""), tj("10.12", "")},
+		"dos pagos en efectivo":   {ef("10", ""), ef("10.11", "")},
+		"monto en cero":           {ef("20.11", ""), tj("0", "")},
+		"últimos 4 inválidos":     {ef("10", ""), tj("10.11", "12a4")},
+		"efectivo que no alcanza": {ef("10", "5"), tj("10.11", "")},
+		"más de dos decimales":    {ef("10.005", ""), tj("10.105", "")},
+	} {
+		if st, _, raw := pagar("mixto-malo-"+strings.ReplaceAll(nombre, " ", "-"), pagos...); st != 422 {
+			t.Fatalf("%s: %d %v", nombre, st, raw)
+		}
+	}
+
+	st, out, raw := pagar("mixto-bueno", ef("10", "20"), tj("10.11", "4821"))
+	if st != 200 {
+		t.Fatalf("pago mixto: %d %v", st, raw)
+	}
+	d := out.Documento
+	if d.Metodo != "Efectivo + Tarjeta crédito" || len(d.Pagos) != 2 || d.Recibido != "20.00" || d.Vuelto != "10.00" || !d.AbreCajon || d.Totales.Total != total.String() {
+		t.Fatalf("documento: %+v", d)
+	}
+	if p := d.Pagos[1]; p.CodigoSRI != "19" || p.Ultimos4 != "4821" || p.Lote != "L-017" || p.Referencia != "123456" || p.Monto != "10.11" {
+		t.Fatalf("pago con tarjeta: %+v", p)
+	}
+	// Dos filas en pagos, con el voucher para el cuadre.
+	var n int
+	var ultimos string
+	_ = c.a.Store.Read().QueryRow(`SELECT count(*), max(coalesce(ultimos4, '')) FROM pagos WHERE documento_id = ?`, d.ID.String()).Scan(&n, &ultimos)
+	if n != 2 || ultimos != "4821" {
+		t.Fatalf("pagos guardados: %d %q", n, ultimos)
+	}
+	esperar(t, func() bool {
+		return slices.ContainsFunc(c.cocina.Textos(), func(s string) bool { return strings.Contains(s, "Tarjeta crédito ****4821") })
+	})
+
+	// El Cierre Z separa lo cobrado por método: $10 en efectivo y $10.11 en tarjeta.
+	st, z, raw := c.cerrar("cierre-mixto", []cierrez.Conteo{{Clave: "B10", Cantidad: 1}}, map[string]any{"metodoId": tarjeta, "monto": "10.11"})
+	if st != 200 || z.Cierre.Resultado != cierrez.Cuadrado {
+		t.Fatalf("cierre: %d %v", st, raw)
+	}
+}

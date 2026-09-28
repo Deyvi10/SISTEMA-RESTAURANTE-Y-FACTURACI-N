@@ -29,15 +29,42 @@ const (
 	consumidorFinalNombre = "CONSUMIDOR FINAL"
 )
 
+// PagoIn es una parte del cobro con un método (RF-04-04). Monto es lo que se aplica a la
+// cuenta; en efectivo, Recibido es lo que entregó el cliente (el vuelto sale de ahí).
+type PagoIn struct {
+	MetodoID   ids.ID `json:"metodoId"`
+	Monto      string `json:"monto"`    // vacío en un cobro de un solo método = el total
+	Recibido   string `json:"recibido"` // solo efectivo; vacío = exacto
+	Referencia string `json:"referencia"`
+	Lote       string `json:"lote"`
+	Ultimos4   string `json:"ultimos4"`
+}
+
 type CobrarIn struct {
-	CajaID          ids.ID `json:"cajaId"`
-	MetodoID        ids.ID `json:"metodoId"`
-	Recibido        string `json:"recibido"` // efectivo entregado; vacío = exacto
-	ConsumidorFinal bool   `json:"consumidorFinal"`
-	Referencia      string `json:"referencia"`
-	Lote            string `json:"lote"`
-	Ultimos4        string `json:"ultimos4"`
-	IdempotencyKey  string `json:"idempotencyKey"`
+	CajaID          ids.ID   `json:"cajaId"`
+	Pagos           []PagoIn `json:"pagos"` // pago mixto: varios métodos que suman el total
+	ConsumidorFinal bool     `json:"consumidorFinal"`
+	IdempotencyKey  string   `json:"idempotencyKey"`
+	// Cobro de un solo método (el toque en un billete): equivale a Pagos con un elemento.
+	MetodoID   ids.ID `json:"metodoId"`
+	Recibido   string `json:"recibido"`
+	Referencia string `json:"referencia"`
+	Lote       string `json:"lote"`
+	Ultimos4   string `json:"ultimos4"`
+}
+
+// PagoDoc es un pago tal como quedó en el documento.
+type PagoDoc struct {
+	MetodoID   ids.ID `json:"metodoId"`
+	Metodo     string `json:"metodo"`
+	Tipo       string `json:"tipo"`
+	CodigoSRI  string `json:"codigoSri"`
+	Monto      string `json:"monto"`
+	Recibido   string `json:"recibido,omitempty"`
+	Vuelto     string `json:"vuelto,omitempty"`
+	Referencia string `json:"referencia,omitempty"`
+	Lote       string `json:"lote,omitempty"`
+	Ultimos4   string `json:"ultimos4,omitempty"`
 }
 
 // DocumentoVenta es lo que devuelve el cobro: el documento emitido y el vuelto.
@@ -50,9 +77,9 @@ type DocumentoVenta struct {
 	Mesa      string    `json:"mesa"`
 	Comprador string    `json:"comprador"`
 	Totales   Totales   `json:"totales"`
-	Metodo    string    `json:"metodo"`
-	MetodoID  ids.ID    `json:"metodoId"`
-	Recibido  string    `json:"recibido"`
+	Metodo    string    `json:"metodo"` // «Efectivo» o «Efectivo + Tarjeta crédito»
+	Pagos     []PagoDoc `json:"pagos"`
+	Recibido  string    `json:"recibido"` // efectivo entregado (0 si no hubo efectivo)
 	Vuelto    string    `json:"vuelto"`
 	AbreCajon bool      `json:"abreCajon"`
 	Cajero    string    `json:"cajero"`
@@ -91,17 +118,38 @@ func (a *App) Cobrar(ctx context.Context, u Usuario, orden ids.ID, in CobrarIn) 
 	if !in.ConsumidorFinal {
 		return out, invalido("Por ahora solo se cobra a consumidor final; los datos del comprador llegan con la facturación (F4-07).")
 	}
-	in.Referencia, in.Lote, in.Ultimos4 = recortar(in.Referencia, 40), recortar(in.Lote, 20), strings.TrimSpace(in.Ultimos4)
-	if in.Ultimos4 != "" && !ultimos4Re.MatchString(in.Ultimos4) {
-		return out, invalido("Los últimos 4 dígitos de la tarjeta son 4 números.")
+	unico := len(in.Pagos) == 0
+	if unico {
+		in.Pagos = []PagoIn{{MetodoID: in.MetodoID, Recibido: in.Recibido, Referencia: in.Referencia, Lote: in.Lote, Ultimos4: in.Ultimos4}}
 	}
-	var recibido money.Money
-	if strings.TrimSpace(in.Recibido) != "" {
-		m, err := montoNoNegativo(in.Recibido, "El monto recibido")
-		if err != nil {
-			return out, err
+	if len(in.Pagos) > 10 {
+		return out, invalido("Un cobro admite hasta 10 pagos.")
+	}
+	pagos := make([]pagoValido, len(in.Pagos))
+	for i, p := range in.Pagos {
+		v := pagoValido{PagoIn: p}
+		v.Referencia, v.Lote, v.Ultimos4 = recortar(p.Referencia, 40), recortar(p.Lote, 20), strings.TrimSpace(p.Ultimos4)
+		if v.Ultimos4 != "" && !ultimos4Re.MatchString(v.Ultimos4) {
+			return out, invalido("Los últimos 4 dígitos de la tarjeta son 4 números.")
 		}
-		recibido = m
+		if strings.TrimSpace(p.Recibido) != "" {
+			m, err := montoNoNegativo(p.Recibido, "El monto recibido")
+			if err != nil {
+				return out, err
+			}
+			v.recibido = m
+		}
+		if !unico {
+			m, err := montoNoNegativo(p.Monto, "El monto de cada pago")
+			if err != nil {
+				return out, err
+			}
+			if m.IsZero() {
+				return out, invalido("Cada pago debe ser mayor que cero.")
+			}
+			v.monto = m
+		}
+		pagos[i] = v
 	}
 	now, loc := a.Clock.Now(), a.zonaLocal(ctx)
 	var despertar []ids.ID
@@ -147,39 +195,22 @@ func (a *App) Cobrar(ctx context.Context, u Usuario, orden ids.ID, in CobrarIn) 
 			return problema(http.StatusUnprocessableEntity, "CONSUMIDOR_FINAL_EXCEDIDO",
 				"El total supera $"+max.String()+", el máximo para consumidor final. Hacen falta los datos del comprador.")
 		}
-		var metodo, tipo string
-		var abreCajon bool
-		err = tx.QueryRowContext(ctx, `SELECT nombre, tipo, abre_cajon FROM metodos_pago WHERE id = ? AND deleted_at IS NULL AND activo = 1`, in.MetodoID.String()).
-			Scan(&metodo, &tipo, &abreCajon)
-		if errors.Is(err, sql.ErrNoRows) {
-			return invalido("Ese método de pago no existe o está desactivado.")
-		}
+		docPagos, recibido, vuelto, abreCajon, err := resolverPagos(ctx, tx, pagos, total, unico)
 		if err != nil {
 			return err
 		}
-		// Efectivo: lo recibido cubre el total y la diferencia es el vuelto. Otros: el total exacto.
-		vuelto := money.Money{}
-		if tipo == "EFECTIVO" {
-			if recibido.IsZero() {
-				recibido = total
-			}
-			if recibido.LessThan(total) {
-				return invalido("Lo recibido ($" + recibido.String() + ") no alcanza para el total ($" + total.String() + ").")
-			}
-			vuelto = recibido.Sub(total)
-		} else {
-			if !recibido.IsZero() && !recibido.Equal(total) {
-				return invalido("Con " + metodo + " se cobra el total exacto. Para combinar métodos usa el pago mixto.")
-			}
-			recibido = money.Money{}
+		nombres := make([]string, len(docPagos))
+		for i, p := range docPagos {
+			nombres[i] = p.Metodo
 		}
+		metodo := strings.Join(nombres, " + ")
 		var numero int
 		if err := tx.QueryRowContext(ctx, `INSERT INTO contadores (clave, valor) VALUES ('documento:INTERNO', 1)
 			ON CONFLICT (clave) DO UPDATE SET valor = valor + 1 RETURNING valor`).Scan(&numero); err != nil {
 			return err
 		}
 		doc := DocumentoVenta{ID: ids.New(), Tipo: "INTERNO", Numero: numero, Codigo: escpos.NumeroInterno(numero), OrdenID: o.ID, Mesa: o.Mesa,
-			Comprador: consumidorFinalNombre, Totales: tot, Metodo: metodo, MetodoID: in.MetodoID, Recibido: recibido.String(), Vuelto: vuelto.String(),
+			Comprador: consumidorFinalNombre, Totales: tot, Metodo: metodo, Pagos: docPagos, Recibido: recibido.String(), Vuelto: vuelto.String(),
 			AbreCajon: abreCajon, Cajero: u.Nombre, TurnoID: t.ID, EmitidoAt: now}
 		raw, err := json.Marshal(doc)
 		if err != nil {
@@ -192,14 +223,12 @@ func (a *App) Cobrar(ctx context.Context, u Usuario, orden ids.ID, in CobrarIn) 
 			base.String(), iva.String(), propina.String(), total.String(), string(raw), in.IdempotencyKey, u.ID.String(), ts); err != nil {
 			return err
 		}
-		var rec, vue any
-		if tipo == "EFECTIVO" {
-			rec, vue = recibido.String(), vuelto.String()
-		}
-		if _, err := tx.ExecContext(ctx, `INSERT INTO pagos (id, orden_id, turno_id, metodo_pago_id, monto, recibido, vuelto, referencia, lote, ultimos4, documento_id, created_at)
-			VALUES (?, ?, ?, ?, ?, ?, ?, nullif(?, ''), nullif(?, ''), nullif(?, ''), ?, ?)`,
-			ids.New().String(), o.ID.String(), t.ID.String(), in.MetodoID.String(), total.String(), rec, vue, in.Referencia, in.Lote, in.Ultimos4, doc.ID.String(), ts); err != nil {
-			return err
+		for _, p := range docPagos {
+			if _, err := tx.ExecContext(ctx, `INSERT INTO pagos (id, orden_id, turno_id, metodo_pago_id, monto, recibido, vuelto, referencia, lote, ultimos4, documento_id, created_at)
+				VALUES (?, ?, ?, ?, ?, nullif(?, ''), nullif(?, ''), nullif(?, ''), nullif(?, ''), nullif(?, ''), ?, ?)`,
+				ids.New().String(), o.ID.String(), t.ID.String(), p.MetodoID.String(), p.Monto, p.Recibido, p.Vuelto, p.Referencia, p.Lote, p.Ultimos4, doc.ID.String(), ts); err != nil {
+				return err
+			}
 		}
 		// La orden se cierra y la mesa queda libre; se suelta cualquier bloqueo vencido.
 		if _, err := tx.ExecContext(ctx, `UPDATE ordenes SET estado = 'CERRADA', cerrada_at = ?, version = version + 1 WHERE id = ?`, ts, o.ID.String()); err != nil {
@@ -233,9 +262,9 @@ func (a *App) Cobrar(ctx context.Context, u Usuario, orden ids.ID, in CobrarIn) 
 		var local string
 		_ = tx.QueryRowContext(ctx, `SELECT nombre FROM locales LIMIT 1`).Scan(&local)
 		ticket := escpos.DocumentoVenta{Local: local, Numero: numero, Hora: now.In(loc), Mesa: o.Mesa, Cajero: u.Nombre, Comprador: consumidorFinalNombre,
-			Lineas: lineasCuenta(o.Lineas), Subtotal: base, IVA: iva, Propina: propina, Total: total, Metodo: metodo, AbrirCajon: abreCajon}
-		if tipo == "EFECTIVO" {
-			ticket.Recibido, ticket.Vuelto = recibido, vuelto
+			Lineas: lineasCuenta(o.Lineas), Subtotal: base, IVA: iva, Propina: propina, Total: total, Recibido: recibido, Vuelto: vuelto}
+		for _, p := range docPagos {
+			ticket.Pagos = append(ticket.Pagos, escpos.PagoTicket{Metodo: p.Metodo, Monto: money.MustParse(p.Monto), Ultimos4: p.Ultimos4})
 		}
 		out.Impresoras = []string{}
 		oid := o.ID.String()
@@ -265,4 +294,60 @@ func (a *App) Cobrar(ctx context.Context, u Usuario, orden ids.ID, in CobrarIn) 
 	}
 	a.notificarPush()
 	return out, nil
+}
+
+type pagoValido struct {
+	PagoIn
+	monto, recibido money.Money
+}
+
+// resolverPagos valida el pago (simple o mixto) contra el total: métodos activos, un solo
+// pago en efectivo (el único que da vuelto) y montos que suman exactamente el total.
+func resolverPagos(ctx context.Context, tx *store.Tx, pagos []pagoValido, total money.Money, unico bool) (out []PagoDoc, recibido, vuelto money.Money, abreCajon bool, err error) {
+	suma := money.Money{}
+	efectivos := 0
+	for i := range pagos {
+		p := &pagos[i]
+		var d PagoDoc
+		var abre bool
+		err := tx.QueryRowContext(ctx, `SELECT nombre, tipo, codigo_forma_pago_sri, abre_cajon FROM metodos_pago WHERE id = ? AND deleted_at IS NULL AND activo = 1`, p.MetodoID.String()).
+			Scan(&d.Metodo, &d.Tipo, &d.CodigoSRI, &abre)
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, money.Money{}, money.Money{}, false, invalido("Ese método de pago no existe o está desactivado.")
+		}
+		if err != nil {
+			return nil, money.Money{}, money.Money{}, false, err
+		}
+		if unico {
+			p.monto = total
+		}
+		d.MetodoID, d.Monto, d.Referencia, d.Lote, d.Ultimos4 = p.MetodoID, p.monto.String(), p.Referencia, p.Lote, p.Ultimos4
+		if d.Tipo == "EFECTIVO" {
+			efectivos++
+			if p.recibido.IsZero() {
+				p.recibido = p.monto
+			}
+			if p.recibido.LessThan(p.monto) {
+				falta := "el total ($" + total.String() + ")"
+				if !unico {
+					falta = "su parte en efectivo ($" + p.monto.String() + ")"
+				}
+				return nil, money.Money{}, money.Money{}, false, invalido("Lo recibido ($" + p.recibido.String() + ") no alcanza para " + falta + ".")
+			}
+			recibido, vuelto = p.recibido, p.recibido.Sub(p.monto)
+			d.Recibido, d.Vuelto = recibido.String(), vuelto.String()
+		} else if !p.recibido.IsZero() && !p.recibido.Equal(p.monto) {
+			return nil, money.Money{}, money.Money{}, false, invalido("Con " + d.Metodo + " se cobra el monto exacto. Para combinar métodos usa el pago mixto.")
+		}
+		abreCajon = abreCajon || abre
+		suma = suma.Add(p.monto)
+		out = append(out, d)
+	}
+	if efectivos > 1 {
+		return nil, money.Money{}, money.Money{}, false, invalido("Registra el efectivo en un solo pago.")
+	}
+	if !suma.Equal(total) {
+		return nil, money.Money{}, money.Money{}, false, invalido("Los pagos suman $" + suma.String() + " y el total es $" + total.String() + ".")
+	}
+	return out, recibido, vuelto, abreCajon, nil
 }

@@ -314,12 +314,23 @@ export interface Totales {
   total: string;
 }
 
+export interface PagoDocumento {
+  metodoId: string;
+  metodo: string;
+  tipo: string;
+  monto: string;
+  recibido?: string;
+  vuelto?: string;
+  ultimos4?: string;
+}
+
 export interface DocumentoVenta {
   id: string;
   codigo: string; // INT-000123
   mesa: string;
   totales: Totales;
-  metodo: string;
+  metodo: string; // «Efectivo + Tarjeta crédito»
+  pagos: PagoDocumento[];
   recibido: string;
   vuelto: string;
   abreCajon: boolean;
@@ -384,7 +395,17 @@ export const nodo = {
   enviarOrden: (b: { idempotencyKey: string; ordenId: string; tipo: TipoOrden; etiqueta: string; lineas: LineaNueva[] }) =>
     api<{ orden: Orden; comandaNumero: number }>("POST", "/v1/ordenes/enviar", b),
   orden: (id: string) => api<{ orden: Orden; totales: Totales }>("GET", `/v1/ordenes/${id}`),
-  cobrar: (ordenId: string, b: { cajaId: string; metodoId: string; recibido: string; consumidorFinal: boolean; idempotencyKey: string }) =>
+  cobrar: (
+    ordenId: string,
+    b: {
+      cajaId: string;
+      consumidorFinal: boolean;
+      idempotencyKey: string;
+      metodoId?: string;
+      recibido?: string;
+      pagos?: { metodoId: string; monto: string; recibido: string; referencia: string; lote: string; ultimos4: string }[];
+    },
+  ) =>
     api<CobroOut>("POST", `/v1/ordenes/${ordenId}/cobrar`, b),
   movimientos: (turnoId: string) => api<Movimiento[]>("GET", `/v1/turnos/${turnoId}/movimientos`),
 };

@@ -6,14 +6,13 @@ import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react"
 import { uuidv7 } from "../api/identidad";
 import { ApiError, type CierreOut, type ConfigCaja, type Denominacion, type MetodoPago, nodo, type ResultadoCierre } from "../api/nodo";
 import { useAtajo } from "../components/atajos";
-import { centavos, verCentavos } from "../lib/dinero";
+import { centavos, montoValido, verCentavos } from "../lib/dinero";
 
 /** Total del efectivo contado, en texto decimal. */
 export function totalContado(dens: Denominacion[], conteo: Record<string, number>): string {
   return verCentavos(dens.reduce((t, d) => t + centavos(d.valor) * (conteo[d.clave] ?? 0), 0));
 }
 
-export const montoValido = (s: string) => /^\d{1,6}(\.\d{1,2})?$/.test(s.trim());
 
 const RESULTADO: Record<ResultadoCierre, { titulo: string; tono: string; Icono: typeof CircleCheck }> = {
   CUADRADO: { titulo: "Cuadrado", tono: "verde", Icono: CircleCheck },

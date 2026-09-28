@@ -9,3 +9,6 @@ export function centavos(valor: string): number {
 export function verCentavos(c: number): string {
   return `${Math.floor(c / 100)}.${String(c % 100).padStart(2, "0")}`;
 }
+
+/** Importe escrito por el cajero: hasta 6 enteros y 2 decimales, sin signo. */
+export const montoValido = (s: string) => /^\d{1,6}(\.\d{1,2})?$/.test(s.trim());

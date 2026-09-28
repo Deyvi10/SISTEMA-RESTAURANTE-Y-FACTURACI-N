@@ -20,11 +20,10 @@ describe("¿Quién cobra?", () => {
         </AtajosProvider>
       </SesionProvider>,
     );
-    // Margen amplio: con toda la suite en paralelo el primer render puede pasar de 1 s.
-    await screen.findByText("Luis P.", undefined, { timeout: 5000 });
+    await screen.findByText("Luis P.");
     await act(async () => {
       fireEvent.keyDown(window, { key: "1" });
     });
-    expect(await screen.findByText("Hola, Luis", undefined, { timeout: 5000 })).toBeInTheDocument();
+    expect(await screen.findByText("Hola, Luis")).toBeInTheDocument();
   });
 });

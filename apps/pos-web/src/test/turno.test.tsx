@@ -3,8 +3,8 @@ import { useState } from "react";
 import { describe, expect, it } from "vitest";
 import { montoDe, TecladoMonto, teclearMonto, verMonto } from "../components/TecladoMonto";
 import { AtajosProvider } from "../components/atajos";
-import { centavos } from "../lib/dinero";
-import { CierreTurno, montoValido, totalContado } from "../pages/CierreTurno";
+import { centavos, montoValido } from "../lib/dinero";
+import { CierreTurno, totalContado } from "../pages/CierreTurno";
 import { cajaDeEstaPC, verFecha } from "../pages/Turno";
 
 const escribir = (teclas: string[]) => teclas.reduce(teclearMonto, "");

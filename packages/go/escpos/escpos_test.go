@@ -266,13 +266,19 @@ func TestGoldenDocumentoVenta(t *testing.T) {
 		Local: "Cevichería Don Pepe", Numero: 123, Hora: hora, Mesa: "Mesa 4", Cajero: "Luis P.", Comprador: "CONSUMIDOR FINAL",
 		Lineas:   []LineaCuenta{{Cantidad: "1", Producto: "Ceviche mixto", Total: money.MustParse("15.00")}, {Cantidad: "2", Producto: "Cerveza", Total: money.MustParse("5.00")}},
 		Subtotal: money.MustParse("17.39"), IVA: money.MustParse("2.61"), Propina: money.MustParse("1.74"), Total: money.MustParse("21.74"),
-		Metodo: "Efectivo", Recibido: money.MustParse("50"), Vuelto: money.MustParse("28.26"), AbrirCajon: true,
+		Pagos:    []PagoTicket{{Metodo: "Efectivo", Monto: money.MustParse("21.74")}},
+		Recibido: money.MustParse("50"), Vuelto: money.MustParse("28.26"), AbrirCajon: true,
 	}
 	raw := ImprimirDocumentoVenta(Paper80, d)
 	if !bytes.HasPrefix(raw, New(Paper80).OpenDrawer().Bytes()) {
 		t.Fatal("el pulso del cajón debe ir antes que el texto")
 	}
 	golden(t, "venta-80", Decode(raw).Text())
-	d.AbrirCajon, d.Metodo, d.Recibido, d.Vuelto = false, "Tarjeta crédito", money.Money{}, money.Money{}
+	d.AbrirCajon, d.Recibido, d.Vuelto = false, money.Money{}, money.Money{}
+	d.Pagos = []PagoTicket{{Metodo: "Tarjeta crédito", Monto: money.MustParse("21.74")}}
 	golden(t, "venta-tarjeta-58", Decode(ImprimirDocumentoVenta(Paper58, d)).Text())
+	// Pago mixto: $10 en efectivo (entregó $20) y el resto con tarjeta.
+	d.Pagos = []PagoTicket{{Metodo: "Efectivo", Monto: money.MustParse("10")}, {Metodo: "Tarjeta débito", Monto: money.MustParse("11.74"), Ultimos4: "4821"}}
+	d.Recibido, d.Vuelto, d.AbrirCajon = money.MustParse("20"), money.MustParse("10"), true
+	golden(t, "venta-mixta-80", Decode(ImprimirDocumentoVenta(Paper80, d)).Text())
 }
