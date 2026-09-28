@@ -175,9 +175,16 @@ export interface Denominacion {
   etiqueta: string;
 }
 
+export interface MotivoDescuento {
+  id: string;
+  nombre: string;
+  tipo: "DESCUENTO" | "CORTESIA";
+}
+
 export interface ConfigCaja {
   cajas: CajaInfo[];
   metodos: MetodoPago[];
+  motivos?: MotivoDescuento[];
   consumidorFinalMaximo: string;
   denominaciones: Denominacion[];
 }
@@ -315,6 +322,21 @@ export interface Totales {
   propinaActiva?: boolean; // el local cobra servicio
   propinaPorcentaje?: string;
   propinaRetirada?: boolean; // el cliente lo rechazó y el cajero lo quitó
+  descuento?: string; // total descontado
+  descuentos?: DescuentoAplicado[];
+  lineas?: Record<string, string>; // importe final de cada línea tras descuentos
+}
+
+/** Descuento vigente de una línea (lineaId) o de la cuenta (lineaId nulo). */
+export interface DescuentoAplicado {
+  id: string;
+  lineaId: string | null;
+  tipo: "PORCENTAJE" | "MONTO";
+  valor: string;
+  cortesia: boolean;
+  motivo: string;
+  usuarioNombre: string;
+  monto: string;
 }
 
 export interface ClienteRegistrado {
@@ -423,6 +445,9 @@ export const nodo = {
     api<{ orden: Orden; comandaNumero: number }>("POST", "/v1/ordenes/enviar", b),
   buscarCliente: (identificacion: string, tipo = "") =>
     api<BusquedaCliente>("GET", `/v1/clientes/buscar?${new URLSearchParams({ identificacion, tipo })}`),
+  descontar: (ordenId: string, b: { lineaId: string | null; tipo: string; valor: string; cortesia: boolean; motivoId: string; autorizacion: string }) =>
+    api<Totales>("POST", `/v1/ordenes/${ordenId}/descuentos`, b),
+  quitarDescuento: (ordenId: string, id: string) => api<Totales>("DELETE", `/v1/ordenes/${ordenId}/descuentos/${id}`),
   propina: (ordenId: string, retirar: boolean, motivo = "") => api<Totales>("POST", `/v1/ordenes/${ordenId}/propina`, { retirar, motivo }),
   orden: (id: string) => api<{ orden: Orden; totales: Totales }>("GET", `/v1/ordenes/${id}`),
   cobrar: (

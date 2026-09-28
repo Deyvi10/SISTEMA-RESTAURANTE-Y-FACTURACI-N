@@ -177,6 +177,7 @@ func Routes(d Deps) []Route {
 		{"PUT", "/v1/usuarios/{id}", per, update(pe.Actualizar)},
 		{"GET", "/v1/usuarios/{id}/permisos", per, get(pe.Permisos)},
 		{"PUT", "/v1/usuarios/{id}/permisos", per, update(pe.CambiarPermiso)},
+		{"PUT", "/v1/usuarios/{id}/limite-descuento", per, update(pe.CambiarLimiteDescuento)},
 		{"PUT", "/v1/usuarios/{id}/pin", per, updateNoContent(func(ctx context.Context, p auth.Principal, id idT, in struct {
 			PIN string `json:"pin"`
 		},

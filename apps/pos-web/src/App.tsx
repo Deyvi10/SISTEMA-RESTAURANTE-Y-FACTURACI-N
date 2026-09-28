@@ -87,6 +87,7 @@ function Caja() {
             caja={caja}
             volver={alSalon}
             irATurno={() => setSeccion("turno")}
+            usuarioId={usuario?.id}
             agregar={(o) => {
               setVenta({ existente: { ordenId: o.id, tipo: o.tipo as OrdenExistente["tipo"], etiqueta: o.etiqueta, nombre: o.mesa } });
               setSeccion("venta");

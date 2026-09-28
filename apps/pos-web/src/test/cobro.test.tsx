@@ -1,9 +1,10 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { type EstadoCaja, type Mesa, nodo } from "../api/nodo";
+import { ApiError, type EstadoCaja, type Mesa, nodo } from "../api/nodo";
 import { AtajosProvider } from "../components/atajos";
 import { opcionesBillete, vueltoCentavos } from "../lib/billetes";
 import { Cobro, porcentaje } from "../pages/Cobro";
+import { vistaPrevia } from "../pages/Descuento";
 import { aEnvio, type FilaPago, problemaPagos, restante } from "../pages/PagoMixto";
 import type { Caja } from "../pages/Turno";
 
@@ -160,5 +161,84 @@ describe("servicio (propina legal)", () => {
     await waitFor(() => expect(screen.getByTestId("total")).toHaveTextContent("$18.50"));
     expect(screen.getByTestId("billete-18.50")).toBeInTheDocument();
     expect(screen.getByTestId("servicio")).toHaveTextContent("Reponer");
+  });
+});
+
+describe("descuentos en el cobro", () => {
+  it("vista previa con la misma regla que el nodo", () => {
+    expect(vistaPrevia("PORCENTAJE", "10", "18.50")).toBe(185);
+    expect(vistaPrevia("PORCENTAJE", "12.5", "10.00")).toBe(125);
+    expect(vistaPrevia("PORCENTAJE", "15", "18.50")).toBe(278); // 2.775 → 2.78
+    expect(vistaPrevia("MONTO", "30", "18.50")).toBe(1850); // nunca más que el importe
+    expect(vistaPrevia("CORTESIA", "", "6.00")).toBe(600);
+  });
+
+  it("aplica un 10 % a la cuenta con motivo, lo muestra y lo quita", async () => {
+    const base = { subtotal: "16.09", iva: "2.41", propina: "0.00", total: "18.50", descuento: "0.00", descuentos: [] };
+    const con = { ...base, subtotal: "14.48", iva: "2.17", total: "16.65", descuento: "1.85",
+      descuentos: [{ id: "d1", lineaId: null, tipo: "PORCENTAJE" as const, valor: "10", cortesia: false, motivo: "Cliente frecuente", usuarioNombre: "Luis P.", monto: "1.85" }] };
+    const lineas = [{ id: "l1", producto: "Cerveza", cantidad: "2", modificadores: [], estado: "ENVIADA", total: "6.00" }, { id: "l2", producto: "Ceviche", cantidad: "1", modificadores: [], estado: "ENVIADA", total: "12.50" }];
+    vi.spyOn(nodo, "orden").mockResolvedValue({ orden: { ...orden, lineas }, totales: base });
+    const descontar = vi.spyOn(nodo, "descontar").mockResolvedValue(con);
+    const quitar = vi.spyOn(nodo, "quitarDescuento").mockResolvedValue(base);
+    render(
+      <AtajosProvider>
+        <Cobro orden={{ ordenId: "o1", nombre: "Mesa 4" }} caja={{ ...caja(true), config: { ...caja(true).config!, motivos: [{ id: "m1", nombre: "Cliente frecuente", tipo: "DESCUENTO" }, { id: "m2", nombre: "Invitación", tipo: "CORTESIA" }] } }} volver={() => {}} irATurno={() => {}} />
+      </AtajosProvider>,
+    );
+    await waitFor(() => expect(screen.getByTestId("total")).toHaveTextContent("$18.50"));
+    fireEvent.keyDown(window, { key: "d" });
+    await act(async () => {
+      for (const k of ["1", "0"]) fireEvent.keyDown(window, { key: k });
+    });
+    expect(screen.getByTestId("previa")).toHaveTextContent("Descuenta $1.85 de $18.50");
+    expect(screen.queryByRole("button", { name: "Invitación" })).not.toBeInTheDocument(); // es de cortesía
+    fireEvent.click(screen.getByRole("button", { name: "Cliente frecuente" }));
+    fireEvent.click(screen.getByTestId("aplicar-descuento"));
+    expect(descontar).toHaveBeenCalledWith("o1", { lineaId: null, tipo: "PORCENTAJE", valor: "10", cortesia: false, motivoId: "m1", autorizacion: "" });
+    await waitFor(() => expect(screen.getByTestId("total")).toHaveTextContent("$16.65"));
+    expect(screen.getByTestId("total-descuento")).toHaveTextContent("−$1.85");
+    expect(screen.getByTestId("chip-descuento")).toHaveTextContent("10 % −$1.85 · Cliente frecuente (toda la cuenta)");
+    fireEvent.click(screen.getByRole("button", { name: /Quitar 10 %/ }));
+    expect(quitar).toHaveBeenCalledWith("o1", "d1");
+    await waitFor(() => expect(screen.getByTestId("total")).toHaveTextContent("$18.50"));
+  });
+
+  it("si pasa el límite pide un supervisor", async () => {
+    const base = { subtotal: "16.09", iva: "2.41", propina: "0.00", total: "18.50" };
+    vi.spyOn(nodo, "orden").mockResolvedValue({ orden, totales: base });
+    vi.spyOn(nodo, "descontar").mockRejectedValue(new ApiError(403, "REQUIERE_SUPERVISOR", "Necesita autorización."));
+    vi.spyOn(nodo, "personal").mockResolvedValue([{ id: "s1", nombre: "Sofía A.", rol: "ADMIN", avatarUrl: null, permisos: [] }]);
+    render(
+      <AtajosProvider>
+        <Cobro orden={{ ordenId: "o1", nombre: "Mesa 4" }} caja={{ ...caja(true), config: { ...caja(true).config!, motivos: [{ id: "m1", nombre: "Cliente frecuente", tipo: "DESCUENTO" }] } }} volver={() => {}} irATurno={() => {}} />
+      </AtajosProvider>,
+    );
+    await waitFor(() => expect(screen.getByTestId("descuento")).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId("descuento"));
+    await act(async () => {
+      for (const k of ["5", "0"]) fireEvent.keyDown(window, { key: k });
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Cliente frecuente" }));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("aplicar-descuento"));
+    });
+    expect(await screen.findByTestId("supervisor-Sofía A.")).toBeInTheDocument();
+  });
+});
+
+describe("cuenta invitada", () => {
+  it("con total en cero por cortesía se cierra sin cobro", async () => {
+    vi.spyOn(nodo, "orden").mockResolvedValue({ orden, totales: { subtotal: "0.00", iva: "0.00", propina: "0.00", total: "0.00", descuento: "12.50" } });
+    const cobrar = vi.spyOn(nodo, "cobrar").mockResolvedValue({
+      documento: { ...docCF, id: "d", codigo: "INT-000010", mesa: "Mesa 4", totales: { subtotal: "0.00", iva: "0.00", propina: "0.00", total: "0.00" }, metodo: "Cortesía", pagos: [], recibido: "0.00", vuelto: "0.00", abreCajon: false },
+      impresoras: [],
+    });
+    montar();
+    const boton = await screen.findByTestId("cerrar-cortesia");
+    expect(screen.queryByTestId("billete-0.00")).not.toBeInTheDocument();
+    fireEvent.click(boton);
+    expect(cobrar).toHaveBeenCalledWith("o1", expect.objectContaining({ metodoId: "ef", recibido: "" }));
+    expect(await screen.findByTestId("cobro-listo")).toHaveTextContent("Cortesía · INT-000010");
   });
 });

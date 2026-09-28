@@ -74,6 +74,7 @@ export const api = {
   crearPersona: (b: object) => post<Persona>("/v1/usuarios", b),
   editarPersona: (id: string, b: object) => put<Persona>(`/v1/usuarios/${id}`, b),
   cambiarPIN: (id: string, pin: string) => put<void>(`/v1/usuarios/${id}/pin`, { pin }),
+  cambiarLimiteDescuento: (id: string, porcentaje: string | null) => put<PermisosPersona>(`/v1/usuarios/${id}/limite-descuento`, { porcentaje }),
   cambiarPermiso: (id: string, permiso: string, concedido: boolean) => put<PermisosPersona>(`/v1/usuarios/${id}/permisos`, { permiso, concedido }),
   cambiarEstado: (id: string, activo: boolean) => put<Persona>(`/v1/usuarios/${id}/estado`, { activo }),
   crearImpresora: (b: object) => post<Impresora>("/v1/impresoras", b),

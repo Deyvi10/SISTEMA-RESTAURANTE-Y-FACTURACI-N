@@ -125,6 +125,8 @@ export interface Local {
   preciosIncluyenIva: boolean;
   /** Diferencia de caja (USD) que convierte el correo del Cierre Z en alerta crítica. */
   umbralAlertaCierre: string;
+  /** Descuento (%) que puede dar sin autorización quien no es administrador. */
+  descuentoMaximoPct: string;
 }
 export interface Estacion {
   id: UUID;
@@ -280,4 +282,6 @@ export interface PermisosPersona {
   usuarioId: UUID;
   rol: Rol;
   permisos: PermisoPersona[];
+  /** Límite propio de descuento sin autorización; null = el del local. */
+  descuentoMaximoPct: string | null;
 }

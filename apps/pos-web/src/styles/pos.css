@@ -279,3 +279,17 @@ button { font: inherit; }
 .supervisor__gente { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; }
 .supervisor__gente .persona { padding: 14px 8px 12px; }
 .supervisor__gente .persona b { font-size: 15px; margin-top: 2px; }
+
+/* ---------- Descuentos (F4-09) ---------- */
+.hoja-descuento { width: min(480px, 94vw); }
+.descuento__fila { display: flex; flex-direction: column; gap: 10px; margin: 0 20px 6px; }
+.descuento__fila select { min-height: 42px; border-radius: 12px; border: 1px solid var(--rp-color-separator); background: var(--rp-color-surface); color: var(--rp-color-label); font: inherit; padding: 0 10px; }
+.descuento__fila .rp-field span { font-size: 13px; color: var(--rp-color-label-secondary); }
+.descuento__motivos-titulo { margin: 6px 20px 4px; }
+.descuento__motivos { margin: 0 20px; flex-wrap: wrap; }
+.chip-descuento { display: inline-flex; align-items: center; gap: 6px; margin-top: 4px; padding: 2px 4px 2px 10px; border-radius: 999px; font-size: 13px; font-weight: 600;
+  background: var(--rp-color-success-soft); color: var(--rp-color-success-text); }
+.chip-descuento__quitar { border: 0; background: none; color: inherit; font: 700 16px/1 inherit; cursor: pointer; padding: 2px 6px; border-radius: 50%; }
+.chip-descuento__quitar:hover { background: color-mix(in srgb, var(--rp-color-success-text) 18%, transparent); }
+.cobro__antes { display: block; font-size: 12px; color: var(--rp-color-label-tertiary); text-align: right; }
+.cobro__descuento-cuenta { margin: 0; }

@@ -80,3 +80,35 @@ func TestPermisosGranulares(t *testing.T) {
 		t.Fatalf("réplica: %v %d", err, n)
 	}
 }
+
+// F4-09: el límite de descuento sin autorización del local (Ajustes) y el propio de una persona.
+func TestLimitesDeDescuento(t *testing.T) {
+	e := newEnv(t)
+	c, r := e.restaurante("1790011674001", "a@a.ec")
+	var local struct {
+		DescuentoMaximoPct string `json:"descuentoMaximoPct"`
+	}
+	c.do("PATCH", "/v1/locales/"+r.LocalID.String(), map[string]any{"descuentoMaximoPct": "150"}, 422, nil)
+	c.do("PATCH", "/v1/locales/"+r.LocalID.String(), map[string]any{"descuentoMaximoPct": "12.5"}, 200, &local)
+	if local.DescuentoMaximoPct != "12.50" {
+		t.Fatalf("límite del local: %+v", local)
+	}
+	var cajero personal.Usuario
+	c.do("POST", "/v1/usuarios", map[string]any{"nombreMostrar": "Luis P.", "rol": "CAJERO", "pin": "7391"}, 201, &cajero)
+	base := "/v1/usuarios/" + cajero.ID.String() + "/limite-descuento"
+	var ps personal.PermisosUsuario
+	c.do("PUT", base, map[string]any{"porcentaje": "20.123"}, 422, nil)
+	c.do("PUT", base, map[string]any{"porcentaje": "20"}, 200, &ps)
+	if ps.DescuentoMaximoPct == nil || *ps.DescuentoMaximoPct != "20.00" {
+		t.Fatalf("límite propio: %+v", ps.DescuentoMaximoPct)
+	}
+	c.do("PUT", base, map[string]any{"porcentaje": nil}, 200, &ps)
+	if ps.DescuentoMaximoPct != nil {
+		t.Fatal("no volvió al del local")
+	}
+	c.do("PUT", "/v1/usuarios/"+r.UsuarioID.String()+"/limite-descuento", map[string]any{"porcentaje": "5"}, 409, nil) // el dueño no tiene tope
+	var n int
+	if err := e.tdb.Admin.QueryRow(context.Background(), `SELECT count(*) FROM auditoria WHERE accion = 'LIMITE_DESCUENTO_CAMBIADO'`).Scan(&n); err != nil || n != 2 {
+		t.Fatalf("auditoría de límites: %v %d", err, n)
+	}
+}

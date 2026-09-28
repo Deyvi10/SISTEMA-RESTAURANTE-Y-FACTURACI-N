@@ -4,11 +4,12 @@ import { formatMoney } from "@restpos/ui";
 import { ArrowLeft, Check, CreditCard, Landmark, Smartphone, Wallet } from "lucide-react";
 import { type Dispatch, type SetStateAction, useCallback, useEffect, useRef, useState } from "react";
 import { uuidv7 } from "../api/identidad";
-import { ApiError, type CobroOut, type MetodoPago, nodo, type Orden, type Totales } from "../api/nodo";
+import { ApiError, type CobroOut, type DescuentoAplicado, type MetodoPago, nodo, type Orden, type Totales } from "../api/nodo";
 import { useAtajo } from "../components/atajos";
 import { montoDe, TecladoMonto } from "../components/TecladoMonto";
 import { opcionesBillete, vueltoCentavos } from "../lib/billetes";
 import { centavos, verCentavos } from "../lib/dinero";
+import { HojaDescuento } from "./Descuento";
 import { Comprador, compradorInicial, compradorParaCobro, esConsumidorFinal, type EstadoComprador, validar } from "./Comprador";
 import { HojaPagos, type PagoEnvio } from "./PagoMixto";
 import type { Caja } from "./Turno";
@@ -44,7 +45,21 @@ export interface ACobrar {
   nombre: string;
 }
 
-export function Cobro({ orden: aCobrar, caja, volver, irATurno, agregar }: { orden: ACobrar; caja: Caja; volver: () => void; irATurno: () => void; agregar?: (o: Orden) => void }) {
+export function Cobro({
+  orden: aCobrar,
+  caja,
+  volver,
+  irATurno,
+  agregar,
+  usuarioId,
+}: {
+  orden: ACobrar;
+  caja: Caja;
+  volver: () => void;
+  irATurno: () => void;
+  agregar?: (o: Orden) => void;
+  usuarioId?: string; // quien cobra: no se autoriza a sí mismo como supervisor
+}) {
   const [datos, setDatos] = useState<{ orden: Orden; totales: Totales } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
@@ -53,6 +68,7 @@ export function Cobro({ orden: aCobrar, caja, volver, irATurno, agregar }: { ord
   const [hojaPago, setHojaPago] = useState<{ inicial?: MetodoPago } | null>(null);
   const [comprador, setComprador] = useState<EstadoComprador>(compradorInicial);
   const [quitandoServicio, setQuitandoServicio] = useState(false);
+  const [hojaDescuento, setHojaDescuento] = useState(false);
   const campoId = useRef<HTMLInputElement>(null);
   // Una clave por intento de cobro: un doble toque o un reintento no cobra dos veces.
   const clave = useRef(uuidv7());
@@ -74,7 +90,9 @@ export function Cobro({ orden: aCobrar, caja, volver, irATurno, agregar }: { ord
   const compradorListo = cf ? !excedeCF : datosComprador !== null;
   const efectivo = config?.metodos.find((m) => m.tipo === "EFECTIVO");
   const otros = config?.metodos.filter((m) => m.tipo !== "EFECTIVO") ?? [];
-  const puedeCobrar = !!turno && !!datos && compradorListo && centavos(total) > 0 && !ocupado && !hecho;
+  // Toda la cuenta invitada: total en cero por cortesías, se cierra sin cobro.
+  const invitada = !!datos && centavos(total) === 0 && centavos(datos.totales.descuento ?? "0") > 0;
+  const puedeCobrar = !!turno && !!datos && compradorListo && (centavos(total) > 0 || invitada) && !ocupado && !hecho;
 
   const enviarCobro = useCallback(
     (pago: { metodoId: string; recibido: string } | { pagos: PagoEnvio[] }) => {
@@ -103,7 +121,7 @@ export function Cobro({ orden: aCobrar, caja, volver, irATurno, agregar }: { ord
   );
 
   const billetes = opcionesBillete(total);
-  const libre = puedeCobrar && otroMonto === null && hojaPago === null && !quitandoServicio;
+  const libre = puedeCobrar && otroMonto === null && hojaPago === null && !quitandoServicio && !hojaDescuento;
   const cambiarServicio = (retirar: boolean, motivo = "") => {
     if (!datos) return;
     nodo
@@ -116,12 +134,27 @@ export function Cobro({ orden: aCobrar, caja, volver, irATurno, agregar }: { ord
       .catch((e) => setError(e instanceof ApiError ? e.message : "No se pudo cambiar el servicio."));
   };
   const servicio = datos?.totales.propinaActiva && !hecho;
+  const descuentosDe = (linea: string | null) => (datos?.totales.descuentos ?? []).filter((d) => d.lineaId === linea);
+  /** Precio de la línea con solo su propio descuento (el de la cuenta se muestra en los totales). */
+  const precioLinea = (l: { id: string; total: string }) => centavos(l.total) - descuentosDe(l.id).reduce((t, d) => t + centavos(d.monto), 0);
+  const alCambiarTotales = (t: Totales) => {
+    setDatos((d) => (d ? { ...d, totales: t } : d));
+    clave.current = uuidv7(); // el total cambió: es otro cobro
+  };
+  const quitarDescuento = (id: string) => {
+    if (!datos) return;
+    nodo
+      .quitarDescuento(datos.orden.id, id)
+      .then(alCambiarTotales)
+      .catch((e) => setError(e instanceof ApiError ? e.message : "No se pudo quitar el descuento."));
+  };
   useAtajo("1", "Cobrar el monto exacto en efectivo", () => cobrar(efectivo, billetes[0]!), "Cobro", libre);
   useAtajo("2", "Cobrar con el segundo billete", () => billetes[1] && cobrar(efectivo, billetes[1]), "Cobro", libre && billetes.length > 1);
   useAtajo("3", "Cobrar con el tercer billete", () => billetes[2] && cobrar(efectivo, billetes[2]), "Cobro", libre && billetes.length > 2);
   useAtajo("4", "Cobrar con el cuarto billete", () => billetes[3] && cobrar(efectivo, billetes[3]), "Cobro", libre && billetes.length > 3);
   useAtajo("o", "Otro monto en efectivo", () => setOtroMonto(""), "Cobro", libre);
   useAtajo("m", "Pago mixto (varios métodos)", () => setHojaPago({}), "Cobro", libre);
+  useAtajo("d", "Descuento o cortesía", () => setHojaDescuento(true), "Cobro", !!datos && !hecho && otroMonto === null && hojaPago === null && !quitandoServicio && !hojaDescuento);
   useAtajo("s", "Quitar o reponer el servicio (propina)", () => (datos?.totales.propinaRetirada ? cambiarServicio(false) : setQuitandoServicio(true)), "Cobro", !!servicio && otroMonto === null && hojaPago === null && !quitandoServicio);
   useAtajo("c", "Datos del comprador", () => {
     setComprador((x) => ({ ...x, modo: "ID" }));
@@ -158,14 +191,38 @@ export function Cobro({ orden: aCobrar, caja, volver, irATurno, agregar }: { ord
                   <span className="rp-cell__body">
                     <span className="rp-cell__title">{l.producto}</span>
                     {l.modificadores.length > 0 && <span className="rp-cell__subtitle">{l.modificadores.map((m) => m.nombre).join(", ")}</span>}
+                    {descuentosDe(l.id).map((d) => (
+                      <ChipDescuento key={d.id} d={d} quitar={hecho ? undefined : () => quitarDescuento(d.id)} />
+                    ))}
                   </span>
-                  <span className="rp-cell__value rp-num">{formatMoney(l.total)}</span>
+                  <span className="rp-cell__value rp-num">
+                    {descuentosDe(l.id).length > 0 && <s className="cobro__antes">{formatMoney(l.total)}</s>}
+                    {formatMoney(verCentavos(precioLinea(l)))}
+                  </span>
                 </div>
               ))}
           </div>
         )}
+        {datos && descuentosDe(null).map((d) => (
+          <p className="cobro__descuento-cuenta" key={d.id}>
+            <ChipDescuento d={d} quitar={hecho ? undefined : () => quitarDescuento(d.id)} />
+          </p>
+        ))}
+        {datos && !hecho && (
+          <button className="rp-btn rp-btn--gray rp-btn--sm cobro__agregar" onClick={() => setHojaDescuento(true)} data-testid="descuento">
+            Descuento o cortesía <kbd className="tecla">D</kbd>
+          </button>
+        )}
         {datos && (
           <dl className="cobro__totales">
+            {centavos(datos.totales.descuento ?? "0") > 0 && (
+              <>
+                <dt>Descuentos</dt>
+                <dd className="rp-num" data-testid="total-descuento">
+                  −{formatMoney(datos.totales.descuento ?? "0")}
+                </dd>
+              </>
+            )}
             <dt>Subtotal</dt>
             <dd className="rp-num">{formatMoney(datos.totales.subtotal)}</dd>
             <dt>IVA</dt>
@@ -226,42 +283,64 @@ export function Cobro({ orden: aCobrar, caja, volver, irATurno, agregar }: { ord
           </p>
         )}
 
-        <p className="cobro__rotulo">Efectivo</p>
-        <div className="billetes" role="group" aria-label="Cobrar en efectivo">
-          {billetes.map((b, i) => (
-            <button key={b} className="billete" disabled={!puedeCobrar || !efectivo} onClick={() => cobrar(efectivo, b)} data-testid={`billete-${b}`}>
-              <span className="billete__monto rp-num">{formatMoney(b)}</span>
-              <small>{i === 0 ? "Exacto" : `Vuelto ${formatMoney(verCentavos(vueltoCentavos(total, b)))}`}</small>
-              <kbd className="tecla tecla--esquina">{i + 1}</kbd>
-            </button>
-          ))}
-          <button className="billete billete--otro" disabled={!puedeCobrar || !efectivo} onClick={() => setOtroMonto("")} data-testid="otro-monto">
-            <span className="billete__monto">Otro</span>
-            <small>monto</small>
-            <kbd className="tecla tecla--esquina">O</kbd>
+        {invitada ? (
+          <button className="rp-btn rp-btn--primary rp-btn--block cobro__invitada" disabled={!puedeCobrar || !efectivo} onClick={() => efectivo && enviarCobro({ metodoId: efectivo.id, recibido: "" })} data-testid="cerrar-cortesia">
+            Cerrar como cortesía (sin cobro) <kbd className="tecla">1</kbd>
           </button>
-        </div>
-
-        {otros.length > 0 && (
+        ) : (
           <>
-            <p className="cobro__rotulo">Otros métodos · total exacto</p>
-            <div className="metodos">
-              {otros.map((m) => {
-                const Icono = ICONO[m.icono] ?? Wallet;
-                return (
-                  <button key={m.id} className="rp-btn rp-btn--gray metodo" disabled={!puedeCobrar} onClick={() => cobrar(m, "")} data-testid={`metodo-${m.nombre}`}>
-                    <Icono aria-hidden="true" /> {m.nombre}
-                  </button>
-                );
-              })}
-              <button className="rp-btn rp-btn--tinted metodo" disabled={!puedeCobrar} onClick={() => setHojaPago({})} data-testid="pago-mixto">
-                Pago mixto <kbd className="tecla">M</kbd>
+            <p className="cobro__rotulo">Efectivo</p>
+            <div className="billetes" role="group" aria-label="Cobrar en efectivo">
+              {billetes.map((b, i) => (
+                <button key={b} className="billete" disabled={!puedeCobrar || !efectivo} onClick={() => cobrar(efectivo, b)} data-testid={`billete-${b}`}>
+                  <span className="billete__monto rp-num">{formatMoney(b)}</span>
+                  <small>{i === 0 ? "Exacto" : `Vuelto ${formatMoney(verCentavos(vueltoCentavos(total, b)))}`}</small>
+                  <kbd className="tecla tecla--esquina">{i + 1}</kbd>
+                </button>
+              ))}
+              <button className="billete billete--otro" disabled={!puedeCobrar || !efectivo} onClick={() => setOtroMonto("")} data-testid="otro-monto">
+                <span className="billete__monto">Otro</span>
+                <small>monto</small>
+                <kbd className="tecla tecla--esquina">O</kbd>
               </button>
             </div>
+
+            {otros.length > 0 && (
+              <>
+                <p className="cobro__rotulo">Otros métodos · total exacto</p>
+                <div className="metodos">
+                  {otros.map((m) => {
+                    const Icono = ICONO[m.icono] ?? Wallet;
+                    return (
+                      <button key={m.id} className="rp-btn rp-btn--gray metodo" disabled={!puedeCobrar} onClick={() => cobrar(m, "")} data-testid={`metodo-${m.nombre}`}>
+                        <Icono aria-hidden="true" /> {m.nombre}
+                      </button>
+                    );
+                  })}
+                  <button className="rp-btn rp-btn--tinted metodo" disabled={!puedeCobrar} onClick={() => setHojaPago({})} data-testid="pago-mixto">
+                    Pago mixto <kbd className="tecla">M</kbd>
+                  </button>
+                </div>
+              </>
+            )}
           </>
         )}
       </div>
 
+      {hojaDescuento && datos && (
+        <HojaDescuento
+          ordenId={datos.orden.id}
+          lineas={datos.orden.lineas}
+          totalPlatos={verCentavos(datos.orden.lineas.filter((l) => l.estado !== "ANULADA").reduce((t, l) => t + precioLinea(l), 0))}
+          motivos={config?.motivos ?? []}
+          usuarioId={usuarioId}
+          cerrar={() => setHojaDescuento(false)}
+          listo={(t) => {
+            alCambiarTotales(t);
+            setHojaDescuento(false);
+          }}
+        />
+      )}
       {quitandoServicio && <AlertaServicio monto={datos?.totales.propina ?? "0"} cerrar={() => setQuitandoServicio(false)} quitar={(m) => cambiarServicio(true, m)} />}
       {hojaPago && config && (
         <HojaPagos
@@ -423,5 +502,20 @@ function AlertaServicio({ monto, cerrar, quitar }: { monto: string; cerrar: () =
         </div>
       </form>
     </div>
+  );
+}
+
+function ChipDescuento({ d, quitar }: { d: DescuentoAplicado; quitar?: () => void }) {
+  const que = d.cortesia ? "Cortesía" : d.tipo === "PORCENTAJE" ? `${porcentaje(d.valor)} %` : "Descuento";
+  return (
+    <span className="chip-descuento" data-testid="chip-descuento">
+      {que} −{formatMoney(d.monto)} · {d.motivo}
+      {d.lineaId === null && " (toda la cuenta)"}
+      {quitar && (
+        <button type="button" className="chip-descuento__quitar" onClick={quitar} aria-label={`Quitar ${que.toLowerCase()} de ${d.motivo}`}>
+          ×
+        </button>
+      )}
+    </span>
   );
 }

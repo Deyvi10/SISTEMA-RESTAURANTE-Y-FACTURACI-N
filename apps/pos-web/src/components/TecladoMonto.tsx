@@ -22,10 +22,11 @@ export function montoDe(actual: string): string {
 }
 
 /** Lo que se ve mientras se escribe: $1,250.5 conserva el punto y los decimales tecleados. */
-export function verMonto(actual: string): string {
+export function verMonto(actual: string, unidad: "$" | "%" = "$"): string {
   const [enteros = "0", decimales] = (actual || "0").split(".");
   const miles = enteros.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-  return "$" + miles + (decimales !== undefined ? "." + decimales : "");
+  const numero = miles + (decimales !== undefined ? "." + decimales : "");
+  return unidad === "%" ? numero + " %" : "$" + numero;
 }
 
 function escribiendoTexto(e: KeyboardEvent) {
@@ -33,7 +34,7 @@ function escribiendoTexto(e: KeyboardEvent) {
   return !!t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable);
 }
 
-export function TecladoMonto({ valor, cambiar, etiqueta }: { valor: string; cambiar: Dispatch<SetStateAction<string>>; etiqueta: string }) {
+export function TecladoMonto({ valor, cambiar, etiqueta, unidad = "$" }: { valor: string; cambiar: Dispatch<SetStateAction<string>>; etiqueta: string; unidad?: "$" | "%" }) {
   useEffect(() => {
     const alTeclear = (e: KeyboardEvent) => {
       if (escribiendoTexto(e) || e.ctrlKey || e.metaKey || e.altKey) return;
@@ -50,7 +51,7 @@ export function TecladoMonto({ valor, cambiar, etiqueta }: { valor: string; camb
   return (
     <div className="teclado-monto">
       <output className="teclado-monto__valor rp-num" aria-label={etiqueta} data-testid="monto">
-        {verMonto(valor)}
+        {verMonto(valor, unidad)}
       </output>
       <div className="rp-keypad">
         {["1", "2", "3", "4", "5", "6", "7", "8", "9", ".", "0"].map((d) => (

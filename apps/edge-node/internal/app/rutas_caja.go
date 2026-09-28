@@ -3,6 +3,8 @@ package app
 import (
 	"context"
 	"net/http"
+
+	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/ids"
 )
 
 var errNoEsCaja = problema(http.StatusForbidden, "SOLO_CAJA", "Esta acción solo se hace desde una caja.")
@@ -75,6 +77,28 @@ func (a *App) rutasCaja() {
 			return nil, err
 		}
 		return a.CambiarPropina(ctx, u, id, in)
+	}))
+	m.Handle("POST /v1/ordenes/{id}/descuentos", a.enCaja(func(ctx context.Context, d Dispositivo, u Usuario, r *http.Request) (any, error) {
+		id, err := idRuta(r)
+		if err != nil {
+			return nil, err
+		}
+		in, err := leer[DescuentoIn](nil, r)
+		if err != nil {
+			return nil, err
+		}
+		return a.AplicarDescuento(ctx, d, u, id, in)
+	}))
+	m.Handle("DELETE /v1/ordenes/{id}/descuentos/{descuento}", a.enCaja(func(ctx context.Context, _ Dispositivo, u Usuario, r *http.Request) (any, error) {
+		id, err := idRuta(r)
+		if err != nil {
+			return nil, err
+		}
+		desc, err := ids.Parse(r.PathValue("descuento"))
+		if err != nil {
+			return nil, invalido("Descuento inválido.")
+		}
+		return a.QuitarDescuento(ctx, u, id, desc)
 	}))
 	m.Handle("POST /v1/ordenes/{id}/cobrar", a.enCaja(func(ctx context.Context, _ Dispositivo, u Usuario, r *http.Request) (any, error) {
 		id, err := idRuta(r)

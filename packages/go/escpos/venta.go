@@ -18,6 +18,7 @@ type DocumentoVenta struct {
 	Comprador   string // «CONSUMIDOR FINAL» o el nombre del comprador
 	CompradorID string // cédula, RUC o pasaporte (vacío para consumidor final)
 	Lineas      []LineaCuenta
+	Descuento   money.Money // descuentos y cortesías (F4-09)
 	Subtotal    money.Money
 	IVA         money.Money
 	Propina     money.Money
@@ -58,6 +59,9 @@ func ImprimirDocumentoVenta(p Paper, d DocumentoVenta) []byte {
 		b.Columns(l.Cantidad+" "+l.Producto, "$"+l.Total.String())
 	}
 	b.Separator('-')
+	if !d.Descuento.IsZero() {
+		b.Columns("Descuento", "-$"+d.Descuento.String())
+	}
 	b.Columns("Subtotal", "$"+d.Subtotal.String())
 	b.Columns("IVA", "$"+d.IVA.String())
 	if !d.Propina.IsZero() {
@@ -65,6 +69,9 @@ func ImprimirDocumentoVenta(p Paper, d DocumentoVenta) []byte {
 	}
 	b.Bold(true).Size(1, 2).Columns("TOTAL", "$"+d.Total.String()).Size(1, 1).Bold(false)
 	b.Separator('-')
+	if len(d.Pagos) == 0 {
+		b.Line("Cortesía de la casa: sin cobro")
+	}
 	for _, p := range d.Pagos {
 		nombre := p.Metodo
 		if p.Ultimos4 != "" {

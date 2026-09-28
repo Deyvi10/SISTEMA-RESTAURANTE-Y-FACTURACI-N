@@ -13,6 +13,7 @@ const permiso = (permiso: string, nombre: string, concedido: boolean, configurab
 const datos = (abrirCajon: boolean): PermisosPersona => ({
   usuarioId: "u1",
   rol: "CAJERO",
+  descuentoMaximoPct: null,
   permisos: [permiso("ABRIR_CAJON", "Abrir cajón sin venta", abrirCajon, true), permiso("DAR_DESCUENTO", "Dar descuentos y cortesías", false, true),
     permiso("GESTIONAR_TURNO", "Abrir y cerrar turnos", true, false), permiso("CONFIGURAR_SRI", "Configurar facturación SRI", false, false)],
 });

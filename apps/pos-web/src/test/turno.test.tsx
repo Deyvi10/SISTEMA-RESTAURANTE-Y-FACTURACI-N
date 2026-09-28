@@ -28,6 +28,7 @@ describe("teclado de importes", () => {
     expect(verMonto("")).toBe("$0");
     expect(verMonto("1250.5")).toBe("$1,250.5");
     expect(verMonto("123456.")).toBe("$123,456.");
+    expect(verMonto("12.5", "%")).toBe("12.5 %");
   });
 
   it("acepta el teclado físico, pero no mientras se escribe el motivo", async () => {

@@ -181,6 +181,7 @@ export function Ajustes() {
   const guardar = useGuardar(() => api.editarLocal(local!.id, {
     nombre: form?.nombre, direccion: form?.direccion, propinaLegalActiva: form?.propinaLegalActiva,
     propinaPorcentaje: form?.propinaPorcentaje, preciosIncluyenIva: form?.preciosIncluyenIva, umbralAlertaCierre: form?.umbralAlertaCierre,
+    descuentoMaximoPct: form?.descuentoMaximoPct,
   }), ["locales", "productos"]);
   if (!form) return <Spinner />;
   const set = <K extends keyof typeof form>(k: K, v: (typeof form)[K]) => setForm({ ...form, [k]: v });
@@ -218,6 +219,17 @@ export function Ajustes() {
           )}
           <ToggleRow label="Mis precios incluyen IVA" detalle={`Recomendado: lo que ve el cliente es lo que paga. Ej.: ${formatUSD("15.00")} ya con IVA.`} checked={form.preciosIncluyenIva} onChange={(v) => set("preciosIncluyenIva", v)} />
         </div>
+        <div className="rp-group" style={{ margin: 0 }}>
+          <div className="rp-cell">
+            <span className="rp-cell__body">
+              <span className="rp-cell__title">Descuento máximo sin autorización</span>
+              <span className="rp-cell__subtitle">Para quien tiene el permiso de dar descuentos. Más que esto, o una cortesía, pide el PIN de un supervisor. El administrador no tiene tope.</span>
+            </span>
+            <input aria-label="Descuento máximo sin autorización" inputMode="decimal" value={form.descuentoMaximoPct} onChange={(e) => set("descuentoMaximoPct", e.target.value)} style={{ width: 90, minHeight: 40, textAlign: "right" }} />
+            <span>%</span>
+          </div>
+        </div>
+        {errores.descuentoMaximoPct && <p className="error-inline">{errores.descuentoMaximoPct}</p>}
         {errores.propinaPorcentaje && <p className="error-inline">{errores.propinaPorcentaje}</p>}
         <div className="rp-section-header" style={{ margin: "0 4px -10px" }}>Cierre de caja</div>
         <div className="rp-group" style={{ margin: 0 }}>
@@ -269,7 +281,10 @@ export function Permisos({ persona }: { persona: Persona }) {
       ) : (
         <div className="rp-group" style={{ margin: 0 }}>
           {ajustables.map((p) => (
-            <ToggleRow key={p.permiso} label={p.nombre} detalle={p.descripcion} checked={p.concedido} onChange={(v) => cambiar.mutate({ permiso: p.permiso, concedido: v })} />
+            <div key={p.permiso}>
+              <ToggleRow label={p.nombre} detalle={p.descripcion} checked={p.concedido} onChange={(v) => cambiar.mutate({ permiso: p.permiso, concedido: v })} />
+              {p.permiso === "DAR_DESCUENTO" && p.concedido && <LimiteDescuento persona={persona} actual={permisos.data.descuentoMaximoPct} />}
+            </div>
           ))}
         </div>
       )}
@@ -283,5 +298,43 @@ export function Permisos({ persona }: { persona: Persona }) {
         </>
       )}
     </section>
+  );
+}
+
+/** Límite propio de descuento sin autorización; vacío = el del local (F4-09). */
+function LimiteDescuento({ persona, actual }: { persona: Persona; actual: string | null }) {
+  const { toast } = useFeedback();
+  const qc = useQueryClient();
+  const locales = useLocales();
+  const [valor, setValor] = useState(actual ?? "");
+  useEffect(() => setValor(actual ?? ""), [actual]);
+  const guardar = useMutation({
+    mutationFn: (v: string) => api.cambiarLimiteDescuento(persona.id, v.trim() === "" ? null : v.trim()),
+    onSuccess: (datos) => {
+      qc.setQueryData(["permisos", persona.id], datos);
+      toast("Límite de descuento guardado");
+    },
+    onError: (e) => toast(e instanceof ApiError ? e.message : "No se pudo guardar el límite.", "error"),
+  });
+  // "12.50" → "12.5" (texto: un porcentaje de la API nunca pasa por coma flotante)
+  const delLocal = locales.data?.[0]?.descuentoMaximoPct?.replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "");
+  return (
+    <div className="rp-cell">
+      <span className="rp-cell__body">
+        <span className="rp-cell__title">Hasta este % sin autorización</span>
+        <span className="rp-cell__subtitle">Vacío: el del local{delLocal ? ` (${delLocal} %)` : ""}.</span>
+      </span>
+      <input
+        aria-label="Límite de descuento de esta persona"
+        inputMode="decimal"
+        value={valor}
+        placeholder={delLocal ?? ""}
+        onChange={(e) => setValor(e.target.value)}
+        onBlur={() => valor.trim() !== (actual ?? "") && guardar.mutate(valor)}
+        onKeyDown={(e) => e.key === "Enter" && (e.currentTarget as HTMLInputElement).blur()}
+        style={{ width: 80, minHeight: 40, textAlign: "right" }}
+      />
+      <span>%</span>
+    </div>
   );
 }

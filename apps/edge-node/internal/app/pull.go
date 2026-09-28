@@ -32,12 +32,18 @@ type CambiosAplicados struct {
 	Cambios  []edgesync.Cambio
 }
 
+// versionEsquemaReplica sube cuando una migración agrega columnas a tablas ya replicadas:
+// sus valores solo llegan completos con un volcado, que la huella nueva provoca.
+// 2: locales.descuento_maximo_pct y usuarios.descuento_maximo_pct (F4-09).
+const versionEsquemaReplica = 2
+
 // huellaTablas identifica el conjunto de tablas replicadas de esta versión del nodo. Si una
 // actualización agrega tablas, sus filas pudieron llegar antes (y descartarse) con la versión
 // vieja: la huella distinta obliga a pedir un volcado completo.
 func huellaTablas() int64 {
 	h := fnv.New64a()
 	_, _ = h.Write([]byte(strings.Join(edgesync.TablasReplica, ",")))
+	_, _ = fmt.Fprintf(h, "|esquema:%d", versionEsquemaReplica)
 	return int64(h.Sum64() >> 1)
 }
 

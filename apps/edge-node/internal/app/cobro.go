@@ -205,22 +205,33 @@ func (a *App) Cobrar(ctx context.Context, u Usuario, orden ids.ID, in CobrarIn) 
 		if err != nil {
 			return err
 		}
-		if !total.GreaterThan(money.Money{}) {
+		// Total en cero: si todo es cortesía la orden se cierra con un documento en $0 (sin pagos
+		// ni cajón); sin platos o sin descuentos no hay nada que cobrar.
+		todoCortesia := total.IsZero() && tot.Descuento != "0.00" && len(o.Lineas) > 0
+		if !total.GreaterThan(money.Money{}) && !todoCortesia {
 			return problema(http.StatusConflict, "ORDEN_VACIA", "La orden no tiene nada que cobrar.")
 		}
 		if max := consumidorFinalMaximo(ctx, tx); esCF && total.GreaterThan(max) {
 			return problema(http.StatusUnprocessableEntity, "CONSUMIDOR_FINAL_EXCEDIDO",
 				"El total supera $"+max.String()+", el máximo para consumidor final. Hacen falta los datos del comprador.")
 		}
-		docPagos, recibido, vuelto, abreCajon, err := resolverPagos(ctx, tx, pagos, total, unico)
-		if err != nil {
-			return err
+		var docPagos []PagoDoc
+		var recibido, vuelto money.Money
+		var abreCajon bool
+		metodo := "Cortesía"
+		if !todoCortesia {
+			if docPagos, recibido, vuelto, abreCajon, err = resolverPagos(ctx, tx, pagos, total, unico); err != nil {
+				return err
+			}
+			nombres := make([]string, len(docPagos))
+			for i, p := range docPagos {
+				nombres[i] = p.Metodo
+			}
+			metodo = strings.Join(nombres, " + ")
 		}
-		nombres := make([]string, len(docPagos))
-		for i, p := range docPagos {
-			nombres[i] = p.Metodo
+		if docPagos == nil {
+			docPagos = []PagoDoc{}
 		}
-		metodo := strings.Join(nombres, " + ")
 		var numero int
 		if err := tx.QueryRowContext(ctx, `INSERT INTO contadores (clave, valor) VALUES ('documento:INTERNO', 1)
 			ON CONFLICT (clave) DO UPDATE SET valor = valor + 1 RETURNING valor`).Scan(&numero); err != nil {
@@ -299,7 +310,7 @@ func (a *App) Cobrar(ctx context.Context, u Usuario, orden ids.ID, in CobrarIn) 
 		_ = tx.QueryRowContext(ctx, `SELECT nombre FROM locales LIMIT 1`).Scan(&local)
 		ticket := escpos.DocumentoVenta{Local: local, Numero: numero, Hora: now.In(loc), Mesa: o.Mesa, Cajero: u.Nombre, Comprador: comprador.RazonSocial,
 			CompradorID: map[bool]string{true: "", false: comprador.Identificacion}[esCF],
-			Lineas:      lineasCuenta(o.Lineas), Subtotal: base, IVA: iva, Propina: propina, Total: total, Recibido: recibido, Vuelto: vuelto}
+			Lineas:      lineasCuenta(o.Lineas), Descuento: money.MustParse(tot.Descuento), Subtotal: base, IVA: iva, Propina: propina, Total: total, Recibido: recibido, Vuelto: vuelto}
 		for _, p := range docPagos {
 			ticket.Pagos = append(ticket.Pagos, escpos.PagoTicket{Metodo: p.Metodo, Monto: money.MustParse(p.Monto), Ultimos4: p.Ultimos4})
 		}

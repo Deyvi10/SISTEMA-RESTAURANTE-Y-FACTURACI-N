@@ -284,6 +284,10 @@ func TestGoldenDocumentoVenta(t *testing.T) {
 	// Comprador identificado: nombre largo (se parte en líneas) y su RUC.
 	d.Comprador, d.CompradorID = "Distribuidora de Mariscos del Pacífico Hermanos Andrade S.A.", "1790011674001"
 	golden(t, "venta-ruc-58", Decode(ImprimirDocumentoVenta(Paper58, d)).Text())
+	// Con un descuento: las líneas a precio de carta, el descuento y los totales ya descontados.
+	d.Descuento, d.Subtotal, d.IVA, d.Propina, d.Total = money.MustParse("2.00"), money.MustParse("15.65"), money.MustParse("2.35"), money.MustParse("1.57"), money.MustParse("19.57")
+	d.Pagos = []PagoTicket{{Metodo: "Efectivo", Monto: money.MustParse("19.57")}}
+	golden(t, "venta-descuento-80", Decode(ImprimirDocumentoVenta(Paper80, d)).Text())
 }
 
 func TestGoldenAperturaCajon(t *testing.T) {

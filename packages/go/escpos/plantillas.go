@@ -84,16 +84,17 @@ type LineaCuenta struct {
 
 // PreCuenta es el ticket informativo sin valor tributario (RF-03-09).
 type PreCuenta struct {
-	Local    string
-	Mesa     string
-	Mesero   string
-	Hora     time.Time
-	Lineas   []LineaCuenta
-	Subtotal money.Money // base imponible (sin IVA)
-	IVA      money.Money
-	Propina  money.Money // cero si el local no cobra propina legal
-	Total    money.Money
-	Personas int // > 1 imprime el total dividido en partes iguales (informativo)
+	Local     string
+	Mesa      string
+	Mesero    string
+	Hora      time.Time
+	Lineas    []LineaCuenta
+	Subtotal  money.Money // base imponible (sin IVA)
+	IVA       money.Money
+	Propina   money.Money // cero si el local no cobra propina legal
+	Descuento money.Money // descuentos y cortesías (F4-09)
+	Total     money.Money
+	Personas  int // > 1 imprime el total dividido en partes iguales (informativo)
 }
 
 // ImprimirPreCuenta arma la pre-cuenta para la estación de caja.
@@ -109,6 +110,9 @@ func ImprimirPreCuenta(p Paper, c PreCuenta) []byte {
 		b.Columns(l.Cantidad+" "+l.Producto, "$"+l.Total.String())
 	}
 	b.Separator('-')
+	if !c.Descuento.IsZero() {
+		b.Columns("Descuento", "-$"+c.Descuento.String())
+	}
 	b.Columns("Subtotal", "$"+c.Subtotal.String())
 	b.Columns("IVA", "$"+c.IVA.String())
 	if !c.Propina.IsZero() {

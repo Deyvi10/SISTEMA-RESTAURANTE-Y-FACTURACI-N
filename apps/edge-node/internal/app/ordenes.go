@@ -729,6 +729,11 @@ type Totales struct {
 	PropinaActiva     bool   `json:"propinaActiva"`
 	PropinaPorcentaje string `json:"propinaPorcentaje"`
 	PropinaRetirada   bool   `json:"propinaRetirada"`
+	// Descuentos vigentes (F4-09) y cuánto restan en total (con IVA si los precios lo incluyen).
+	Descuento  string      `json:"descuento"`
+	Descuentos []Descuento `json:"descuentos"`
+	// Importe final de cada línea tras los descuentos (base del detalle del comprobante en F5).
+	Lineas map[ids.ID]string `json:"lineas,omitempty"`
 }
 
 func (a *App) calcularTotales(ctx context.Context, q queryer, o Orden) (Totales, money.Money, money.Money, money.Money, money.Money, error) {
@@ -741,6 +746,17 @@ func (a *App) calcularTotales(ctx context.Context, q queryer, o Orden) (Totales,
 	if o.Tipo == "LLEVAR" || o.Tipo == "DELIVERY" {
 		propActiva = 0
 	}
+	ds, err := leerDescuentos(ctx, q, o.ID)
+	if err != nil {
+		return Totales{}, money.Money{}, money.Money{}, money.Money{}, money.Money{}, err
+	}
+	finales, ds := aplicarDescuentos(o.Lineas, ds)
+	descuento := money.Money{}
+	for _, d := range ds {
+		m, _ := money.Parse(d.Monto)
+		descuento = descuento.Add(m)
+	}
+	lineasFinales := map[ids.ID]string{}
 	porTarifa := map[string]money.Money{}
 	for _, l := range o.Lineas {
 		if l.Estado == "ANULADA" {
@@ -750,11 +766,12 @@ func (a *App) calcularTotales(ctx context.Context, q queryer, o Orden) (Totales,
 		if err := q.QueryRowContext(ctx, `SELECT porcentaje_iva FROM orden_lineas WHERE id = ?`, l.ID.String()).Scan(&pct); err != nil {
 			return Totales{}, money.Money{}, money.Money{}, money.Money{}, money.Money{}, err
 		}
-		t, err := money.Parse(l.Total)
-		if err != nil {
-			return Totales{}, money.Money{}, money.Money{}, money.Money{}, money.Money{}, err
-		}
+		t := finales[l.ID]
+		lineasFinales[l.ID] = t.String()
 		porTarifa[pct] = porTarifa[pct].Add(t)
+	}
+	if ds == nil {
+		ds = []Descuento{}
 	}
 	var base, iva money.Money
 	claves := make([]string, 0, len(porTarifa))
@@ -786,7 +803,8 @@ func (a *App) calcularTotales(ctx context.Context, q queryer, o Orden) (Totales,
 	}
 	total := base.Add(iva).Add(propina)
 	return Totales{Subtotal: base.String(), IVA: iva.String(), Propina: propina.String(), Total: total.String(),
-		PropinaActiva: propActiva == 1, PropinaPorcentaje: propPct, PropinaRetirada: o.PropinaRetirada}, base, iva, propina, total, nil
+		PropinaActiva: propActiva == 1, PropinaPorcentaje: propPct, PropinaRetirada: o.PropinaRetirada,
+		Descuento: descuento.String(), Descuentos: ds, Lineas: lineasFinales}, base, iva, propina, total, nil
 }
 
 type PrecuentaIn struct {
@@ -827,7 +845,8 @@ func (a *App) Precuenta(ctx context.Context, u Usuario, orden ids.ID, in Precuen
 		out.Orden, out.Totales = o, tot
 		var local string
 		_ = tx.QueryRowContext(ctx, `SELECT nombre FROM locales LIMIT 1`).Scan(&local)
-		pc := escpos.PreCuenta{Local: local, Mesa: o.Mesa, Mesero: o.MeseroNombre, Hora: now.In(loc), Subtotal: base, IVA: iva, Propina: propina, Total: total, Personas: in.Personas}
+		desc, _ := money.Parse(tot.Descuento)
+		pc := escpos.PreCuenta{Local: local, Mesa: o.Mesa, Mesero: o.MeseroNombre, Hora: now.In(loc), Descuento: desc, Subtotal: base, IVA: iva, Propina: propina, Total: total, Personas: in.Personas}
 		pc.Lineas = lineasCuenta(o.Lineas)
 		imps, respaldo, err := a.impresorasDeCaja(ctx, tx, nil)
 		if err != nil {
