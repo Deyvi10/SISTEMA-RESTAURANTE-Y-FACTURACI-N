@@ -15,6 +15,7 @@ import (
 
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/edge-node/internal/impresion"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/edge-node/internal/store"
+	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/auditoria"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/clock"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/edgesync"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/escpos"
@@ -563,15 +564,140 @@ func (a *App) Reimprimir(ctx context.Context, comanda ids.ID, in ReimprimirIn) (
 	return envios, nil
 }
 
-// auditar agrega una fila a la auditoría local (append-only; la cadena de hash llega en F4-15).
+// EventoAuditoria lleva cada registro de auditoría a la nube, que verifica la cadena del nodo.
+const EventoAuditoria = "auditoria.registrada"
+
+// outboxAuditoria: Append solo inserta en la tabla outbox de la transacción que recibe.
+var outboxAuditoria edgesync.Outbox
+
+type claveDispositivo struct{}
+
+// conDispositivoAuditado deja el dispositivo de la petición en el contexto para que la
+// auditoría lo registre sin que cada acción tenga que pasarlo.
+func conDispositivoAuditado(ctx context.Context, d Dispositivo) context.Context {
+	if d.ID == ids.Nil {
+		return ctx
+	}
+	return context.WithValue(ctx, claveDispositivo{}, d.ID)
+}
+
+// idDe acepta un ids.ID, un *ids.ID o su texto (así vienen en los detalles de las acciones).
+func idDe(v any) *ids.ID {
+	switch x := v.(type) {
+	case ids.ID:
+		if x != ids.Nil {
+			return &x
+		}
+	case *ids.ID:
+		if x != nil && *x != ids.Nil {
+			return x
+		}
+	case string:
+		if id, err := ids.Parse(x); err == nil {
+			return &id
+		}
+	}
+	return nil
+}
+
+// auditar agrega un registro a la auditoría inmutable (RF-08-06) encadenado con el anterior
+// y lo deja en el outbox, todo en la transacción de la acción. Del detalle toma el motivo, el
+// monto y quién autorizó con su PIN; el dispositivo sale del contexto de la petición.
 func auditar(ctx context.Context, tx *store.Tx, accion, entidad string, entidadID ids.ID, usuario *ids.ID, detalle any, now time.Time) error {
-	raw, err := json.Marshal(detalle)
+	r := auditoria.Registro{ID: ids.New(), UsuarioID: usuario, Accion: accion, Entidad: entidad, CreatedAt: now, Detalle: auditoria.Compactar(detalle)}
+	if entidadID != ids.Nil {
+		r.EntidadID = entidadID.String()
+	}
+	if d, ok := ctx.Value(claveDispositivo{}).(ids.ID); ok {
+		r.DispositivoID = &d
+	}
+	if m, ok := detalle.(map[string]any); ok {
+		if v, ok := m["motivo"].(string); ok {
+			r.Motivo = strings.TrimSpace(v)
+		}
+		for _, k := range []string{"monto", "total"} {
+			if v, ok := m[k].(string); ok && v != "" {
+				r.Monto = v
+				break
+			}
+		}
+		r.AutorizadoPor = idDe(m["autorizadoPor"])
+	}
+	var tenant, local sql.NullString
+	_ = tx.QueryRowContext(ctx, `SELECT tenant_id, local_id FROM nodo WHERE id = 1`).Scan(&tenant, &local)
+	r.TenantID, _ = ids.Parse(tenant.String)
+	r.LocalID = idDe(local.String)
+	var anterior string
+	if err := tx.QueryRowContext(ctx, `SELECT seq, hash FROM auditoria ORDER BY seq DESC LIMIT 1`).Scan(&r.Seq, &anterior); err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return err
+	}
+	r.Seq++
+	r.Sellar(anterior)
+	txt := func(b json.RawMessage) any {
+		if len(b) == 0 {
+			return nil
+		}
+		return string(b)
+	}
+	vacio := func(s string) any {
+		if s == "" {
+			return nil
+		}
+		return s
+	}
+	det := "{}"
+	if len(r.Detalle) > 0 {
+		det = string(r.Detalle)
+	}
+	if _, err := tx.ExecContext(ctx, `INSERT INTO auditoria (id, seq, usuario_id, autorizado_por, dispositivo_id, accion, entidad, entidad_id, antes, despues, monto, motivo, detalle, created_at, hash_anterior, hash)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		r.ID.String(), r.Seq, idOrNil(r.UsuarioID), idOrNil(r.AutorizadoPor), idOrNil(r.DispositivoID), r.Accion, r.Entidad, vacio(r.EntidadID),
+		txt(r.Antes), txt(r.Despues), vacio(r.Monto), vacio(r.Motivo), det, r.CreatedAt.Format(time.RFC3339Nano), r.HashAnterior, r.Hash); err != nil {
+		return err
+	}
+	ev, err := edgesync.NewEvent(EventoAuditoria, 1, r.ID, r, now)
 	if err != nil {
 		return err
 	}
-	_, err = tx.ExecContext(ctx, `INSERT INTO auditoria (id, usuario_id, accion, entidad, entidad_id, detalle, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		ids.New().String(), idOrNil(usuario), accion, entidad, entidadID.String(), string(raw), now.Format(time.RFC3339Nano))
+	_, err = outboxAuditoria.Append(ctx, tx, ev)
 	return err
+}
+
+// CadenaAuditoria lee la auditoría del nodo en orden para verificarla.
+func (a *App) CadenaAuditoria(ctx context.Context) ([]auditoria.Registro, error) {
+	rows, err := a.Store.Read().QueryContext(ctx, `SELECT id, seq, usuario_id, autorizado_por, dispositivo_id, accion, entidad, entidad_id, antes, despues, monto, motivo, detalle, created_at, hash_anterior, hash
+		FROM auditoria ORDER BY seq`)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	var tenant, local sql.NullString
+	_ = a.Store.Read().QueryRowContext(ctx, `SELECT tenant_id, local_id FROM nodo WHERE id = 1`).Scan(&tenant, &local)
+	tid, _ := ids.Parse(tenant.String)
+	var out []auditoria.Registro
+	for rows.Next() {
+		r := auditoria.Registro{TenantID: tid, LocalID: idDe(local.String)}
+		var id, creado, det string
+		var usr, aut, disp, ent, antes, despues, monto, motivo sql.NullString
+		if err := rows.Scan(&id, &r.Seq, &usr, &aut, &disp, &r.Accion, &r.Entidad, &ent, &antes, &despues, &monto, &motivo, &det, &creado, &r.HashAnterior, &r.Hash); err != nil {
+			return nil, err
+		}
+		r.ID, _ = ids.Parse(id)
+		r.UsuarioID, r.AutorizadoPor, r.DispositivoID = idDe(usr.String), idDe(aut.String), idDe(disp.String)
+		r.EntidadID, r.Monto, r.Motivo = ent.String, monto.String, motivo.String
+		if antes.Valid {
+			r.Antes = json.RawMessage(antes.String)
+		}
+		if despues.Valid {
+			r.Despues = json.RawMessage(despues.String)
+		}
+		if det != "{}" {
+			r.Detalle = json.RawMessage(det)
+		}
+		r.CreatedAt, _ = time.Parse(time.RFC3339Nano, creado)
+		out = append(out, r)
+	}
+	return out, rows.Err()
 }
 
 // notificarPush despierta al envío a la nube si la sincronización está activa.

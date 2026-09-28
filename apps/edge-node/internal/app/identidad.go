@@ -176,15 +176,14 @@ func (a *App) Activar(ctx context.Context, codigo string) (*Identidad, error) {
 			{`INSERT INTO nodo (id, nodo_id, tenant_id, local_id, nube_url, llave_privada, nombre_local, nombre_comercial, activado_at) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?)`,
 				[]any{nodoID.String(), res.TenantID.String(), res.LocalID.String(), a.Cfg.NubeURL, []byte(llave), res.NombreLocal, res.NombreComercial, a.now()}},
 			{`DELETE FROM identidad_pendiente`, nil},
-			{`INSERT INTO auditoria (id, accion, entidad, entidad_id, detalle, created_at) VALUES (?, 'NODO_ACTIVADO', 'nodo', ?, json_object('localId', ?), ?)`,
-				[]any{ids.New().String(), nodoID.String(), res.LocalID.String(), a.now()}},
 		}
 		for _, s := range stmts {
 			if _, err := tx.ExecContext(ctx, s.q, s.args...); err != nil {
 				return err
 			}
 		}
-		return nil
+		// Después de guardar la identidad: el registro ya lleva el tenant y el local.
+		return auditar(ctx, tx, "NODO_ACTIVADO", "nodo", nodoID, nil, map[string]any{"localId": res.LocalID}, a.Clock.Now())
 	})
 	if err != nil {
 		return nil, err

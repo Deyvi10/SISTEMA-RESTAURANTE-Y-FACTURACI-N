@@ -78,7 +78,7 @@ func TestAuditoriaAppendOnly(t *testing.T) {
 	s := abrir(t, filepath.Join(t.TempDir(), "nodo.db"))
 	ctx := context.Background()
 	if err := s.Write(ctx, func(tx *Tx) error {
-		_, err := tx.Exec(`INSERT INTO auditoria (id, accion, entidad, created_at) VALUES ('a', 'PRUEBA', 'nodo', '2026-09-25T00:00:00Z')`)
+		_, err := tx.Exec(`INSERT INTO auditoria (id, seq, accion, entidad, created_at) VALUES ('a', 1, 'PRUEBA', 'nodo', '2026-09-25T00:00:00Z')`)
 		return err
 	}); err != nil {
 		t.Fatal(err)

@@ -108,6 +108,11 @@ func (c *cliente) nodoOperativo() *nodoSim {
 	c.e.notificarCierres()
 	n.cliente(caja.Cliente{ID: ids.New(), TipoIdentificacion: "05", Identificacion: "1710034065", RazonSocial: "María Pérez", Email: "maria@example.com",
 		CamposAt: map[string]time.Time{"razonSocial": time.Now(), "email": time.Now()}})
+	var tenant ids.ID
+	if err := c.e.tdb.Admin.QueryRow(context.Background(), `SELECT tenant_id FROM nodos WHERE id = $1`, n.id).Scan(&tenant); err != nil {
+		c.e.t.Fatal(err)
+	}
+	n.auditar(tenant, 1, "", nil)
 	return n
 }
 

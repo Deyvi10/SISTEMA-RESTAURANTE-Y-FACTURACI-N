@@ -24,7 +24,7 @@ func (a *App) sesion(fn conSesion) http.Handler {
 			responderError(w, a.Log, err)
 			return
 		}
-		out, err := fn(r.Context(), d, u, r)
+		out, err := fn(conDispositivoAuditado(r.Context(), d), d, u, r)
 		if err != nil {
 			responderError(w, a.Log, err)
 			return
@@ -44,7 +44,7 @@ func (a *App) conDispositivo(fn func(ctx context.Context, d Dispositivo, r *http
 			responderError(w, a.Log, err)
 			return
 		}
-		out, err := fn(r.Context(), d, r)
+		out, err := fn(conDispositivoAuditado(r.Context(), d), d, r)
 		if err != nil {
 			responderError(w, a.Log, err)
 			return

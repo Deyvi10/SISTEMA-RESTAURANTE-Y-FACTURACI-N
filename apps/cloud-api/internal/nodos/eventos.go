@@ -11,6 +11,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/auditoria"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/auth"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/caja"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/edgesync"
@@ -115,6 +116,8 @@ func (s *Service) Aplicador(n auth.Nodo) edgesync.Applier {
 			return caja.RegistrarCierre(ctx, tx, n.TenantID, n.LocalID, e.Payload)
 		case caja.EventoClienteGuardado:
 			return caja.RegistrarCliente(ctx, tx, n.TenantID, e.Payload)
+		case auditoria.EventoNodo:
+			return auditoria.RegistrarDelNodo(ctx, tx, n.TenantID, n.ID, e.Payload)
 		case EventoImpresoraDetectada:
 			var d ImpresoraDetectada
 			if err := json.Unmarshal(e.Payload, &d); err != nil || d.ID == ids.Nil {
