@@ -135,6 +135,7 @@ func (a *App) routes() {
 	a.mux.HandleFunc("GET /v1/conectividad", a.handleConectividad)
 	a.mux.Handle("GET /v1/ws", a.hub.Handler(a.autenticarWS))
 	a.rutasApp()
+	a.rutasCaja()
 
 	// Operación: por ahora solo desde esta PC; los teléfonos entran con el emparejamiento (F3-02).
 	a.mux.Handle("POST /v1/comandas", soloLocal(jsonHandler(a.EnviarComanda, http.StatusCreated)))

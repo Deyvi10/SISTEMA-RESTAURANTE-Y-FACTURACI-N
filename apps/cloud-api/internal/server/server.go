@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/auth"
+	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/caja"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/catalogo"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/imagenes"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/impresoras"
@@ -46,13 +47,14 @@ type Deps struct {
 	Imagenes      *imagenes.Service
 	Nodos         *nodos.Service
 	Impresoras    *impresoras.Service
+	Caja          *caja.Service
 	BackofficeURL string
 }
 
 // Routes devuelve la tabla completa de rutas.
 func Routes(d Deps) []Route {
 	s, c, pe := d.Salon, d.Catalogo, d.Personal
-	menu, sal, per := con(rbac.ConfigurarMenu), con(rbac.ConfigurarSalon), con(rbac.GestionarPersonal)
+	menu, sal, per, cja := con(rbac.ConfigurarMenu), con(rbac.ConfigurarSalon), con(rbac.GestionarPersonal), con(rbac.ConfigurarCaja)
 	return []Route{
 		{"GET", "/health", publico, func(w http.ResponseWriter, r *http.Request) { httpx.JSON(w, 200, map[string]string{"estado": "ok"}) }},
 		{"GET", "/ready", publico, ready(d.DB)},
@@ -129,6 +131,18 @@ func Routes(d Deps) []Route {
 			}
 			d.Imagenes.HandleSubir(w, r)
 		}},
+
+		{"GET", "/v1/cajas", cja, list(d.Caja.Cajas)},
+		{"POST", "/v1/cajas", cja, create(d.Caja.CrearCaja)},
+		{"PUT", "/v1/cajas/{id}", cja, update(d.Caja.ActualizarCaja)},
+		{"DELETE", "/v1/cajas/{id}", cja, remove(d.Caja.EliminarCaja)},
+		{"GET", "/v1/metodos-pago", cja, list(d.Caja.Metodos)},
+		{"POST", "/v1/metodos-pago", cja, create(d.Caja.CrearMetodo)},
+		{"PUT", "/v1/metodos-pago/{id}", cja, update(d.Caja.ActualizarMetodo)},
+		{"DELETE", "/v1/metodos-pago/{id}", cja, remove(d.Caja.EliminarMetodo)},
+		{"GET", "/v1/motivos-descuento", cja, list(d.Caja.Motivos)},
+		{"POST", "/v1/motivos-descuento", cja, create(d.Caja.CrearMotivo)},
+		{"DELETE", "/v1/motivos-descuento/{id}", cja, remove(d.Caja.EliminarMotivo)},
 
 		{"GET", "/v1/impresoras", sal, list(d.Impresoras.Listar)},
 		{"POST", "/v1/impresoras", sal, create(d.Impresoras.Crear)},

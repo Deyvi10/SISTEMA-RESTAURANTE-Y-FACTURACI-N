@@ -294,7 +294,7 @@ func (a *App) EnviarComanda(ctx context.Context, in ComandaIn) (ComandaOut, erro
 			lineas = append(lineas, Linea{ID: lid, ProductoID: l.ProductoID, Producto: nombre, Cantidad: l.Cantidad,
 				Modificadores: l.Modificadores, Nota: l.Nota, Tiempo: l.Tiempo, EstacionID: est.ID})
 		}
-		fecha := now.In(loc).Format("2006-01-02")
+		fecha := fechaNegocio(ctx, tx, now, loc)
 		if err := tx.QueryRowContext(ctx, `INSERT INTO contadores (clave, valor) VALUES (?, 1)
 			ON CONFLICT (clave) DO UPDATE SET valor = valor + 1 RETURNING valor`, "comanda:"+fecha).Scan(&out.Numero); err != nil {
 			return err

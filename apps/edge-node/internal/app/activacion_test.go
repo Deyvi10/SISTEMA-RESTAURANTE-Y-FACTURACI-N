@@ -389,3 +389,33 @@ func TestTiempoRealYConectividad(t *testing.T) {
 	}
 	_ = a
 }
+
+// Una actualización del nodo que agrega tablas replicadas pide un volcado: las filas de esas
+// tablas pudieron llegar antes, con la versión vieja, y descartarse.
+func TestVolcadoAlCambiarLasTablasReplicadas(t *testing.T) {
+	f := newNubeFalsa()
+	f.codigos["ABCDEFGH"] = true
+	a, lan := nodoDePrueba(t, f)
+	if st, _ := postJSON(t, lan.URL+"/v1/activacion", map[string]string{"codigo": "ABCDEFGH"}); st != 200 {
+		t.Fatal("activación")
+	}
+	esperar(t, func() bool { return a.huellaGuardada(context.Background()) == huellaTablas() })
+	// Simula que el último volcado lo hizo una versión con otras tablas; la nube ya tiene cajas.
+	f.mu.Lock()
+	f.volcado = []edgesync.Cambio{{Tabla: "cajas", Op: "U", Datos: []byte(`{"id":"k1","tenant_id":"t","local_id":"l","nombre":"Caja 1","activa":true}`)}}
+	f.mu.Unlock()
+	if err := a.Store.Write(context.Background(), func(tx *store.Tx) error {
+		_, err := tx.Exec(`UPDATE inbox_cursores SET cursor = 1 WHERE flujo = ?`, flujoTablas)
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	esperar(t, func() bool {
+		var n int
+		_ = a.Store.Read().QueryRow(`SELECT count(*) FROM cajas`).Scan(&n)
+		return n == 1
+	})
+	if a.huellaGuardada(context.Background()) != huellaTablas() {
+		t.Fatal("la huella no se actualizó tras el volcado")
+	}
+}

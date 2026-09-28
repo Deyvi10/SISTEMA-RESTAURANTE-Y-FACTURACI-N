@@ -89,3 +89,33 @@ button { font: inherit; }
 .rp-scrim:has(.ayuda-atajos) { opacity: 1; display: grid; place-items: center; }
 .ayuda-atajos .rp-sheet__header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .ayuda-atajos { position: static; transform: none; width: min(560px, 92vw); max-height: 80vh; overflow: auto; border-radius: 18px; }
+
+/* ---------- Turno de caja ---------- */
+.barra__tab { border: 0; background: none; cursor: pointer; }
+.barra__tab:hover { color: var(--rp-color-label); }
+.estado-turno { border: 0; cursor: pointer; font: inherit; font-size: 13px; }
+.turno { max-width: 1100px; margin: 0 auto; }
+.turno__cabecera { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 8px; flex-wrap: wrap; }
+.turno__tarjetas { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; margin: 16px 0 8px; }
+.tarjeta { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 20px; border-radius: 18px; background: var(--rp-color-surface); }
+.tarjeta p { margin: 0; }
+.tarjeta__cabecera { display: flex; align-items: center; gap: 8px; width: 100%; }
+.tarjeta__cabecera svg { width: 20px; height: 20px; color: var(--rp-color-accent); }
+.tarjeta__cabecera h2 { flex: 1; }
+.tarjeta__dato { font: 700 22px/1.2 var(--rp-font-display, inherit); }
+.tarjeta__dato::first-letter { text-transform: uppercase; }
+.tarjeta .rp-btn { margin-top: 6px; }
+.tarjeta .rp-btn svg { width: 16px; height: 16px; }
+.turno__acciones { display: flex; gap: 8px; flex-wrap: wrap; }
+.turno .gente { margin-top: 20px; }
+.turno .persona svg { width: 34px; height: 34px; color: var(--rp-color-accent); }
+.movimientos { margin: 0; }
+
+/* Hoja con teclado de importe: centrada en la caja (pantalla ancha), no pegada abajo. */
+.rp-scrim:has(.hoja-caja), .centrado-fijo { display: grid; place-items: center; }
+.hoja-caja { position: static; transform: none; width: min(420px, 92vw); max-height: 92vh; border-radius: 22px; }
+.hoja-caja .rp-sheet__grabber { display: none; }
+.hoja-caja__ayuda { margin: 0 20px; text-align: center; color: var(--rp-color-label-secondary); }
+.hoja-caja__pie { display: flex; flex-direction: column; gap: 12px; padding: 12px 20px 0; }
+.teclado-monto { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 8px 20px; }
+.teclado-monto__valor { font: 300 48px/1.1 var(--rp-font-display, inherit); letter-spacing: -0.5px; min-height: 56px; }

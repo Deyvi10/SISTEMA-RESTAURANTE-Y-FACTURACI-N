@@ -111,18 +111,18 @@ func consultasVolcado(tabla string) (string, bool) {
 		return `SELECT to_jsonb(t) FROM locales t WHERE t.id = $1 AND t.deleted_at IS NULL`, true
 	case "dispositivos":
 		return `SELECT to_jsonb(t) - 'llave_publica' FROM dispositivos t WHERE t.local_id = $1`, true
-	case "estaciones", "zonas", "mesas", "impresoras":
+	case "estaciones", "zonas", "mesas", "impresoras", "cajas":
 		return fmt.Sprintf(`SELECT to_jsonb(t) FROM %s t WHERE t.local_id = $1 AND t.deleted_at IS NULL`, tabla), true
 	case "usuario_locales", "estacion_impresoras":
 		return fmt.Sprintf(`SELECT to_jsonb(t) FROM %s t WHERE t.local_id = $1`, tabla), true
 	case "comandos_nodo":
 		// Solo órdenes recientes y pendientes: un volcado nunca repite una prueba vieja.
 		return `SELECT to_jsonb(t) FROM comandos_nodo t WHERE t.local_id = $1 AND t.ejecutado_at IS NULL AND t.created_at > now() - interval '10 minutes'`, true
-	case "categorias", "productos", "grupos_modificadores":
+	case "categorias", "productos", "grupos_modificadores", "metodos_pago", "motivos_descuento":
 		return fmt.Sprintf(`SELECT to_jsonb(t) FROM %s t WHERE t.deleted_at IS NULL`, tabla), false
 	case "usuarios":
 		return `SELECT to_jsonb(t) - 'password_hash' - 'totp_secret_cifrado' - 'email' - 'debe_cambiar_password' FROM usuarios t`, false
-	case "modificadores", "producto_grupos_modificadores", "notas_rapidas", "permisos_usuario", "tarifas_iva":
+	case "modificadores", "producto_grupos_modificadores", "notas_rapidas", "permisos_usuario", "tarifas_iva", "parametros_globales":
 		return fmt.Sprintf(`SELECT to_jsonb(t) FROM %s t`, tabla), false
 	}
 	return "", false

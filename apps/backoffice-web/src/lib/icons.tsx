@@ -1,7 +1,7 @@
 // Iconos por nombre (los mismos nombres que usa la API y packages/design/icons.json).
 // Importación explícita: el paquete solo incluye lo que se usa.
 import {
-  Armchair, Banknote, Beef, Beer, CakeSlice, Camera, Check, ChefHat, Cherry, ChevronLeft, ChevronRight, CircleAlert,
+  ArrowLeftRight, Armchair, Banknote, CreditCard, Wallet, Beef, Beer, CakeSlice, Camera, Check, ChefHat, Cherry, ChevronLeft, ChevronRight, CircleAlert,
   CircleCheck, Citrus, Clock, CloudOff, Coffee, Copy, HardDrive, RefreshCw, Server, Activity, Cookie, CookingPot, Croissant, Crown, CupSoda, Dessert, Donut,
   Drumstick, EggFried, Eye, EyeOff, Fish, Flame, GlassWater, GripVertical, Ham, House, IceCreamCone, ImagePlus,
   Images, Info, KeyRound, LayoutGrid, LogOut, type LucideIcon, Mail, MapPin, Martini, Milk, Minus, Monitor, Pencil,
@@ -18,6 +18,7 @@ export const ICONOS: Record<string, LucideIcon> = {
   "ice-cream-cone": IceCreamCone, dessert: Dessert, donut: Donut, cookie: Cookie, cherry: Cherry, coffee: Coffee,
   milk: Milk, "cup-soda": CupSoda, citrus: Citrus, "glass-water": GlassWater, beer: Beer, wine: Wine, martini: Martini,
   // estaciones (nombres semánticos del sistema de diseño)
+  efectivo: Banknote, tarjeta: CreditCard, transferencia: ArrowLeftRight, billetera: Wallet,
   cocina: Flame, bar: Wine, cocinaFria: Snowflake, kds: Monitor, factura: Receipt, impresora: Printer, caja: Banknote,
   // interfaz
   inicio: House, salon: LayoutGrid, personal: Users, ajustes: Settings, salir: LogOut, agregar: Plus, buscar: Search,

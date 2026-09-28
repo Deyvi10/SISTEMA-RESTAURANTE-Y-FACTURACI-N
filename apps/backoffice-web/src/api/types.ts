@@ -233,3 +233,34 @@ export interface ImpresoraInstalada {
   localId: UUID;
   impresoraId: UUID | null;
 }
+
+// ---------- Caja (F4-03, F4-06, F4-09) ----------
+
+export interface Caja {
+  id: string;
+  localId: string;
+  nombre: string;
+  estacionId: string | null;
+  activa: boolean;
+}
+
+export type TipoMetodoPago = "EFECTIVO" | "TARJETA_CREDITO" | "TARJETA_DEBITO" | "TRANSFERENCIA" | "BILLETERA" | "OTRO";
+
+export interface MetodoPago {
+  id: string;
+  nombre: string;
+  tipo: TipoMetodoPago;
+  codigoSri: string;
+  abreCajon: boolean;
+  pideReferencia: boolean;
+  icono: string;
+  orden: number;
+  activo: boolean;
+}
+
+export interface MotivoDescuento {
+  id: string;
+  nombre: string;
+  tipo: "DESCUENTO" | "CORTESIA";
+  activo: boolean;
+}

@@ -3,7 +3,9 @@ package app
 import (
 	"context"
 	"fmt"
+	"hash/fnv"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/edge-node/internal/nube"
@@ -14,6 +16,8 @@ import (
 const (
 	flujoNube    = "nube"
 	flujoVolcado = "nube-volcado"
+	// flujoTablas guarda la huella de las tablas que tenía el nodo en su último volcado.
+	flujoTablas = "nube-tablas"
 	// EsperaPull: long-poll; la nube responde apenas hay un cambio.
 	EsperaPull = 25 * time.Second
 	// VolcadoCada: una vez al día se pide todo de nuevo para corregir cualquier deriva
@@ -26,6 +30,21 @@ type CambiosAplicados struct {
 	Completo bool
 	Tablas   map[string]int
 	Cambios  []edgesync.Cambio
+}
+
+// huellaTablas identifica el conjunto de tablas replicadas de esta versión del nodo. Si una
+// actualización agrega tablas, sus filas pudieron llegar antes (y descartarse) con la versión
+// vieja: la huella distinta obliga a pedir un volcado completo.
+func huellaTablas() int64 {
+	h := fnv.New64a()
+	_, _ = h.Write([]byte(strings.Join(edgesync.TablasReplica, ",")))
+	return int64(h.Sum64() >> 1)
+}
+
+func (a *App) huellaGuardada(ctx context.Context) int64 {
+	var h int64
+	_ = a.Store.Read().QueryRowContext(ctx, `SELECT cursor FROM inbox_cursores WHERE flujo = ?`, flujoTablas).Scan(&h)
+	return h
 }
 
 // cursorNube devuelve el último cambio aplicado y cuándo fue el último volcado completo
@@ -57,7 +76,7 @@ func (a *App) PullOnce(ctx context.Context, esperar time.Duration) (bool, error)
 	if err != nil {
 		return false, err
 	}
-	pedirVolcado := ultimoVolcado.IsZero() || a.Clock.Now().Sub(ultimoVolcado) > VolcadoCada
+	pedirVolcado := ultimoVolcado.IsZero() || a.Clock.Now().Sub(ultimoVolcado) > VolcadoCada || a.huellaGuardada(ctx) != huellaTablas()
 	cctx, cancel := context.WithTimeout(ctx, esperar+20*time.Second)
 	defer cancel()
 	var res edgesync.PullResponse
@@ -94,9 +113,12 @@ func (a *App) PullOnce(ctx context.Context, esperar time.Duration) (bool, error)
 			return err
 		}
 		if aplicados.Completo {
-			_, err := tx.ExecContext(ctx, `INSERT INTO inbox_cursores (flujo, cursor, updated_at) VALUES (?, ?, ?)
-				ON CONFLICT (flujo) DO UPDATE SET cursor = excluded.cursor, updated_at = excluded.updated_at`, flujoVolcado, res.Hasta, now)
-			return err
+			for flujo, cursor := range map[string]int64{flujoVolcado: res.Hasta, flujoTablas: huellaTablas()} {
+				if _, err := tx.ExecContext(ctx, `INSERT INTO inbox_cursores (flujo, cursor, updated_at) VALUES (?, ?, ?)
+					ON CONFLICT (flujo) DO UPDATE SET cursor = excluded.cursor, updated_at = excluded.updated_at`, flujo, cursor, now); err != nil {
+					return err
+				}
+			}
 		}
 		return nil
 	})

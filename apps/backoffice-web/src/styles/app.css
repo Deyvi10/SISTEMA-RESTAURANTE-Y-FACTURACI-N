@@ -194,6 +194,10 @@ h1, h2, h3 { text-wrap: balance; margin: 0; }
 .seccion { margin-top: 34px; }
 .seccion > h2 { font: 700 22px/1.2 var(--rp-font-display); margin-bottom: 4px; }
 .seccion > p { margin: 0 0 14px; color: var(--rp-color-label-secondary); }
+.seccion__cabecera { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 4px; }
+.seccion__cabecera h2 { font: 700 22px/1.2 var(--rp-font-display); }
+.seccion .rp-group { max-width: 720px; }
+.seccion .rp-cell { width: 100%; border: 0; background: none; text-align: left; font: inherit; color: inherit; cursor: pointer; }
 
 /* ---------- Personal ---------- */
 .equipo { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }

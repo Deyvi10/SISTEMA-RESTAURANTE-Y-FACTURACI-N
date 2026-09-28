@@ -35,6 +35,7 @@ const (
 	RecargarCupo      Permiso = "RECARGAR_CUPO"
 	ConfigurarMenu    Permiso = "CONFIGURAR_MENU"
 	ConfigurarSalon   Permiso = "CONFIGURAR_SALON"
+	ConfigurarCaja    Permiso = "CONFIGURAR_CAJA"
 	AjustarInventario Permiso = "AJUSTAR_INVENTARIO"
 	GestionarPersonal Permiso = "GESTIONAR_PERSONAL"
 	ConfigurarSRI     Permiso = "CONFIGURAR_SRI"
@@ -84,6 +85,7 @@ var matriz = map[Permiso]regla{
 	RecargarCupo:      r("Recargar platos del día", "Sumar unidades a un plato con cupo diario", nil, []Rol{Cajero, Cocina}),
 	ConfigurarMenu:    r("Configurar menú", "Crear y editar categorías, productos, precios y recetas", nil, nil),
 	ConfigurarSalon:   r("Configurar salón", "Editar zonas, mesas, estaciones e impresoras", nil, nil),
+	ConfigurarCaja:    r("Configurar caja", "Cajas, métodos de pago y motivos de descuento", nil, nil),
 	AjustarInventario: r("Ajustar inventario", "Tomas físicas y ajustes", nil, []Rol{Cocina, Bodega}),
 	GestionarPersonal: r("Gestionar personal", "Crear usuarios, PIN y dispositivos", nil, nil),
 	ConfigurarSRI:     r("Configurar facturación SRI", "Firma electrónica y puntos de emisión", nil, nil),

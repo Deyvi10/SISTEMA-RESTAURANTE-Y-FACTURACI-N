@@ -3,6 +3,7 @@ import { useSession } from "./api/session";
 import { Spinner } from "./components/ui";
 import { Shell } from "./layout/Shell";
 import { CambiarClave, Login, Olvide, Restablecer } from "./pages/Acceso";
+import { Caja } from "./pages/Caja";
 import { Inicio, Proximamente } from "./pages/Inicio";
 import { Impresoras } from "./pages/Impresoras";
 import { Menu } from "./pages/Menu";
@@ -40,6 +41,7 @@ export function App() {
         <Route path="ajustes" element={<Ajustes />} />
         <Route path="nodo" element={<Nodo />} />
         <Route path="impresoras" element={<Impresoras />} />
+        <Route path="caja" element={<Caja />} />
         <Route path="facturacion" element={<Proximamente titulo="Facturación electrónica SRI" icono="receipt" tint="pink"
           texto="Sube tu firma electrónica una vez y factura sin hacer esperar al cajero, incluso cuando el SRI está lento o caído."
           beneficios={["Comprobante impreso al instante con clave de acceso", "Autorización automática en segundo plano", "Tus XML guardados 7 años sin posibilidad de borrarse"]} />} />

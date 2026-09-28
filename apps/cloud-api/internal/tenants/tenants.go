@@ -114,7 +114,7 @@ func (s *Service) Crear(ctx context.Context, a Alta) (Resultado, error) {
 	return r, nil
 }
 
-// sembrar crea lo mínimo para operar (RF-01-01.3): estaciones, salón y categorías con icono.
+// sembrar crea lo mínimo para operar (RF-01-01.3): estaciones, salón, categorías con icono y caja.
 func sembrar(ctx context.Context, tx db.Tx, r Resultado) error {
 	cajaID := ids.New()
 	stmts := []struct {
@@ -135,7 +135,9 @@ func sembrar(ctx context.Context, tx db.Tx, r Resultado) error {
 			return err
 		}
 	}
-	return nil
+	// Caja 1, métodos de pago y motivos de descuento: la misma función que sembró a los existentes.
+	_, err := tx.Exec(ctx, `SELECT sembrar_caja($1)`, r.TenantID)
+	return err
 }
 
 func (s *Service) enviarBienvenida(ctx context.Context, a Alta, r Resultado) error {

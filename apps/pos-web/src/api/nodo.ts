@@ -149,6 +149,57 @@ export interface Salon {
   mesas: Mesa[];
 }
 
+// ---------- Caja (F4-02, F4-03, F4-11) ----------
+
+export interface CajaInfo {
+  id: string;
+  nombre: string;
+  estacionId: string | null;
+}
+
+export interface ConfigCaja {
+  cajas: CajaInfo[];
+  consumidorFinalMaximo: string;
+}
+
+export interface Jornada {
+  id: string;
+  fechaNegocio: string;
+  abiertaAt: string;
+  abiertaPor: string;
+  cerradaAt?: string;
+}
+
+export interface Turno {
+  id: string;
+  cajaId: string;
+  jornadaId: string;
+  cajeroId: string;
+  cajeroNombre: string;
+  fondoInicial: string;
+  abiertoAt: string;
+  estado: "ABIERTO" | "CERRADO";
+}
+
+/** Lo que ve la caja al entrar: nunca trae el esperado del cierre (cierre ciego). */
+export interface EstadoCaja {
+  caja: CajaInfo;
+  jornada: Jornada | null;
+  turno: Turno | null;
+}
+
+export type TipoMovimiento = "RETIRO" | "INGRESO" | "GASTO";
+
+export interface Movimiento {
+  id: string;
+  turnoId: string;
+  tipo: TipoMovimiento;
+  monto: string;
+  motivo: string;
+  usuarioNombre: string;
+  createdAt: string;
+}
+
 // ---------- Llamadas ----------
 
 export const nodo = {
@@ -162,4 +213,11 @@ export const nodo = {
   entrar: (usuarioId: string, pin: string) => api<SesionUsuario>("POST", "/v1/sesiones", { usuarioId, pin }),
   salir: () => api<void>("DELETE", "/v1/sesiones"),
   salon: () => api<Salon>("GET", "/v1/salon"),
+  configCaja: () => api<ConfigCaja>("GET", "/v1/caja/config"),
+  estadoCaja: (cajaId: string) => api<EstadoCaja>("GET", `/v1/cajas/${cajaId}/estado`),
+  abrirJornada: () => api<Jornada>("POST", "/v1/jornada/abrir", {}),
+  cerrarJornada: (transferirOrdenes: boolean) => api<Jornada>("POST", "/v1/jornada/cerrar", { transferirOrdenes }),
+  abrirTurno: (cajaId: string, fondoInicial: string) => api<Turno>("POST", "/v1/turnos", { cajaId, fondoInicial }),
+  movimiento: (b: { cajaId: string; tipo: TipoMovimiento; monto: string; motivo: string; idempotencyKey: string }) => api<Movimiento>("POST", "/v1/caja/movimientos", b),
+  movimientos: (turnoId: string) => api<Movimiento[]>("GET", `/v1/turnos/${turnoId}/movimientos`),
 };

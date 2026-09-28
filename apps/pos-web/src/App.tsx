@@ -8,6 +8,7 @@ import { Indicador } from "./components/Indicador";
 import { Emparejar } from "./pages/Emparejar";
 import { Mesas } from "./pages/Mesas";
 import { Personal } from "./pages/Personal";
+import { Turno, useCaja } from "./pages/Turno";
 
 export function App() {
   const { fase } = useSesion();
@@ -26,17 +27,34 @@ export function App() {
 function Caja() {
   const { usuario, salir } = useSesion();
   const [mesa, setMesa] = useState<Mesa | null>(null);
+  const [seccion, setSeccion] = useState<"mesas" | "turno">("mesas");
+  const caja = useCaja();
+  const turno = caja.estado?.turno ?? null;
   useAtajo("F12", "Bloquear la caja", () => void salir(), "General");
+  useAtajo("F9", "Ver las mesas", () => setSeccion("mesas"), "General");
+  useAtajo("F10", "Ver el turno de caja", () => setSeccion("turno"), "General");
 
   return (
     <div className="caja">
       <header className="barra">
         <span className="rp-t-headline barra__marca">Caja</span>
         <nav className="barra__nav" aria-label="Secciones">
-          <span className="barra__tab" aria-current="page">
-            Mesas
-          </span>
+          {(
+            [
+              ["mesas", "Mesas", "F9"],
+              ["turno", "Turno", "F10"],
+            ] as const
+          ).map(([id, nombre, tecla]) => (
+            <button key={id} className="barra__tab" aria-current={seccion === id ? "page" : undefined} onClick={() => setSeccion(id)} title={`${nombre} (${tecla})`} data-testid={`tab-${id}`}>
+              {nombre}
+            </button>
+          ))}
         </nav>
+        {caja.estado && (
+          <button className={`rp-status ${turno ? "rp-status--success" : "rp-status--warning"} estado-turno`} onClick={() => setSeccion("turno")} data-testid="estado-turno">
+            {turno ? `${caja.estado.caja.nombre} · turno de ${turno.cajeroNombre}` : `${caja.estado.caja.nombre} · sin turno`}
+          </button>
+        )}
         <Indicador />
         <span className="barra__usuario">
           <Avatar nombre={usuario?.nombre ?? ""} tamano={30} />
@@ -47,11 +65,17 @@ function Caja() {
         </button>
       </header>
       <main className="contenido">
-        <Mesas abrir={setMesa} />
-        {mesa && (
-          <p className="rp-secondary" role="status">
-            {mesa.nombre} elegida. El cobro llega con los turnos de caja.
-          </p>
+        {seccion === "turno" ? (
+          <Turno caja={caja} />
+        ) : (
+          <>
+            <Mesas abrir={setMesa} />
+            {mesa && (
+              <p className="rp-secondary" role="status">
+                {turno ? `${mesa.nombre} elegida. El cobro llega en la siguiente entrega (F4-05).` : `${mesa.nombre} elegida. Abre el turno de caja para poder cobrar.`}
+              </p>
+            )}
+          </>
         )}
       </main>
       <footer className="pie">

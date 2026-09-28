@@ -131,6 +131,7 @@ var TablasReplica = []string{
 	"locales", "estaciones", "zonas", "mesas", "categorias", "productos", "grupos_modificadores",
 	"modificadores", "producto_grupos_modificadores", "notas_rapidas", "usuarios", "usuario_locales",
 	"permisos_usuario", "tarifas_iva", "impresoras", "estacion_impresoras", "comandos_nodo", "dispositivos",
+	"cajas", "metodos_pago", "motivos_descuento", "parametros_globales",
 }
 
 // Cambio es una fila de la nube: op U = insertar o reemplazar, D = borrar.

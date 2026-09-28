@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { del, get, post, put, patch } from "./client";
 import type {
-  Categoria, CodigoNodo, ComandoNodo, Estacion, Impresora, ImpresoraInstalada, FotoGaleria, Grupo, IconoCategoria, Imagen, Local, Mesa, NodoLocal, Persona, Producto, Resumen, TarifaIVA, Zona,
+  Caja, Categoria, CodigoNodo, MetodoPago, MotivoDescuento, ComandoNodo, Estacion, Impresora, ImpresoraInstalada, FotoGaleria, Grupo, IconoCategoria, Imagen, Local, Mesa, NodoLocal, Persona, Producto, Resumen, TarifaIVA, Zona,
 } from "./types";
 
 export const useResumen = () => useQuery({ queryKey: ["resumen"], queryFn: () => get<Resumen>("/v1/resumen") });
@@ -19,6 +19,9 @@ export const useMesas = () => useQuery({ queryKey: ["mesas"], queryFn: () => get
 export const useNodos = () => useQuery({ queryKey: ["nodos"], queryFn: () => get<NodoLocal[]>("/v1/nodos"), refetchInterval: 15_000 });
 export const useInstaladas = () => useQuery({ queryKey: ["impresoras", "instaladas"], queryFn: () => get<ImpresoraInstalada[]>("/v1/impresoras/instaladas"), refetchInterval: 30_000 });
 export const useImpresoras = () => useQuery({ queryKey: ["impresoras"], queryFn: () => get<Impresora[]>("/v1/impresoras"), refetchInterval: 10_000 });
+export const useCajas = () => useQuery({ queryKey: ["cajas"], queryFn: () => get<Caja[]>("/v1/cajas") });
+export const useMetodosPago = () => useQuery({ queryKey: ["metodos-pago"], queryFn: () => get<MetodoPago[]>("/v1/metodos-pago") });
+export const useMotivos = () => useQuery({ queryKey: ["motivos-descuento"], queryFn: () => get<MotivoDescuento[]>("/v1/motivos-descuento") });
 export const usePersonal = () => useQuery({ queryKey: ["personal"], queryFn: () => get<Persona[]>("/v1/usuarios") });
 
 /** Mutación que al terminar refresca las listas afectadas y el progreso de la guía. */
@@ -33,6 +36,14 @@ export function useGuardar<TIn, TOut>(fn: (v: TIn) => Promise<TOut>, invalida: s
 }
 
 export const api = {
+  crearCaja: (b: object) => post<Caja>("/v1/cajas", b),
+  editarCaja: (id: string, b: object) => put<Caja>(`/v1/cajas/${id}`, b),
+  borrarCaja: (id: string) => del(`/v1/cajas/${id}`),
+  crearMetodo: (b: object) => post<MetodoPago>("/v1/metodos-pago", b),
+  editarMetodo: (id: string, b: object) => put<MetodoPago>(`/v1/metodos-pago/${id}`, b),
+  borrarMetodo: (id: string) => del(`/v1/metodos-pago/${id}`),
+  crearMotivo: (b: object) => post<MotivoDescuento>("/v1/motivos-descuento", b),
+  borrarMotivo: (id: string) => del(`/v1/motivos-descuento/${id}`),
   subirFoto: (f: File) => {
     const fd = new FormData();
     fd.append("foto", f);

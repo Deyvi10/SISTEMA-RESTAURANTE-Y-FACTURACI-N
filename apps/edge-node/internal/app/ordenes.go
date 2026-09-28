@@ -347,7 +347,12 @@ func (a *App) EnviarOrden(ctx context.Context, d Dispositivo, u Usuario, in Envi
 		} else if b != nil && (b.UsuarioID != u.ID || b.DispositivoID != d.ID) {
 			return errOcupada(b)
 		}
-		fecha := now.In(loc).Format("2006-01-02")
+		// El día de negocio es el de la jornada abierta (cruza la medianoche); si no hay, se abre.
+		jornada, err := jornadaParaOperar(ctx, tx, u, now, loc)
+		if err != nil {
+			return err
+		}
+		fecha := jornada.FechaNegocio
 		// Orden abierta de la mesa o una nueva.
 		var abierta, estado string
 		err = tx.QueryRowContext(ctx, `SELECT id, estado FROM ordenes WHERE mesa_id = ? AND estado IN ('ABIERTA','PRECUENTA')`, in.MesaID.String()).Scan(&abierta, &estado)
@@ -361,8 +366,8 @@ func (a *App) EnviarOrden(ctx context.Context, d Dispositivo, u Usuario, in Envi
 			if err := tx.QueryRowContext(ctx, `INSERT INTO contadores (clave, valor) VALUES (?, 1) ON CONFLICT (clave) DO UPDATE SET valor = valor + 1 RETURNING valor`, "orden:"+fecha).Scan(&numero); err != nil {
 				return err
 			}
-			if _, err := tx.ExecContext(ctx, `INSERT INTO ordenes (id, mesa_id, tipo, mesero_id, mesero_nombre, numero_corto, fecha_negocio, comensales, abierta_at) VALUES (?, ?, 'MESA', ?, ?, ?, ?, ?, ?)`,
-				ordenID.String(), in.MesaID.String(), u.ID.String(), u.Nombre, numero, fecha, in.Comensales, now.Format(time.RFC3339Nano)); err != nil {
+			if _, err := tx.ExecContext(ctx, `INSERT INTO ordenes (id, mesa_id, tipo, mesero_id, mesero_nombre, numero_corto, fecha_negocio, jornada_id, comensales, abierta_at) VALUES (?, ?, 'MESA', ?, ?, ?, ?, ?, ?, ?)`,
+				ordenID.String(), in.MesaID.String(), u.ID.String(), u.Nombre, numero, fecha, jornada.ID.String(), in.Comensales, now.Format(time.RFC3339Nano)); err != nil {
 				return err
 			}
 		case err != nil:
@@ -562,7 +567,7 @@ func (a *App) Marchar(ctx context.Context, u Usuario, orden ids.ID, in MarcharIn
 		if len(lineas) == 0 {
 			return invalido("No hay platos en espera para marchar.")
 		}
-		comanda, envios, desp, numero, err := a.comandaDeLineas(ctx, tx, in.IdempotencyKey, orden, o.Mesa, u, lineas, estaciones, loc, now, now.In(loc).Format("2006-01-02"))
+		comanda, envios, desp, numero, err := a.comandaDeLineas(ctx, tx, in.IdempotencyKey, orden, o.Mesa, u, lineas, estaciones, loc, now, fechaNegocio(ctx, tx, now, loc))
 		if err != nil {
 			return err
 		}
@@ -860,13 +865,15 @@ func (a *App) Mover(ctx context.Context, d Dispositivo, u Usuario, orden ids.ID,
 		}
 		if errors.Is(errDest, sql.ErrNoRows) {
 			destinoOrden = ids.New()
-			fecha := now.In(loc).Format("2006-01-02")
+			fecha := fechaNegocio(ctx, tx, now, loc)
 			var numero int
 			if err := tx.QueryRowContext(ctx, `INSERT INTO contadores (clave, valor) VALUES (?, 1) ON CONFLICT (clave) DO UPDATE SET valor = valor + 1 RETURNING valor`, "orden:"+fecha).Scan(&numero); err != nil {
 				return err
 			}
-			if _, err := tx.ExecContext(ctx, `INSERT INTO ordenes (id, mesa_id, tipo, mesero_id, mesero_nombre, numero_corto, fecha_negocio, abierta_at) VALUES (?, ?, 'MESA', ?, ?, ?, ?, ?)`,
-				destinoOrden.String(), in.MesaID.String(), o.MeseroID.String(), o.MeseroNombre, numero, fecha, now.Format(time.RFC3339Nano)); err != nil {
+			// La parte movida sigue en la jornada de la orden original.
+			if _, err := tx.ExecContext(ctx, `INSERT INTO ordenes (id, mesa_id, tipo, mesero_id, mesero_nombre, numero_corto, fecha_negocio, jornada_id, abierta_at)
+				SELECT ?, ?, 'MESA', ?, ?, ?, ?, jornada_id, ? FROM ordenes WHERE id = ?`,
+				destinoOrden.String(), in.MesaID.String(), o.MeseroID.String(), o.MeseroNombre, numero, fecha, now.Format(time.RFC3339Nano), orden.String()); err != nil {
 				return err
 			}
 		} else {
