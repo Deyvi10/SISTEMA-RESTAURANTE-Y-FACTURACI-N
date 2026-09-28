@@ -113,6 +113,8 @@ func (s *Service) Aplicador(n auth.Nodo) edgesync.Applier {
 			return err
 		case caja.EventoCierreZ:
 			return caja.RegistrarCierre(ctx, tx, n.TenantID, n.LocalID, e.Payload)
+		case caja.EventoClienteGuardado:
+			return caja.RegistrarCliente(ctx, tx, n.TenantID, e.Payload)
 		case EventoImpresoraDetectada:
 			var d ImpresoraDetectada
 			if err := json.Unmarshal(e.Payload, &d); err != nil || d.ID == ids.Nil {

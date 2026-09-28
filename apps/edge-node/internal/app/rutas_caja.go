@@ -58,6 +58,10 @@ func (a *App) rutasCaja() {
 		}
 		return a.CerrarTurno(ctx, u, in)
 	}))
+	m.Handle("GET /v1/clientes/buscar", a.enCaja(func(ctx context.Context, _ Dispositivo, _ Usuario, r *http.Request) (any, error) {
+		q := r.URL.Query()
+		return a.BuscarCliente(ctx, q.Get("tipo"), q.Get("identificacion"))
+	}))
 	m.Handle("GET /v1/ordenes/sin-mesa", a.enCaja(func(ctx context.Context, _ Dispositivo, _ Usuario, _ *http.Request) (any, error) {
 		return a.OrdenesSinMesa(ctx)
 	}))

@@ -115,6 +115,9 @@ jobs:
       - name: Tipos y pruebas de @restpos/ui
         working-directory: packages/ts/ui
         run: npx -y -p typescript@5.9 tsc --noEmit -p . && node --experimental-strip-types --test src/*.test.ts
+      - name: Tipos y pruebas de @restpos/sri (mismos vectores que Go)
+        working-directory: packages/ts/sri
+        run: npx -y -p typescript@5.9 tsc --noEmit -p . && node --experimental-strip-types --test src/*.test.ts
       - uses: subosito/flutter-action@v2
         with:
           channel: stable

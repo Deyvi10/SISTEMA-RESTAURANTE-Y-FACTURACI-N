@@ -202,3 +202,42 @@ func TestCierreZLlegaYSeEnviaAlDueno(t *testing.T) {
 		t.Fatalf("aviso de integridad: %q", m.Text)
 	}
 }
+
+// cliente simula que la caja guardó un comprador con consentimiento.
+func (n *nodoSim) cliente(c caja.Cliente) {
+	n.e.t.Helper()
+	ev := n.evento(caja.EventoClienteGuardado)
+	ev.Payload, _ = json.Marshal(map[string]any{"cliente": c, "consentimientoAt": time.Now()})
+	n.req("POST", "/v1/sync/push", edgesync.PushRequest{NodeID: n.id, Events: []edgesync.Event{ev}}, true, 200, nil)
+}
+
+// F4-07: dos cajas sin internet cambian campos distintos del mismo cliente; la nube se
+// queda campo por campo con el cambio más reciente y responde la búsqueda del nodo.
+func TestClientesSeFusionanPorCampo(t *testing.T) {
+	e := newEnv(t)
+	c, _ := e.restaurante("1790011674001", "a@a.ec")
+	n := c.e.nuevoNodo()
+	n.activar(c.codigoNodo().Codigo, 200)
+	t0 := time.Date(2026, 9, 25, 20, 0, 0, 0, time.UTC)
+	var encontrado caja.Cliente
+
+	n.req("GET", "/v1/nodos/clientes?identificacion=1710034065", nil, true, 404, nil)
+	n.cliente(caja.Cliente{ID: ids.New(), TipoIdentificacion: "05", Identificacion: "1710034065", RazonSocial: "María Pérez", Email: "maria@a.ec", Telefono: "0991111111",
+		CamposAt: map[string]time.Time{"razonSocial": t0, "email": t0, "telefono": t0}})
+	// Otra caja, con otro id local: cambió el teléfono después, pero su correo es más viejo.
+	n.cliente(caja.Cliente{ID: ids.New(), TipoIdentificacion: "05", Identificacion: "1710034065", RazonSocial: "María Pérez", Email: "vieja@a.ec", Telefono: "0992222222",
+		CamposAt: map[string]time.Time{"razonSocial": t0, "email": t0.Add(-time.Hour), "telefono": t0.Add(time.Hour)}})
+	n.req("GET", "/v1/nodos/clientes?identificacion=1710034065", nil, true, 200, &encontrado)
+	if encontrado.Email != "maria@a.ec" || encontrado.Telefono != "0992222222" || encontrado.RazonSocial != "María Pérez" {
+		t.Fatalf("fusión: %+v", encontrado)
+	}
+	// Un evento con una identificación inválida no se aplica.
+	n.cliente(caja.Cliente{ID: ids.New(), TipoIdentificacion: "05", Identificacion: "1710034066", RazonSocial: "X", CamposAt: map[string]time.Time{"razonSocial": t0}})
+	n.req("GET", "/v1/nodos/clientes?identificacion=1710034066", nil, true, 404, nil)
+
+	// Otro restaurante no ve los clientes de este (RLS).
+	c2, _ := e.restaurante("1760001550001", "b@b.ec")
+	n2 := c2.e.nuevoNodo()
+	n2.activar(c2.codigoNodo().Codigo, 200)
+	n2.req("GET", "/v1/nodos/clientes?identificacion=1710034065", nil, true, 404, nil)
+}

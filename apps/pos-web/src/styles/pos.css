@@ -165,7 +165,7 @@ button { font: inherit; }
 .cobro__cf svg { width: 18px; height: 18px; }
 .cobro__cf:disabled { border-color: var(--rp-color-separator); background: none; color: var(--rp-color-label-tertiary); text-decoration: line-through; }
 .cobro__aviso { color: var(--rp-color-warning-text); display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.billetes { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 10px; }
+.billetes { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
 .billete {
   position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-height: 92px; padding: 14px; border-radius: 16px; cursor: pointer;
   border: 1px solid color-mix(in srgb, var(--rp-color-success-text) 35%, transparent);
@@ -175,7 +175,8 @@ button { font: inherit; }
 .billete:active:not(:disabled) { transform: scale(0.97); }
 .billete:focus-visible { outline: 3px solid var(--rp-color-accent); outline-offset: 2px; }
 .billete:disabled { opacity: 0.4; cursor: default; }
-.billete__monto { font: 700 24px/1.1 var(--rp-font-display, inherit); white-space: nowrap; }
+.billete__monto { font: 700 22px/1.1 var(--rp-font-display, inherit); white-space: nowrap; }
+.billete { padding-right: 38px; } /* la tecla de la esquina no tapa el monto */
 .billete small { color: var(--rp-color-success-text); font-weight: 600; }
 .billete--otro { background: var(--rp-color-fill); border-color: transparent; }
 .billete--otro small { color: var(--rp-color-label-secondary); }
@@ -249,3 +250,18 @@ button { font: inherit; }
 .hoja-pagos .rp-sheet__body { overflow-x: hidden; }
 .pago, .pago .rp-field, .pago__voucher { min-width: 0; }
 .pago input { width: 100%; min-width: 0; box-sizing: border-box; }
+
+/* ---------- Comprador (F4-07) ---------- */
+.comprador { display: flex; flex-direction: column; gap: 10px; }
+.comprador__modo { display: flex; align-items: center; gap: 10px; }
+.comprador__modo .rp-btn[aria-pressed="true"] { background: var(--rp-color-accent-soft); }
+.comprador__form { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 12px; padding: 12px; border-radius: 14px; background: var(--rp-color-background); }
+.comprador__form .rp-field { min-width: 0; }
+.comprador__form .rp-field span { font-size: 13px; color: var(--rp-color-label-secondary); }
+.comprador__form .rp-field input { min-height: 42px; width: 100%; min-width: 0; box-sizing: border-box; }
+.comprador__id { grid-column: 1 / -1; }
+.comprador__id input { font: 600 20px/1 var(--rp-font-text); letter-spacing: 0.5px; }
+.comprador__origen { color: var(--rp-color-success-text); font-weight: 600; }
+.comprador__pasaporte, .comprador__consentimiento { grid-column: 1 / -1; display: flex; gap: 8px; align-items: flex-start; font-size: 14px; cursor: pointer; }
+.comprador__pasaporte input, .comprador__consentimiento input { width: 18px; height: 18px; accent-color: var(--rp-color-accent); flex: none; margin-top: 1px; }
+.comprador__consentimiento small { display: block; color: var(--rp-color-label-secondary); font-size: 12px; margin-top: 2px; }

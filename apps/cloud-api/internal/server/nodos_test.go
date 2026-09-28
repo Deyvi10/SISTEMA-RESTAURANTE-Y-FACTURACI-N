@@ -106,6 +106,8 @@ func (c *cliente) nodoOperativo() *nodoSim {
 	c.do("GET", "/v1/cajas", nil, 200, &cajas)
 	n.cierreZ(cajas[0].ID, 1, "", "-0.50")
 	c.e.notificarCierres()
+	n.cliente(caja.Cliente{ID: ids.New(), TipoIdentificacion: "05", Identificacion: "1710034065", RazonSocial: "María Pérez", Email: "maria@example.com",
+		CamposAt: map[string]time.Time{"razonSocial": time.Now(), "email": time.Now()}})
 	return n
 }
 

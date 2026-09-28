@@ -81,6 +81,9 @@ contracts-check: ## Falla si los tipos generados de los eventos están desactual
 ui-test: ## Tipos y pruebas del paquete @restpos/ui
 	cd packages/ts/ui && npx -y -p typescript@5.9 tsc --noEmit -p . && node --experimental-strip-types --test src/*.test.ts
 
+sri-ts-test: ## Tipos y pruebas de @restpos/sri (validación de identificaciones, vectores compartidos con Go)
+	cd packages/ts/sri && npx -y -p typescript@5.9 tsc --noEmit -p . && node --experimental-strip-types --test src/*.test.ts
+
 ui-docs: ## Sirve la guía de estilo viva en http://localhost:8095/docs/
 	@echo "Guía de estilo: http://localhost:8095/docs/"
 	cd packages/ts/ui && python3 -m http.server 8095 --bind 127.0.0.1
@@ -118,4 +121,4 @@ bo-test: ## Tipos, pruebas y build del backoffice
 backlog: ## Regenera docs/12-backlog-tickets.md desde el JSON
 	python3 documentacion-proyecto/docs/backlog/generar.py
 
-.PHONY: help hooks dev down reset logs test test-long cover fmt lint check-float golden printer-sim sri-stub tokens tokens-check ui-test ui-docs flutter-ui waiter api demo pos pos-dev bo bo-test backlog
+.PHONY: help hooks dev down reset logs test test-long cover fmt lint check-float golden printer-sim sri-stub tokens tokens-check ui-test sri-ts-test ui-docs flutter-ui waiter api demo pos pos-dev bo bo-test backlog

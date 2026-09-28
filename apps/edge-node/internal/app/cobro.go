@@ -17,17 +17,15 @@ import (
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/ids"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/money"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/rbac"
+	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/sri"
 )
 
 // EventoVentaCobrada lleva a la nube el documento y el pago de una venta (dinero: en la
 // misma transacción del cobro).
 const EventoVentaCobrada = "venta.cobrada"
 
-// Identificación del consumidor final según el SRI (docs/05 §12).
-const (
-	consumidorFinalID     = "9999999999999"
-	consumidorFinalNombre = "CONSUMIDOR FINAL"
-)
+// Nombre del consumidor final en el documento (su identificación es sri.ConsumidorFinal).
+const consumidorFinalNombre = "CONSUMIDOR FINAL"
 
 // PagoIn es una parte del cobro con un método (RF-04-04). Monto es lo que se aplica a la
 // cuenta; en efectivo, Recibido es lo que entregó el cliente (el vuelto sale de ahí).
@@ -44,7 +42,9 @@ type CobrarIn struct {
 	CajaID          ids.ID   `json:"cajaId"`
 	Pagos           []PagoIn `json:"pagos"` // pago mixto: varios métodos que suman el total
 	ConsumidorFinal bool     `json:"consumidorFinal"`
-	IdempotencyKey  string   `json:"idempotencyKey"`
+	// Comprador identificado (F4-07). Nulo con ConsumidorFinal = venta a consumidor final.
+	Comprador      *CompradorIn `json:"comprador"`
+	IdempotencyKey string       `json:"idempotencyKey"`
 	// Cobro de un solo método (el toque en un billete): equivale a Pagos con un elemento.
 	MetodoID   ids.ID `json:"metodoId"`
 	Recibido   string `json:"recibido"`
@@ -69,22 +69,29 @@ type PagoDoc struct {
 
 // DocumentoVenta es lo que devuelve el cobro: el documento emitido y el vuelto.
 type DocumentoVenta struct {
-	ID        ids.ID    `json:"id"`
-	Tipo      string    `json:"tipo"` // INTERNO (en F5, el comprobante electrónico)
-	Numero    int       `json:"numero"`
-	Codigo    string    `json:"codigo"` // INT-000123
-	OrdenID   ids.ID    `json:"ordenId"`
-	Mesa      string    `json:"mesa"`
-	Comprador string    `json:"comprador"`
-	Totales   Totales   `json:"totales"`
-	Metodo    string    `json:"metodo"` // «Efectivo» o «Efectivo + Tarjeta crédito»
-	Pagos     []PagoDoc `json:"pagos"`
-	Recibido  string    `json:"recibido"` // efectivo entregado (0 si no hubo efectivo)
-	Vuelto    string    `json:"vuelto"`
-	AbreCajon bool      `json:"abreCajon"`
-	Cajero    string    `json:"cajero"`
-	TurnoID   ids.ID    `json:"turnoId"`
-	EmitidoAt time.Time `json:"emitidoAt"`
+	ID        ids.ID `json:"id"`
+	Tipo      string `json:"tipo"` // INTERNO (en F5, el comprobante electrónico)
+	Numero    int    `json:"numero"`
+	Codigo    string `json:"codigo"` // INT-000123
+	OrdenID   ids.ID `json:"ordenId"`
+	Mesa      string `json:"mesa"`
+	Comprador string `json:"comprador"` // nombre o razón social
+	// Identificación del comprador con su código SRI (07 = consumidor final).
+	CompradorTipo           string    `json:"compradorTipo"`
+	CompradorIdentificacion string    `json:"compradorIdentificacion"`
+	CompradorEmail          string    `json:"compradorEmail,omitempty"`
+	CompradorDireccion      string    `json:"compradorDireccion,omitempty"`
+	CompradorTelefono       string    `json:"compradorTelefono,omitempty"`
+	ClienteGuardado         bool      `json:"clienteGuardado"` // se guardó con consentimiento
+	Totales                 Totales   `json:"totales"`
+	Metodo                  string    `json:"metodo"` // «Efectivo» o «Efectivo + Tarjeta crédito»
+	Pagos                   []PagoDoc `json:"pagos"`
+	Recibido                string    `json:"recibido"` // efectivo entregado (0 si no hubo efectivo)
+	Vuelto                  string    `json:"vuelto"`
+	AbreCajon               bool      `json:"abreCajon"`
+	Cajero                  string    `json:"cajero"`
+	TurnoID                 ids.ID    `json:"turnoId"`
+	EmitidoAt               time.Time `json:"emitidoAt"`
 }
 
 type CobroOut struct {
@@ -115,9 +122,19 @@ func (a *App) Cobrar(ctx context.Context, u Usuario, orden ids.ID, in CobrarIn) 
 	if len(in.IdempotencyKey) < 8 || len(in.IdempotencyKey) > 64 {
 		return out, invalido("Falta la clave de idempotencia del cobro.")
 	}
-	if !in.ConsumidorFinal {
-		return out, invalido("Por ahora solo se cobra a consumidor final; los datos del comprador llegan con la facturación (F4-07).")
+	// Comprador: identificado o consumidor final (el mismo número 9999999999999 también lo es).
+	comprador := CompradorIn{TipoIdentificacion: string(sri.IdConsumidorFinal), Identificacion: sri.ConsumidorFinal, RazonSocial: consumidorFinalNombre}
+	if in.Comprador != nil {
+		if _, err := in.Comprador.normalizar(); err != nil {
+			return out, err
+		}
+		if in.Comprador.TipoIdentificacion != string(sri.IdConsumidorFinal) {
+			comprador = *in.Comprador
+		}
+	} else if !in.ConsumidorFinal {
+		return out, invalido("Indica los datos del comprador o cobra a consumidor final.")
 	}
+	esCF := comprador.TipoIdentificacion == string(sri.IdConsumidorFinal)
 	unico := len(in.Pagos) == 0
 	if unico {
 		in.Pagos = []PagoIn{{MetodoID: in.MetodoID, Recibido: in.Recibido, Referencia: in.Referencia, Lote: in.Lote, Ultimos4: in.Ultimos4}}
@@ -191,7 +208,7 @@ func (a *App) Cobrar(ctx context.Context, u Usuario, orden ids.ID, in CobrarIn) 
 		if !total.GreaterThan(money.Money{}) {
 			return problema(http.StatusConflict, "ORDEN_VACIA", "La orden no tiene nada que cobrar.")
 		}
-		if max := consumidorFinalMaximo(ctx, tx); total.GreaterThan(max) {
+		if max := consumidorFinalMaximo(ctx, tx); esCF && total.GreaterThan(max) {
 			return problema(http.StatusUnprocessableEntity, "CONSUMIDOR_FINAL_EXCEDIDO",
 				"El total supera $"+max.String()+", el máximo para consumidor final. Hacen falta los datos del comprador.")
 		}
@@ -210,16 +227,24 @@ func (a *App) Cobrar(ctx context.Context, u Usuario, orden ids.ID, in CobrarIn) 
 			return err
 		}
 		doc := DocumentoVenta{ID: ids.New(), Tipo: "INTERNO", Numero: numero, Codigo: escpos.NumeroInterno(numero), OrdenID: o.ID, Mesa: o.Mesa,
-			Comprador: consumidorFinalNombre, Totales: tot, Metodo: metodo, Pagos: docPagos, Recibido: recibido.String(), Vuelto: vuelto.String(),
+			Comprador: comprador.RazonSocial, CompradorTipo: comprador.TipoIdentificacion, CompradorIdentificacion: comprador.Identificacion,
+			CompradorEmail: comprador.Email, CompradorDireccion: comprador.Direccion, CompradorTelefono: comprador.Telefono, Totales: tot, Metodo: metodo, Pagos: docPagos, Recibido: recibido.String(), Vuelto: vuelto.String(),
 			AbreCajon: abreCajon, Cajero: u.Nombre, TurnoID: t.ID, EmitidoAt: now}
+		// Con consentimiento, el comprador queda guardado para la próxima compra (LOPDP).
+		if !esCF && comprador.Consentimiento {
+			if _, err := a.guardarClienteEnTx(ctx, tx, comprador, now); err != nil {
+				return err
+			}
+			doc.ClienteGuardado = true
+		}
 		raw, err := json.Marshal(doc)
 		if err != nil {
 			return err
 		}
 		ts := now.Format(time.RFC3339Nano)
 		if _, err := tx.ExecContext(ctx, `INSERT INTO documentos_venta (id, numero, orden_id, turno_id, comprador_tipo, comprador_identificacion, comprador_nombre,
-			subtotal, iva, propina, total, datos, idempotency_key, emitido_por, created_at) VALUES (?, ?, ?, ?, 'CONSUMIDOR_FINAL', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			doc.ID.String(), numero, o.ID.String(), t.ID.String(), consumidorFinalID, consumidorFinalNombre,
+			subtotal, iva, propina, total, datos, idempotency_key, emitido_por, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			doc.ID.String(), numero, o.ID.String(), t.ID.String(), comprador.TipoIdentificacion, comprador.Identificacion, comprador.RazonSocial,
 			base.String(), iva.String(), propina.String(), total.String(), string(raw), in.IdempotencyKey, u.ID.String(), ts); err != nil {
 			return err
 		}
@@ -261,8 +286,9 @@ func (a *App) Cobrar(ctx context.Context, u Usuario, orden ids.ID, in CobrarIn) 
 		}
 		var local string
 		_ = tx.QueryRowContext(ctx, `SELECT nombre FROM locales LIMIT 1`).Scan(&local)
-		ticket := escpos.DocumentoVenta{Local: local, Numero: numero, Hora: now.In(loc), Mesa: o.Mesa, Cajero: u.Nombre, Comprador: consumidorFinalNombre,
-			Lineas: lineasCuenta(o.Lineas), Subtotal: base, IVA: iva, Propina: propina, Total: total, Recibido: recibido, Vuelto: vuelto}
+		ticket := escpos.DocumentoVenta{Local: local, Numero: numero, Hora: now.In(loc), Mesa: o.Mesa, Cajero: u.Nombre, Comprador: comprador.RazonSocial,
+			CompradorID: map[bool]string{true: "", false: comprador.Identificacion}[esCF],
+			Lineas:      lineasCuenta(o.Lineas), Subtotal: base, IVA: iva, Propina: propina, Total: total, Recibido: recibido, Vuelto: vuelto}
 		for _, p := range docPagos {
 			ticket.Pagos = append(ticket.Pagos, escpos.PagoTicket{Metodo: p.Metodo, Monto: money.MustParse(p.Monto), Ultimos4: p.Ultimos4})
 		}

@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/auth"
+	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/caja"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/nodos"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/platform/apperr"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/platform/db"
@@ -118,5 +119,23 @@ func secretoPIN(n *nodos.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store")
 		httpx.JSON(w, http.StatusOK, n.SecretoPIN(auth.MustNodo(r.Context())))
+	}
+}
+
+// GET /v1/nodos/clientes?tipo=&identificacion=: la búsqueda en cascada del nodo (F4-07)
+// cuando el cliente no está en su base. 404 si el restaurante no lo tiene.
+func buscarClienteNodo(c *caja.Clientes) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query()
+		cli, err := c.Buscar(r.Context(), auth.MustNodo(r.Context()).TenantID, q.Get("tipo"), q.Get("identificacion"))
+		if err == nil && cli == nil {
+			err = apperr.ErrNotFound
+		}
+		if err != nil {
+			httpx.Error(w, r, err)
+			return
+		}
+		w.Header().Set("Cache-Control", "no-store")
+		httpx.JSON(w, http.StatusOK, cli)
 	}
 }

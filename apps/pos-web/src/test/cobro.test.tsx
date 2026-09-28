@@ -9,6 +9,8 @@ import type { Caja } from "../pages/Turno";
 
 afterEach(() => vi.restoreAllMocks());
 
+const docCF = { comprador: "CONSUMIDOR FINAL", compradorTipo: "07", compradorIdentificacion: "9999999999999", clienteGuardado: false };
+
 describe("billetes dinámicos", () => {
   it.each([
     ["14.50", ["14.50", "15.00", "20.00", "50.00"]], // el ejemplo del requisito
@@ -57,7 +59,7 @@ describe("pantalla de cobro", () => {
   it("un toque en $20 cobra en efectivo y muestra el vuelto", async () => {
     vi.spyOn(nodo, "orden").mockResolvedValue({ orden, totales: totales("14.50") });
     const cobrar = vi.spyOn(nodo, "cobrar").mockResolvedValue({
-      documento: { id: "d", codigo: "INT-000001", mesa: "Mesa 4", totales: totales("14.50"), metodo: "Efectivo", pagos: [{ metodoId: "ef", metodo: "Efectivo", tipo: "EFECTIVO", monto: "14.50" }], recibido: "20.00", vuelto: "5.50", abreCajon: true },
+      documento: { ...docCF, id: "d", codigo: "INT-000001", mesa: "Mesa 4", totales: totales("14.50"), metodo: "Efectivo", pagos: [{ metodoId: "ef", metodo: "Efectivo", tipo: "EFECTIVO", monto: "14.50" }], recibido: "20.00", vuelto: "5.50", abreCajon: true },
       impresoras: ["Caja"],
     });
     montar();
@@ -106,7 +108,7 @@ describe("pago mixto", () => {
   it("$20 en efectivo + el resto con tarjeta, con el voucher", async () => {
     vi.spyOn(nodo, "orden").mockResolvedValue({ orden, totales: totales("35.40") });
     const cobrar = vi.spyOn(nodo, "cobrar").mockResolvedValue({
-      documento: { id: "d", codigo: "INT-000002", mesa: "Mesa 4", totales: totales("35.40"), metodo: "Efectivo + Tarjeta crédito", recibido: "20.00", vuelto: "0.00", abreCajon: true,
+      documento: { ...docCF, id: "d", codigo: "INT-000002", mesa: "Mesa 4", totales: totales("35.40"), metodo: "Efectivo + Tarjeta crédito", recibido: "20.00", vuelto: "0.00", abreCajon: true,
         pagos: [{ metodoId: "ef", metodo: "Efectivo", tipo: "EFECTIVO", monto: "20.00" }, { metodoId: "tc", metodo: "Tarjeta crédito", tipo: "TARJETA_CREDITO", monto: "15.40", ultimos4: "4821" }] },
       impresoras: [],
     });

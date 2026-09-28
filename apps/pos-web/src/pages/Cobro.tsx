@@ -1,7 +1,7 @@
 // Cobro «Zero-Click» (F4-05): total gigante, billetes dinámicos y un solo toque para cobrar,
 // dar el vuelto, abrir el cajón, emitir el documento y liberar la mesa.
 import { formatMoney } from "@restpos/ui";
-import { ArrowLeft, Check, CreditCard, Landmark, Smartphone, UserRound, Wallet } from "lucide-react";
+import { ArrowLeft, Check, CreditCard, Landmark, Smartphone, Wallet } from "lucide-react";
 import { type Dispatch, type SetStateAction, useCallback, useEffect, useRef, useState } from "react";
 import { uuidv7 } from "../api/identidad";
 import { ApiError, type CobroOut, type MetodoPago, nodo, type Orden, type Totales } from "../api/nodo";
@@ -9,6 +9,7 @@ import { useAtajo } from "../components/atajos";
 import { montoDe, TecladoMonto } from "../components/TecladoMonto";
 import { opcionesBillete, vueltoCentavos } from "../lib/billetes";
 import { centavos, verCentavos } from "../lib/dinero";
+import { Comprador, compradorInicial, compradorParaCobro, esConsumidorFinal, type EstadoComprador, validar } from "./Comprador";
 import { HojaPagos, type PagoEnvio } from "./PagoMixto";
 import type { Caja } from "./Turno";
 
@@ -47,6 +48,8 @@ export function Cobro({ orden: aCobrar, caja, volver, irATurno, agregar }: { ord
   const [hecho, setHecho] = useState<CobroOut | null>(null);
   const [otroMonto, setOtroMonto] = useState<string | null>(null);
   const [hojaPago, setHojaPago] = useState<{ inicial?: MetodoPago } | null>(null);
+  const [comprador, setComprador] = useState<EstadoComprador>(compradorInicial);
+  const campoId = useRef<HTMLInputElement>(null);
   // Una clave por intento de cobro: un doble toque o un reintento no cobra dos veces.
   const clave = useRef(uuidv7());
 
@@ -62,9 +65,12 @@ export function Cobro({ orden: aCobrar, caja, volver, irATurno, agregar }: { ord
   const total = datos?.totales.total ?? "0.00";
   const maximo = config?.consumidorFinalMaximo ?? "50.00";
   const excedeCF = centavos(total) > centavos(maximo);
+  const cf = esConsumidorFinal(comprador);
+  const { envio: datosComprador, problema: faltaComprador } = compradorParaCobro(comprador);
+  const compradorListo = cf ? !excedeCF : datosComprador !== null;
   const efectivo = config?.metodos.find((m) => m.tipo === "EFECTIVO");
   const otros = config?.metodos.filter((m) => m.tipo !== "EFECTIVO") ?? [];
-  const puedeCobrar = !!turno && !!datos && !excedeCF && centavos(total) > 0 && !ocupado && !hecho;
+  const puedeCobrar = !!turno && !!datos && compradorListo && centavos(total) > 0 && !ocupado && !hecho;
 
   const enviarCobro = useCallback(
     (pago: { metodoId: string; recibido: string } | { pagos: PagoEnvio[] }) => {
@@ -72,7 +78,7 @@ export function Cobro({ orden: aCobrar, caja, volver, irATurno, agregar }: { ord
       setOcupado(true);
       setError(null);
       nodo
-        .cobrar(datos.orden.id, { cajaId: caja.cajaId, consumidorFinal: true, idempotencyKey: clave.current, ...pago })
+        .cobrar(datos.orden.id, { cajaId: caja.cajaId, consumidorFinal: cf, ...(datosComprador ? { comprador: datosComprador } : {}), idempotencyKey: clave.current, ...pago })
         .then(setHecho)
         .catch((e) => {
           setOcupado(false);
@@ -80,7 +86,7 @@ export function Cobro({ orden: aCobrar, caja, volver, irATurno, agregar }: { ord
           setError(e instanceof ApiError ? e.message : "No se pudo cobrar. Intenta de nuevo.");
         });
     },
-    [caja.cajaId, datos, ocupado],
+    [caja.cajaId, datos, ocupado, cf, datosComprador],
   );
   const cobrar = useCallback(
     (metodo: MetodoPago | undefined, recibido: string) => {
@@ -100,6 +106,10 @@ export function Cobro({ orden: aCobrar, caja, volver, irATurno, agregar }: { ord
   useAtajo("4", "Cobrar con el cuarto billete", () => billetes[3] && cobrar(efectivo, billetes[3]), "Cobro", libre && billetes.length > 3);
   useAtajo("o", "Otro monto en efectivo", () => setOtroMonto(""), "Cobro", libre);
   useAtajo("m", "Pago mixto (varios métodos)", () => setHojaPago({}), "Cobro", libre);
+  useAtajo("c", "Datos del comprador", () => {
+    setComprador((x) => ({ ...x, modo: "ID" }));
+    requestAnimationFrame(() => campoId.current?.focus());
+  }, "Cobro", !hecho && otroMonto === null && hojaPago === null);
   useAtajo("a", "Agregar platos a la orden", () => datos && agregar?.(datos.orden), "Cobro", !!datos && datos.orden.tipo !== "MESA" && !!agregar && !hecho && otroMonto === null);
   useAtajo("Escape", hecho ? "Siguiente cliente" : "Volver a las mesas", volver, "Cobro", otroMonto === null && hojaPago === null);
   useAtajo("Enter", "Siguiente cliente", volver, "Cobro", !!hecho);
@@ -158,14 +168,21 @@ export function Cobro({ orden: aCobrar, caja, volver, irATurno, agregar }: { ord
         <p className="cobro__total rp-num" data-testid="total">
           {formatMoney(total)}
         </p>
-        <button className="cobro__cf" aria-pressed={!excedeCF} disabled={excedeCF} data-testid="consumidor-final">
-          <UserRound aria-hidden="true" />
-          Consumidor final
-        </button>
-        {excedeCF && (
+        <Comprador
+          ref={campoId}
+          estado={comprador}
+          cambiar={setComprador}
+          cfPermitido={!excedeCF}
+          alConfirmar={() => puedeCobrar && cobrar(efectivo, billetes[0]!)}
+        />
+        {cf && excedeCF && (
           <p className="aviso-error">
-            Supera {formatMoney(maximo)}, el máximo para consumidor final. Hacen falta los datos del comprador (llegan con la facturación).
+            Supera {formatMoney(maximo)}, el máximo para consumidor final: pulsa <kbd className="tecla">C</kbd> y escribe los datos del comprador.
           </p>
+        )}
+        {/* El campo ya muestra los problemas de la identificación; aquí solo lo que falta del formulario. */}
+        {!cf && faltaComprador && datos && validar(comprador).valida && comprador.buscado === comprador.identificacion.trim().toUpperCase() && (
+          <p className="cobro__aviso">{faltaComprador}</p>
         )}
         {!turno && (
           <p className="cobro__aviso">
@@ -324,6 +341,12 @@ function Listo({ out, conMesa, volver }: { out: CobroOut; conMesa: boolean; volv
       {d.pagos.length > 1 && (
         <p className="rp-secondary rp-num" data-testid="detalle-pagos">
           {d.pagos.map((p) => `${p.metodo} ${formatMoney(p.monto)}`).join(" · ")}
+        </p>
+      )}
+      {d.compradorTipo !== "07" && (
+        <p className="rp-secondary" data-testid="comprador-documento">
+          {d.comprador} · {d.compradorIdentificacion}
+          {d.clienteGuardado ? " · guardado para la próxima" : ""}
         </p>
       )}
       <p className="rp-secondary">

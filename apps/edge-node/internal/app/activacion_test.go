@@ -42,6 +42,8 @@ type nubeFalsa struct {
 	llamadas    []string
 	feed        []edgesync.Cambio // cambios incrementales disponibles (seq 1..n)
 	volcado     []edgesync.Cambio
+	clientes    map[string]Cliente // identificación → cliente del tenant (F4-07)
+	demora      time.Duration      // retraso de la búsqueda de clientes
 }
 
 func newNubeFalsa() *nubeFalsa {
@@ -120,6 +122,18 @@ func (f *nubeFalsa) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewDecoder(r.Body).Decode(&req)
 		f.eventos = append(f.eventos, req.Events...)
 		_ = json.NewEncoder(w).Encode(edgesync.PushResponse{LastApplied: req.Events[len(req.Events)-1].NodeSeq})
+	case "/v1/nodos/clientes":
+		if _, ok := autenticado(); !ok {
+			problema(401, "NODO_NO_AUTORIZADO")
+			return
+		}
+		time.Sleep(f.demora)
+		c, ok := f.clientes[r.URL.Query().Get("identificacion")]
+		if !ok {
+			problema(404, "NO_ENCONTRADO")
+			return
+		}
+		_ = json.NewEncoder(w).Encode(c)
 	default:
 		problema(404, "NO_ENCONTRADO")
 	}

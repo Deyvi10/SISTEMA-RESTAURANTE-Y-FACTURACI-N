@@ -314,6 +314,26 @@ export interface Totales {
   total: string;
 }
 
+export interface ClienteRegistrado {
+  id: string;
+  tipoIdentificacion: string;
+  identificacion: string;
+  razonSocial: string;
+  direccion: string;
+  email: string;
+  telefono: string;
+}
+
+/** Validación del nodo + cliente encontrado en la cascada nodo → nube. */
+export interface BusquedaCliente {
+  valida: boolean;
+  tipo: string;
+  motivo?: string;
+  advertencia?: string;
+  cliente: ClienteRegistrado | null;
+  origen?: "NODO" | "NUBE";
+}
+
 export interface PagoDocumento {
   metodoId: string;
   metodo: string;
@@ -329,6 +349,10 @@ export interface DocumentoVenta {
   codigo: string; // INT-000123
   mesa: string;
   totales: Totales;
+  comprador: string;
+  compradorTipo: string; // 07 = consumidor final
+  compradorIdentificacion: string;
+  clienteGuardado: boolean;
   metodo: string; // «Efectivo + Tarjeta crédito»
   pagos: PagoDocumento[];
   recibido: string;
@@ -394,6 +418,8 @@ export const nodo = {
   ordenesSinMesa: () => api<OrdenSinMesa[]>("GET", "/v1/ordenes/sin-mesa"),
   enviarOrden: (b: { idempotencyKey: string; ordenId: string; tipo: TipoOrden; etiqueta: string; lineas: LineaNueva[] }) =>
     api<{ orden: Orden; comandaNumero: number }>("POST", "/v1/ordenes/enviar", b),
+  buscarCliente: (identificacion: string, tipo = "") =>
+    api<BusquedaCliente>("GET", `/v1/clientes/buscar?${new URLSearchParams({ identificacion, tipo })}`),
   orden: (id: string) => api<{ orden: Orden; totales: Totales }>("GET", `/v1/ordenes/${id}`),
   cobrar: (
     ordenId: string,
@@ -404,6 +430,7 @@ export const nodo = {
       metodoId?: string;
       recibido?: string;
       pagos?: { metodoId: string; monto: string; recibido: string; referencia: string; lote: string; ultimos4: string }[];
+      comprador?: { tipoIdentificacion: string; identificacion: string; razonSocial: string; email: string; direccion: string; telefono: string; consentimiento: boolean };
     },
   ) =>
     api<CobroOut>("POST", `/v1/ordenes/${ordenId}/cobrar`, b),

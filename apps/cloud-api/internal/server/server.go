@@ -48,6 +48,7 @@ type Deps struct {
 	Nodos         *nodos.Service
 	Impresoras    *impresoras.Service
 	Caja          *caja.Service
+	Clientes      *caja.Clientes
 	BackofficeURL string
 }
 
@@ -167,6 +168,7 @@ func Routes(d Deps) []Route {
 		{"POST", "/v1/sync/push", nodo, syncPush(d.DB, d.Nodos)},
 		{"GET", "/v1/sync/pull", nodo, syncPull(d.Nodos)},
 		{"GET", "/v1/nodos/secreto-pin", nodo, secretoPIN(d.Nodos)},
+		{"GET", "/v1/nodos/clientes", nodo, buscarClienteNodo(d.Clientes)},
 		{"GET", "/v1/dispositivos", sal, list(d.Nodos.Dispositivos)},
 		{"POST", "/v1/dispositivos/{id}/revocar", sal, remove(d.Nodos.RevocarDispositivo)},
 
