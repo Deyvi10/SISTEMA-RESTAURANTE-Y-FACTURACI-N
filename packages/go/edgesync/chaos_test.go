@@ -199,11 +199,16 @@ func TestChaosSync(t *testing.T) {
 			}
 			// Tras el último reinicio el nodo sigue hasta vaciar su outbox.
 			n.open(t)
-			defer func() { _ = n.db.Close() }()
 			ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
-			defer cancel()
 			p := &Pusher{Outbox: n.outbox, NodeID: n.id, URL: api.URL, Client: client, Log: quiet, Interval: 20 * time.Millisecond, MaxWait: 150 * time.Millisecond}
-			go p.Run(ctx)
+			done := make(chan struct{})
+			go func() { p.Run(ctx); close(done) }()
+			// Como en las fases: el pusher termina antes de cerrar la base que usa.
+			defer func() {
+				cancel()
+				<-done
+				_ = n.db.Close()
+			}()
 			for ctx.Err() == nil {
 				if s, err := n.outbox.Stats(ctx); err == nil && s.Pending == 0 {
 					// Atomicidad local: cada venta confirmada tiene su evento y viceversa;
