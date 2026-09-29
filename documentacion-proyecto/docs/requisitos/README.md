@@ -45,8 +45,8 @@ Cada requisito indica:
 | Eliminar/anular ítem **ya enviado** a cocina | ✅ | ⚙️ | ⚙️ | ❌ |
 | Transferir mesa / unir mesas | ✅ | ✅ | ⚙️ | ❌ |
 | Imprimir pre-cuenta | ✅ | ✅ | ✅ | ❌ |
-| Cobrar y facturar | ✅ | ✅ | ⚙️ | ❌ |
-| Dividir cuenta | ✅ | ✅ | ⚙️ | ❌ |
+| Cobrar y facturar | ✅ | ✅ | ❌ | ❌ |
+| Dividir cuenta | ✅ | ✅ | ❌ | ❌ |
 | Aplicar descuento / cortesía | ✅ | ⚙️ | ❌ | ❌ |
 | Abrir cajón sin venta | ✅ | ⚙️ | ❌ | ❌ |
 | Emitir nota de crédito | ✅ | ⚙️ | ❌ | ❌ |

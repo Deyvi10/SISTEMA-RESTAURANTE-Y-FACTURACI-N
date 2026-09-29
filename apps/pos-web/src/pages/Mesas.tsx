@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ApiError, type Mesa, nodo, type OrdenSinMesa, type Salon } from "../api/nodo";
 import { useSesion } from "../api/sesion";
 import { useAtajo } from "../components/atajos";
+import { useDispositivo } from "../lib/dispositivo";
 
 const ESTADO: Record<Mesa["estado"], string> = { LIBRE: "libre", OCUPADA: "ocupada", POR_PAGAR: "porPagar", DEMORADA: "demorada" };
 
@@ -41,6 +42,7 @@ export const iconoTipo = (tipo: string) => ICONO_TIPO[tipo] ?? ShoppingBag;
 
 export function Mesas({ abrir, abrirOrden, nuevaVenta }: { abrir: (m: Mesa) => void; abrirOrden: (o: OrdenSinMesa) => void; nuevaVenta: () => void }) {
   const { tiempoReal } = useSesion();
+  const { tactil } = useDispositivo();
   const [salon, setSalon] = useState<Salon | null>(null);
   const [sinMesa, setSinMesa] = useState<OrdenSinMesa[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -95,9 +97,10 @@ export function Mesas({ abrir, abrirOrden, nuevaVenta }: { abrir: (m: Mesa) => v
   useAtajo("ArrowUp", "Mesa de arriba", () => mover(-2), "Mesas");
   useAtajo("Enter", "Abrir la mesa elegida", () => visibles[foco] && abrir(visibles[foco]), "Mesas");
 
+  // Con teclado, la mesa elegida toma el foco; con el dedo no (no hay flechas y el aro estorba).
   useEffect(() => {
-    (rejilla.current?.children[foco] as HTMLElement | undefined)?.focus({ preventScroll: false });
-  }, [foco]);
+    if (!tactil) (rejilla.current?.children[foco] as HTMLElement | undefined)?.focus({ preventScroll: false });
+  }, [foco, tactil]);
 
   const cuenta = (e: Mesa["estado"]) => (salon?.mesas ?? []).filter((m) => m.estado === e).length;
 

@@ -6,6 +6,9 @@ import { createRoot } from "react-dom/client";
 import { SesionProvider } from "./api/sesion";
 import { App } from "./App";
 import { AtajosProvider } from "./components/atajos";
+import { iniciarDispositivo } from "./lib/dispositivo";
+
+iniciarDispositivo();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

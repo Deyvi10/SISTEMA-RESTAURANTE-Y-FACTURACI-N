@@ -30,9 +30,12 @@ func TestMatrizPorDefecto(t *testing.T) {
 }
 
 func TestAjusteSoloSiEsConfigurable(t *testing.T) {
-	ef := Efectivos(Mesero, map[Permiso]bool{Cobrar: true, ConfigurarSRI: true})
-	if !ef[Cobrar] {
-		t.Error("Cobrar es ⚙️ para Mesero: el ajuste debe aplicarse")
+	ef := Efectivos(Mesero, map[Permiso]bool{TransferirMesa: true, Cobrar: true, DividirCuenta: true, ConfigurarSRI: true})
+	if !ef[TransferirMesa] {
+		t.Error("TransferirMesa es ⚙️ para Mesero: el ajuste debe aplicarse")
+	}
+	if ef[Cobrar] || ef[DividirCuenta] {
+		t.Error("el mesero nunca cobra ni divide cuentas: solo la caja y el administrador")
 	}
 	if ef[ConfigurarSRI] {
 		t.Error("ConfigurarSRI no es configurable para Mesero: el ajuste debe ignorarse")

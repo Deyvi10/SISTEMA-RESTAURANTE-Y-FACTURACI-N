@@ -75,10 +75,10 @@ function Caja() {
         <Indicador />
         <span className="barra__usuario">
           <Avatar nombre={usuario?.nombre ?? ""} tamano={30} />
-          {usuario?.nombre}
+          <span className="barra__texto">{usuario?.nombre}</span>
         </span>
         <button className="rp-btn rp-btn--gray rp-btn--sm" onClick={() => void salir()} title="Bloquear la caja (F12)">
-          <LockKeyhole aria-hidden="true" /> Bloquear
+          <LockKeyhole aria-hidden="true" /> <span className="barra__texto">Bloquear</span>
         </button>
       </header>
       <main className="contenido">

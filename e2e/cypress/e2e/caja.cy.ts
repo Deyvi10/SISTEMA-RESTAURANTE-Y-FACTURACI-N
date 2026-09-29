@@ -63,7 +63,7 @@ describe("caja: del turno al Cierre Z", { testIsolation: false }, () => {
 
   it("cobra otra mesa con pago mixto: $10 en efectivo y el resto con tarjeta", () => {
     ordenEnMesa("Mesa 2", [["Arroz marinero", 1], ["Jugo natural", 2]]);
-    cy.getByTestId("mesa-Mesa 2").click();
+    cy.getByTestId("mesa-Mesa 2").should("have.attr", "data-estado", "ocupada").click();
     cy.getByTestId("total").should("contain.text", "$");
     cy.get("body").type("m");
     cy.getByTestId("agregar-Efectivo").click();
@@ -80,7 +80,7 @@ describe("caja: del turno al Cierre Z", { testIsolation: false }, () => {
 
   it("divide una mesa en dos cuentas, comparte la cerveza y cobra cada una", () => {
     ordenEnMesa("Mesa 3", [["Ceviche de camarón", 1], ["Pizza personal", 1], ["Cerveza", 2]]);
-    cy.getByTestId("mesa-Mesa 3").click();
+    cy.getByTestId("mesa-Mesa 3").should("have.attr", "data-estado", "ocupada").click();
     cy.getByTestId("total")
       .invoke("text")
       .then((totalOrden) => {

@@ -11,6 +11,7 @@ import { opcionesBillete, vueltoCentavos } from "../lib/billetes";
 import { centavos, verCentavos } from "../lib/dinero";
 import { HojaDescuento } from "./Descuento";
 import { Division } from "./Division";
+import { vibrar } from "../lib/dispositivo";
 import { Comprador, compradorInicial, compradorParaCobro, esConsumidorFinal, type EstadoComprador, validar } from "./Comprador";
 import { HojaPagos, type PagoEnvio } from "./PagoMixto";
 import type { Caja } from "./Turno";
@@ -496,6 +497,7 @@ function OtroMonto({
 function Listo({ out, conMesa, volver, siguiente }: { out: CobroOut; conMesa: boolean; volver: () => void; siguiente?: () => void }) {
   const d = out.documento;
   const vuelto = useConteo(centavos(d.vuelto));
+  useEffect(() => vibrar(), []); // en el celular se siente que cobró
   // Caja libre para el siguiente cliente: vuelve sola a las mesas (con cuentas pendientes, no).
   useEffect(() => {
     if (siguiente) return;

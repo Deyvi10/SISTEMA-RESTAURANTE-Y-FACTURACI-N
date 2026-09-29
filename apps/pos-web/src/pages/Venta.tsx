@@ -10,6 +10,7 @@ import { ApiError, type Catalogo, type GrupoModificadores, type Modificador, nod
 import { useAtajo } from "../components/atajos";
 import { IndiceBusqueda } from "../lib/busqueda";
 import { centavos, verCentavos } from "../lib/dinero";
+import { useDispositivo } from "../lib/dispositivo";
 
 export const TIPOS: { id: Exclude<TipoOrden, "MESA">; nombre: string }[] = [
   { id: "LLEVAR", nombre: "Para llevar" },
@@ -101,6 +102,12 @@ export function Venta({
   const [enviando, setEnviando] = useState(false);
   const [ordenId] = useState(() => existente?.ordenId ?? uuidv7());
   const buscador = useRef<HTMLInputElement>(null);
+  const carritoRef = useRef<HTMLElement>(null);
+  // En la PC el buscador queda listo para escribir; en el celular no se abre el teclado solo.
+  const { tactil } = useDispositivo();
+  const enfocarBuscador = () => {
+    if (!tactil) buscador.current?.focus();
+  };
 
   useEffect(() => {
     nodo
@@ -110,7 +117,8 @@ export function Venta({
         setCategoria([...c.categorias].sort((a, b) => a.orden - b.orden)[0]?.id ?? null);
       })
       .catch((e) => setError(e instanceof ApiError ? e.message : "No se pudo leer el menú."));
-    buscador.current?.focus();
+    enfocarBuscador();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo al abrir
   }, []);
 
   const indice = useMemo(
@@ -126,7 +134,7 @@ export function Venta({
     if (p.grupos.some((g) => grupos.has(g))) setPidiendo(p);
     else setCarrito((c) => agregar(c, p, []));
     setQ("");
-    buscador.current?.focus();
+    enfocarBuscador();
   };
 
   const total = carrito.reduce((t, i) => t + precioLinea(i), 0);
@@ -222,7 +230,7 @@ export function Venta({
         </div>
       </div>
 
-      <aside className="venta__carrito" aria-label="Orden">
+      <aside className="venta__carrito" aria-label="Orden" ref={carritoRef}>
         {!mesaId && (
           <>
             <div className="rp-segmented" role="radiogroup" aria-label="Tipo de orden">
@@ -249,11 +257,11 @@ export function Venta({
                   <span className="rp-cell__title">{i.producto.nombre}</span>
                   {i.mods.length > 0 && <span className="rp-cell__subtitle">{i.mods.map((m) => m.nombre).join(", ")}</span>}
                   <input
-                    className="venta__nota"
+                    className="venta__observacion"
                     value={i.nota}
                     maxLength={MAX_NOTA}
                     onChange={(e) => setCarrito((c) => anotar(c, i.id, e.target.value))}
-                    onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), buscador.current?.focus())}
+                    onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), enfocarBuscador())}
                     placeholder="Observaciones: sin cebolla, poco picante…"
                     aria-label={`Observaciones de ${i.producto.nombre}`}
                     data-testid={`nota-${i.producto.nombre}`}
@@ -297,18 +305,30 @@ export function Venta({
         </button>
       </aside>
 
+      {/* Celular: el pedido queda debajo del menú; esta barra fija lleva el total y lleva a él. */}
+      {carrito.length > 0 && (
+        <div className="venta__resumen-movil" data-testid="resumen-movil">
+          <button type="button" className="rp-btn rp-btn--gray" onClick={() => carritoRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}>
+            Ver pedido · {carrito.reduce((t, i) => t + i.cantidad, 0)}
+          </button>
+          <button type="button" className="rp-btn rp-btn--primary" disabled={enviando} onClick={() => enviar(true)}>
+            Enviar y cobrar {formatMoney(verCentavos(total))}
+          </button>
+        </div>
+      )}
+
       {pidiendo && (
         <HojaModificadores
           producto={pidiendo}
           grupos={pidiendo.grupos.flatMap((g) => grupos.get(g) ?? [])}
           cerrar={() => {
             setPidiendo(null);
-            buscador.current?.focus();
+            enfocarBuscador();
           }}
           listo={(mods) => {
             setCarrito((c) => agregar(c, pidiendo, mods));
             setPidiendo(null);
-            buscador.current?.focus();
+            enfocarBuscador();
           }}
         />
       )}

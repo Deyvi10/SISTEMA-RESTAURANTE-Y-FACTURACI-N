@@ -1,7 +1,8 @@
-/* Estilos de la caja. Todo sale de los tokens de @restpos/ui; pensada para 1280×720 en adelante. */
+/* Estilos de la caja. Todo sale de los tokens de @restpos/ui. Pensada para la computadora principal
+   (1280×720 en adelante) y adaptada a tableta y celular al final del archivo. */
 
 html, body, #root { height: 100%; }
-body { overscroll-behavior: none; min-width: 1024px; }
+body { overscroll-behavior: none; }
 h1, h2, h3 { margin: 0; text-wrap: balance; }
 button { font: inherit; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
@@ -55,7 +56,7 @@ button { font: inherit; }
 .teclado-pin__error { min-height: 22px; margin: 0; color: var(--rp-color-danger-text); font-size: 15px; }
 
 /* ---------- Estructura de la caja ---------- */
-.caja { height: 100%; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; }
+.caja { height: 100%; height: 100dvh; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; }
 .barra {
   display: flex; align-items: center; gap: 16px; padding: 10px 20px;
   background: var(--rp-color-surface); border-bottom: 0.5px solid var(--rp-color-separator);
@@ -323,8 +324,96 @@ button { font: inherit; }
 
 /* ---------- Observaciones por plato ---------- */
 .venta__linea { align-items: flex-start; }
-.venta__nota { width: 100%; margin-top: 6px; padding: 6px 10px; border-radius: 10px; border: 1px solid var(--rp-color-separator);
+.venta__observacion { width: 100%; margin-top: 6px; padding: 6px 10px; border-radius: 10px; border: 1px solid var(--rp-color-separator);
   background: var(--rp-color-background); color: var(--rp-color-label); font: inherit; font-size: 14px; }
-.venta__nota::placeholder { color: var(--rp-color-label-tertiary, var(--rp-color-label-secondary)); }
-.venta__nota:focus { outline: 2px solid var(--rp-color-accent); outline-offset: 1px; }
+.venta__observacion::placeholder { color: var(--rp-color-label-tertiary, var(--rp-color-label-secondary)); }
+.venta__observacion:focus { outline: 2px solid var(--rp-color-accent); outline-offset: 1px; }
 .cobro__nota { font-style: italic; }
+
+.venta__resumen-movil { display: none; }
+
+/* ======================================================================
+   Adaptación al equipo (lib/dispositivo.ts marca <html data-dispositivo data-tactil>)
+   ====================================================================== */
+
+/* Pantalla táctil: sin pistas de teclado (no hay teclado) y objetivos cómodos para el dedo. */
+[data-tactil="true"] .tecla, [data-tactil="true"] .pie { display: none; }
+[data-tactil="true"] .billete { padding-right: 14px; }
+[data-tactil="true"] .rp-btn--sm { min-height: 40px; }
+[data-tactil="true"] .caja { grid-template-rows: auto minmax(0, 1fr); }
+
+/* Tableta: dos columnas más angostas. */
+@media (max-width: 1099px) {
+  .cobro { grid-template-columns: minmax(0, 1fr) minmax(340px, 1fr); gap: 16px; }
+  .venta { grid-template-columns: minmax(0, 1.2fr) minmax(300px, 1fr); gap: 16px; }
+  .division { grid-template-columns: minmax(0, 1fr) minmax(300px, 1fr); gap: 16px; }
+  .cobro__total { font-size: 54px; }
+}
+
+/* Celular: una columna, pestañas abajo como una app, hojas que suben desde abajo. */
+@media (max-width: 767px) {
+  .caja { grid-template-rows: auto minmax(0, 1fr); }
+  .pie { display: none; }
+  .barra { gap: 8px; padding: 8px 12px; padding-top: max(8px, env(safe-area-inset-top)); }
+  .barra__marca, .barra__texto { display: none; }
+  .estado-turno { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+  .barra__nav {
+    position: fixed; z-index: 20; left: 0; right: 0; bottom: 0; flex: none; justify-content: space-around; gap: 0;
+    padding: 6px 12px max(6px, env(safe-area-inset-bottom)); background: var(--rp-color-surface); border-top: 0.5px solid var(--rp-color-separator);
+  }
+  .barra__tab { flex: 1; padding: 10px 0; font-size: 15px; text-align: center; }
+  .contenido { padding: 12px 12px 84px; }
+
+  .acceso__barra { padding: 12px 16px; }
+  .acceso__gente { padding: 8px 16px 32px; }
+  .gente { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; }
+  .persona { padding: 16px 8px 14px; }
+
+  .mesas__barra { gap: 8px; }
+  .buscador { flex-basis: 100%; min-width: 0; max-width: none; }
+  .zonas { min-width: 0; width: 100%; overflow-x: auto; }
+  .leyenda { gap: 12px; font-size: 13px; margin: 10px 0; flex-wrap: wrap; }
+  .sin-mesa { flex-wrap: nowrap; overflow-x: auto; margin: 10px -12px 4px; padding: 0 12px 4px; scroll-snap-type: x proximity; }
+  .sin-mesa > * { flex: none; scroll-snap-align: start; }
+  .orden-sin-mesa { min-width: 180px; }
+  .rejilla-mesas { grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 10px; }
+  .mesa { min-height: 96px; }
+  .mesa__nombre { font-size: 18px; }
+  .mesa__total { font-size: 16px; }
+
+  .venta, .cobro, .division { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .venta__carrito { position: static; padding: 16px; scroll-margin-top: 8px; }
+  .venta__lineas { max-height: none; }
+  .productos { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+  .producto { min-height: 72px; }
+  .venta__menu .rp-chips { flex-wrap: nowrap; overflow-x: auto; }
+  .venta__resumen-movil {
+    display: flex; gap: 8px; position: fixed; z-index: 19; left: 12px; right: 12px; bottom: 64px;
+    padding: 8px; border-radius: 18px; background: color-mix(in srgb, var(--rp-color-surface) 92%, transparent);
+    backdrop-filter: blur(12px); box-shadow: 0 8px 28px rgb(0 0 0 / 0.28);
+  }
+  .venta__resumen-movil .rp-btn--primary { flex: 1; }
+  .venta { padding-bottom: 72px; }
+
+  .cobro__panel { padding: 16px; border-radius: 18px; }
+  .cobro__total { font-size: 46px; }
+  .billetes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .billete { min-height: 78px; }
+  .metodos .rp-btn { flex: 1 1 45%; }
+  .cobro-listo { min-height: 50vh; padding: 0 12px; }
+  .comprador__form { grid-template-columns: minmax(0, 1fr); }
+  .division__cuentas { padding: 16px; }
+
+  .turno__tarjetas { grid-template-columns: minmax(0, 1fr); }
+  .tarjeta { padding: 16px; }
+
+  /* Las hojas centradas de la PC suben desde abajo, a todo el ancho. */
+  .rp-scrim:has(.hoja-caja), .centrado-fijo { place-items: end center; }
+  .hoja-caja, .hoja-cierre, .hoja-pagos, .hoja-mods, .hoja-descuento {
+    width: 100vw; max-height: 92dvh; border-radius: 22px 22px 0 0; padding-bottom: env(safe-area-inset-bottom);
+  }
+  .pago { grid-template-columns: minmax(0, 1fr); margin: 0 12px 10px; }
+  .pago__voucher { grid-template-columns: 1fr 1fr; }
+  .pagos__agregar, .pagos__total { margin-left: 12px; margin-right: 12px; }
+  .ayuda-atajos { width: 100vw; }
+}

@@ -74,8 +74,9 @@ var matriz = map[Permiso]regla{
 	AnularItemEnviado: r("Anular platos enviados", "Quitar un plato que ya se envió a cocina (imprime ticket de anulación)", nil, []Rol{Cajero, Mesero}),
 	TransferirMesa:    r("Transferir y unir mesas", "Mover pedidos entre mesas o pasar una mesa a otro mesero", []Rol{Cajero}, []Rol{Mesero}),
 	ImprimirPrecuenta: r("Imprimir pre-cuenta", "Imprimir el detalle de consumo sin valor tributario", []Rol{Cajero, Mesero}, nil),
-	Cobrar:            r("Cobrar y facturar", "Registrar pagos y emitir comprobantes", []Rol{Cajero}, []Rol{Mesero}),
-	DividirCuenta:     r("Dividir cuentas", "Separar una orden en varias cuentas", []Rol{Cajero}, []Rol{Mesero}),
+	// Solo la caja cobra (decisión del dueño del producto): al mesero no se le puede activar.
+	Cobrar:            r("Cobrar y facturar", "Registrar pagos y emitir comprobantes", []Rol{Cajero}, nil),
+	DividirCuenta:     r("Dividir cuentas", "Separar una orden en varias cuentas", []Rol{Cajero}, nil),
 	DarDescuento:      r("Dar descuentos y cortesías", "Aplicar descuentos con motivo", nil, []Rol{Cajero}),
 	AbrirCajon:        r("Abrir cajón sin venta", "Abrir el cajón de dinero sin cobrar (queda auditado)", nil, []Rol{Cajero}),
 	EmitirNC:          r("Emitir notas de crédito", "Revertir ventas facturadas", nil, []Rol{Cajero}),
