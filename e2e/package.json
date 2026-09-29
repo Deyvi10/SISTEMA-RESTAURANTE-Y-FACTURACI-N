@@ -1,0 +1,13 @@
+{
+  "name": "@restpos/e2e",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "caja": "cypress run --spec cypress/e2e/caja.cy.ts",
+    "abrir": "cypress open"
+  },
+  "devDependencies": {
+    "cypress": "^16.1.0",
+    "typescript": "5.9"
+  }
+}

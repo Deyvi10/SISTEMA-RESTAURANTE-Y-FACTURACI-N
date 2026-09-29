@@ -13,6 +13,7 @@ type Config struct {
 	DataDir  string // base, logs y caché de fotos
 	HTTPAddr string // API LAN + WebSocket + caja web
 	NubeURL  string // API de la nube (se puede cambiar solo antes de activar)
+	SinMDNS  bool   // no anunciarse en la LAN (pruebas E2E en CI)
 }
 
 // Version la fija el build con -ldflags "-X …/app.Version=1.2.3".

@@ -42,6 +42,7 @@ jobs:
             web:
               - 'apps/backoffice-web/**'
               - 'apps/pos-web/**'
+              - 'e2e/**'
               - 'packages/ts/**'
               - 'package.json'
               - 'package-lock.json'
@@ -157,6 +158,34 @@ jobs:
         run: npm run build -w @restpos/backoffice-web
       - name: Caja web (tipos, pruebas y build dentro del nodo)
         run: npm run typecheck -w @restpos/pos-web && npm test -w @restpos/pos-web && npm run build -w @restpos/pos-web
+
+  e2e-caja:
+    needs: cambios
+    if: needs.cambios.outputs.go == 'true' || needs.cambios.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/Cypress
+          key: cypress-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - run: npm ci
+      - name: Tipos de la suite
+        run: npx tsc -p e2e
+      - name: Suite Cypress de caja (turno → cobro → mixto → división → Cierre Z)
+        run: e2e/correr.sh
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: cypress-capturas
+          path: e2e/cypress/screenshots
 
   secretos:
     runs-on: ubuntu-latest

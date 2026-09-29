@@ -112,6 +112,9 @@ pos: ## Compila la caja web dentro del nodo (apps/pos-web → go:embed); luego c
 pos-dev: ## Caja web con recarga en caliente en http://localhost:5174 (con `make nodo` en otra terminal)
 	npm install --no-audit --no-fund && npm run dev -w @restpos/pos-web
 
+e2e: ## Suite Cypress de la caja contra un nodo efímero sembrado (CYPRESS_NAVEGADOR=ruta de otro Chromium si no hay Chrome)
+	e2e/correr.sh
+
 bo: ## Corre el backoffice en http://localhost:5173 (con `make api` en otra terminal)
 	npm install --no-audit --no-fund && npm run dev -w @restpos/backoffice-web
 
@@ -121,4 +124,4 @@ bo-test: ## Tipos, pruebas y build del backoffice
 backlog: ## Regenera docs/12-backlog-tickets.md desde el JSON
 	python3 documentacion-proyecto/docs/backlog/generar.py
 
-.PHONY: help hooks dev down reset logs test test-long cover fmt lint check-float golden printer-sim sri-stub tokens tokens-check ui-test sri-ts-test ui-docs flutter-ui waiter api demo pos pos-dev bo bo-test backlog
+.PHONY: help hooks dev down reset logs test test-long cover fmt lint check-float golden printer-sim sri-stub tokens tokens-check ui-test sri-ts-test ui-docs flutter-ui waiter api demo pos pos-dev e2e bo bo-test backlog

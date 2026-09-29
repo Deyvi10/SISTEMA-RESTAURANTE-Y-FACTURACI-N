@@ -6,7 +6,8 @@
     "packages/ts/contracts",
     "packages/ts/sri",
     "apps/backoffice-web",
-    "apps/pos-web"
+    "apps/pos-web",
+    "e2e"
   ],
   "engines": {
     "node": ">=22"

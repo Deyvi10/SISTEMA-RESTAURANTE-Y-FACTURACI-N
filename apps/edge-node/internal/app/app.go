@@ -190,7 +190,7 @@ func (a *App) Run(ctx context.Context) error {
 	a.motor.Iniciar(bg)
 	a.wg.Go(func() { a.barrerBloqueos(bg) })
 	a.sincronizarImpresoras(ctx)
-	if !a.sinMDNS {
+	if !a.sinMDNS && !a.Cfg.SinMDNS {
 		if tcp, ok := ln.Addr().(*net.TCPAddr); ok {
 			a.wg.Go(func() { a.anunciarMDNS(bg, tcp.Port) })
 		}
