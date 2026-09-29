@@ -3,3 +3,5 @@
 *.png binary
 *.docx binary
 *.p12 binary
+*.pdf binary
+*.zip binary

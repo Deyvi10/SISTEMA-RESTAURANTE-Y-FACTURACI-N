@@ -1,8 +1,8 @@
 // Package sri contiene la lógica fiscal pura del Servicio de Rentas Internas de Ecuador:
 // clave de acceso, validación de identificaciones y catálogos. No hace I/O.
 //
-// Fuente: docs/05-facturacion-electronica-sri.md. Todo punto marcado 🔎 allí debe
-// confirmarse contra la ficha técnica vigente guardada en docs/fuentes/sri/.
+// Fuente: ficha técnica de comprobantes electrónicos esquema offline v2.34 del SRI, guardada
+// en documentacion-proyecto/docs/fuentes/sri/ (F0-14), y docs/05-facturacion-electronica-sri.md.
 package sri
 
 import (
@@ -114,10 +114,27 @@ func DigitoVerificadorMod11(digitos string) int {
 	}
 }
 
-// ParseClaveAcceso valida longitud, dígitos y dígito verificador.
+// tiposComprobante es la Tabla 3 de la ficha técnica offline v2.34 (docs/fuentes/sri/).
+var tiposComprobante = map[string]bool{"01": true, "03": true, "04": true, "05": true, "06": true, "07": true}
+
+// ParseClaveAcceso valida la clave contra la Tabla 1 de la ficha técnica offline v2.34:
+// 49 dígitos, fecha ddmmaaaa real, tipo de comprobante de la Tabla 3, ambiente de la Tabla 4,
+// tipo de emisión normal (Tabla 2: offline solo tiene el 1) y dígito verificador módulo 11.
 func ParseClaveAcceso(s string) (ClaveAcceso, error) {
 	if !esDigitos(s, ClaveAccesoLen) {
 		return "", fmt.Errorf("%w: debe tener %d dígitos", ErrClaveInvalida, ClaveAccesoLen)
+	}
+	if _, err := time.Parse("02012006", s[0:8]); err != nil {
+		return "", fmt.Errorf("%w: la fecha %s no existe", ErrClaveInvalida, s[0:8])
+	}
+	if !tiposComprobante[s[8:10]] {
+		return "", fmt.Errorf("%w: tipo de comprobante %s desconocido", ErrClaveInvalida, s[8:10])
+	}
+	if a := Ambiente(s[23] - '0'); a != AmbientePruebas && a != AmbienteProduccion {
+		return "", fmt.Errorf("%w: ambiente %c desconocido", ErrClaveInvalida, s[23])
+	}
+	if s[47:48] != TipoEmisionNormal {
+		return "", fmt.Errorf("%w: tipo de emisión %c (offline solo admite 1)", ErrClaveInvalida, s[47])
 	}
 	if int(s[48]-'0') != DigitoVerificadorMod11(s[:48]) {
 		return "", fmt.Errorf("%w: dígito verificador incorrecto", ErrClaveInvalida)

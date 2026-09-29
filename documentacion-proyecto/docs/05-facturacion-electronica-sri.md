@@ -213,13 +213,16 @@ Ver `06-seguridad.md` §4: el P12 y su contraseña se cifran con envelope encryp
 
 ## 14. Puntos a verificar antes de producción (checklist 🔎)
 
-- [ ] Ficha técnica offline vigente y XSD descargados en `docs/fuentes/sri/`.
-- [ ] Versión del esquema de factura y NC a usar (`1.0.0` / `1.1.0` / `2.x`).
-- [ ] Plazo máximo para enviar comprobantes al SRI tras la emisión (el documento fuente dice 72 h).
-- [ ] Monto máximo para consumidor final vigente.
-- [ ] Contenido mínimo del RIDE y validez del formato ticket.
-- [ ] Tratamiento de saltos de secuencial.
-- [ ] Procedimiento vigente de anulación vs nota de crédito.
-- [ ] Campos y leyendas RIMPE vigentes.
-- [ ] Algoritmos de firma exigidos.
+Revisado contra la ficha técnica offline **v2.34** el 2026-09-29 (F0-14); el detalle, con la
+sección de la ficha de cada punto, está en [`docs/fuentes/sri/README.md`](fuentes/sri/README.md).
+
+- [x] Ficha técnica offline vigente y XSD descargados en `docs/fuentes/sri/`.
+- [x] Versión del esquema de factura y NC a usar: **1.1.0** (6 decimales en precio y cantidad; 2.1.0 solo agrega campos de transporte).
+- [ ] Plazo máximo para enviar comprobantes al SRI tras la emisión: la ficha no fija las 72 h del documento fuente (solo que el SRI procesa en hasta 24 h). Pendiente de DP-07.
+- [ ] Monto máximo para consumidor final vigente: la ficha registra su actualización (v2.22) sin dar el valor. Pendiente de DP-07; hoy es parámetro.
+- [ ] Contenido mínimo del RIDE y validez del formato ticket: Anexo 2 de la ficha; falta verificar el ticket de 80 mm contra él (F5-05).
+- [ ] Tratamiento de saltos de secuencial: la ficha exige orden cronológico y secuencial sin duplicados (§9.18), no describe los saltos. Pendiente de DP-07.
+- [ ] Procedimiento vigente de anulación vs nota de crédito: estados y errores en la ficha; el procedimiento está en la guía de anulación. Pendiente de DP-07.
+- [x] Campos y leyendas RIMPE vigentes: `<contribuyenteRimpe>` (Anexo 22).
+- [x] Algoritmos de firma exigidos: XAdES-BES 1.3.2 enveloped, RSA-SHA1, 2048 bits, PKCS#12.
 - [ ] Revisión del flujo completo por un contador o tributarista (acta en `docs/fuentes/`).

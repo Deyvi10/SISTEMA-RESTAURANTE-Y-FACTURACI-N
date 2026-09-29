@@ -29,7 +29,8 @@ La documentación vive en `documentacion-proyecto/`: toda referencia a `docs/…
 | F0-09 Spike impresión | 🟡 Librería ESC/POS lista y probada con el simulador. Falta hardware real (DP-04) |
 | F0-10 Spike sync | ✅ 10 000 eventos con caos: 0 pérdidas, 0 duplicados (ADR-0012, `packages/go/edgesync`) |
 | F0-12 Sistema de diseño | ✅ Tokens únicos → CSS, Tailwind v4, TS y Flutter; contraste AA verificado en CI; componentes CSS; guía viva (`make ui-docs`) |
-| F0-01, F0-13, F0-14 | ⏳ Requieren decisiones, usuarios reales o descargar la ficha del SRI |
+| F0-01, F0-13 | ⏳ Requieren decisiones o usuarios reales |
+| F0-14 | ✅ Normativa del SRI en `documentacion-proyecto/docs/fuentes/sri/`: ficha técnica offline v2.34 y XSD oficiales (factura 1.0.0–2.1.0, NC 1.1.0), con fecha y SHA-256. Checklist de `05 §14` revisado punto por punto; esquema elegido **factura/NC 1.1.0** (6 decimales). Clave de acceso validada contra la Tabla 1 (fecha, tipo, ambiente, emisión) con 18 claves oficiales como vectores. Quedan para el tributarista (DP-07): plazo de envío, monto de consumidor final, saltos de secuencial y anulación |
 | F1-01…F1-09, F1-13 | ✅ API Go (`apps/cloud-api`): RLS forzado + QA-06 en 16 tablas, QA-11, auth completa, catálogo, salón, personal, imágenes WebP + galería de 24 fotos CC0 |
 | F1-10…F1-12 | ✅ Backoffice React (`apps/backoffice-web`): login promocional, guía de 5 pasos, menú con fotos, salón, personal con PIN, ajustes |
 | F2-01 | ✅ Nodo Local (`apps/edge-node`): servicio de Windows/systemd, SQLite con un solo escritor, watchdog, prueba kill -9 |

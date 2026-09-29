@@ -1,15 +1,128 @@
 {
-  "fuente": "docs/05 §4. El primer caso es el ejemplo publicado en la ficha técnica del SRI.",
+  "fuente": "Ficha técnica de comprobantes electrónicos esquema offline v2.34 del SRI (docs/fuentes/sri/, descargada el 2026-09-29): claves publicadas en la ficha y en los XML de ejemplo oficiales, más casos borde.",
   "validas": [
-    {"clave": "2110201101179214673900110020010000000011234567813", "nota": "Ejemplo de la ficha técnica"}
+    {
+      "clave": "2110201101179214673900110020010000000011234567813",
+      "nota": "Ejemplo de la ficha técnica"
+    },
+    {
+      "clave": "0211202401050306179800120010020000000677300995216",
+      "nota": "Publicada en la ficha técnica v2.34 o sus XML de ejemplo"
+    },
+    {
+      "clave": "0403201301179226110400110015010000000081234567816",
+      "nota": "Publicada en la ficha técnica v2.34 o sus XML de ejemplo"
+    },
+    {
+      "clave": "0503201201176001321000110010030009900641234567814",
+      "nota": "Publicada en la ficha técnica v2.34 o sus XML de ejemplo"
+    },
+    {
+      "clave": "0601201601176001321000110011230000000081234567817",
+      "nota": "Publicada en la ficha técnica v2.34 o sus XML de ejemplo"
+    },
+    {
+      "clave": "0603201304176001321000110015010000000461234567817",
+      "nota": "Publicada en la ficha técnica v2.34 o sus XML de ejemplo"
+    },
+    {
+      "clave": "0603201306176001321000110015010000000081234567812",
+      "nota": "Publicada en la ficha técnica v2.34 o sus XML de ejemplo"
+    },
+    {
+      "clave": "1111202401099338176200110020010000003961234567815",
+      "nota": "Publicada en la ficha técnica v2.34 o sus XML de ejemplo"
+    },
+    {
+      "clave": "1211202401092554321700110021000000000790925543211",
+      "nota": "Publicada en la ficha técnica v2.34 o sus XML de ejemplo"
+    },
+    {
+      "clave": "1302201201176001321000120010030000050431234567814",
+      "nota": "Publicada en la ficha técnica v2.34 o sus XML de ejemplo"
+    },
+    {
+      "clave": "1510202407099313057500110010010000103591234567816",
+      "nota": "Publicada en la ficha técnica v2.34 o sus XML de ejemplo"
+    },
+    {
+      "clave": "1702201205176001321000110010030001000011234567816",
+      "nota": "Publicada en la ficha técnica v2.34 o sus XML de ejemplo"
+    },
+    {
+      "clave": "2103201601176001321000110010010000000061234567816",
+      "nota": "Publicada en la ficha técnica v2.34 o sus XML de ejemplo"
+    },
+    {
+      "clave": "2103201605176001321000110010010000000011234567814",
+      "nota": "Publicada en la ficha técnica v2.34 o sus XML de ejemplo"
+    },
+    {
+      "clave": "2110201104179214673900110020010000000011234567812",
+      "nota": "Publicada en la ficha técnica v2.34 o sus XML de ejemplo"
+    },
+    {
+      "clave": "2111202405176001321000110010010000001241234567810",
+      "nota": "Publicada en la ficha técnica v2.34 o sus XML de ejemplo"
+    },
+    {
+      "clave": "2203201601176001321000110010010000000101234567812",
+      "nota": "Publicada en la ficha técnica v2.34 o sus XML de ejemplo"
+    },
+    {
+      "clave": "2410201107179214673900110020010000000011234567815",
+      "nota": "Publicada en la ficha técnica v2.34 o sus XML de ejemplo"
+    }
   ],
   "digito": [
-    {"base48": "000000000000000000000000000000000000000000000000", "digito": 0, "nota": "d = 11 → 0"},
-    {"base48": "000000000000000000000000000000000000000000020000", "digito": 1, "nota": "d = 10 → 1"}
+    {
+      "base48": "000000000000000000000000000000000000000000000000",
+      "digito": 0,
+      "nota": "d = 11 → 0"
+    },
+    {
+      "base48": "000000000000000000000000000000000000000000020000",
+      "digito": 1,
+      "nota": "d = 10 → 1"
+    },
+    {
+      "base48": "41261533",
+      "digito": 6,
+      "nota": "Ejemplo del procedimiento módulo 11 de la ficha (sobre 8 dígitos)"
+    }
   ],
   "invalidas": [
-    {"clave": "2110201101179214673900110020010000000011234567814", "nota": "Dígito verificador alterado"},
-    {"clave": "211020110117921467390011002001000000001123456781", "nota": "48 dígitos (el error del documento fuente, L-01)"},
-    {"clave": "21102011011792146739001100200100000000112345678A3", "nota": "Contiene una letra"}
+    {
+      "clave": "2110201101179214673900110020010000000011234567814",
+      "nota": "Dígito verificador alterado"
+    },
+    {
+      "clave": "211020110117921467390011002001000000001123456781",
+      "nota": "48 dígitos (el error del documento fuente, L-01)"
+    },
+    {
+      "clave": "21102011011792146739001100200100000000112345678A3",
+      "nota": "Contiene una letra"
+    },
+    {
+      "clave": "0403201301176815353000110015010000000081234567816",
+      "nota": "Ejemplo ilustrativo de la ficha (Petroecuador) con el dígito verificador de otra clave: el correcto es 0"
+    },
+    {
+      "clave": "2111202401176001321000110010010000011171234567810",
+      "nota": "Ejemplo de la ficha de una consulta RECHAZADA: el dígito correcto es 5"
+    },
+    {
+      "clave": "0000000000000000000000000000000000000000000000000",
+      "nota": "Relleno de la ficha: fecha 00000000 y tipo 00 no existen"
+    },
+    {
+      "clave": "3102202401179214673900110020010000000011234567811",
+      "nota": "31 de febrero no existe"
+    },
+    {
+      "clave": "2808201400179210439400110010010000000091234567812",
+      "nota": "Clave de un lote (Tabla 8, tipo 00): válida para lotes, no como clave de comprobante; el nodo envía comprobantes individuales"
+    }
   ]
 }
