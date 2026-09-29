@@ -10,6 +10,7 @@ import (
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/edge-node/internal/store"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/eventos"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/ids"
+	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/money"
 )
 
 const (
@@ -270,6 +271,9 @@ func (a *App) SalonVivo(ctx context.Context) (Salon, error) {
 	if err != nil {
 		return s, err
 	}
+	// Primero se leen todas las mesas y se cierra la consulta: consultar otra cosa con estas
+	// filas abiertas pide una segunda conexión del pool y, con muchos teléfonos a la vez, cada
+	// petición retiene una y espera otra hasta congelar el nodo (prueba «restaurante lleno»).
 	defer func() { _ = rows.Close() }()
 	for rows.Next() {
 		var m MesaMapa
@@ -304,9 +308,6 @@ func (a *App) SalonVivo(ctx context.Context) (Salon, error) {
 					}
 				}
 			}
-			if tot, err := totalOrden(ctx, q, o); err == nil {
-				m.Total = tot
-			}
 		}
 		if buid.Valid {
 			t, _ := time.Parse(time.RFC3339Nano, blatido.String)
@@ -319,7 +320,66 @@ func (a *App) SalonVivo(ctx context.Context) (Salon, error) {
 		}
 		s.Mesas = append(s.Mesas, m)
 	}
-	return s, rows.Err()
+	if err := rows.Err(); err != nil {
+		return s, err
+	}
+	_ = rows.Close()
+	// Totales de todas las mesas ocupadas en dos consultas (no dos por plato).
+	totales, err := totalesMesasAbiertas(ctx, q)
+	if err != nil {
+		return s, err
+	}
+	for i := range s.Mesas {
+		if o := s.Mesas[i].OrdenID; o != nil {
+			if t, ok := totales[*o]; ok {
+				s.Mesas[i].Total = t.String()
+			}
+		}
+	}
+	return s, nil
+}
+
+// totalesMesasAbiertas suma los platos vivos (precio + modificadores) × cantidad de cada orden
+// abierta con mesa, igual que leerOrden, pero con una consulta para los platos y otra para sus
+// modificadores. La suma se hace en Go con decimales exactos, nunca en SQL.
+func totalesMesasAbiertas(ctx context.Context, q queryer) (map[ids.ID]money.Money, error) {
+	const abiertas = `JOIN ordenes o ON o.id = l.orden_id WHERE o.estado IN ('ABIERTA','PRECUENTA') AND o.mesa_id IS NOT NULL AND l.estado <> 'ANULADA'`
+	mods := map[string][]ModLinea{}
+	rows, err := q.QueryContext(ctx, `SELECT m.orden_linea_id, m.precio_adicional FROM orden_linea_modificadores m JOIN orden_lineas l ON l.id = m.orden_linea_id `+abiertas)
+	if err != nil {
+		return nil, err
+	}
+	for rows.Next() {
+		var linea string
+		var m ModLinea
+		if err := rows.Scan(&linea, &m.PrecioAdicional); err != nil {
+			_ = rows.Close()
+			return nil, err
+		}
+		mods[linea] = append(mods[linea], m)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	rows, err = q.QueryContext(ctx, `SELECT l.id, l.orden_id, l.precio_unitario, l.cantidad FROM orden_lineas l `+abiertas)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	out := map[ids.ID]money.Money{}
+	for rows.Next() {
+		var linea, orden, precio, cantidad string
+		if err := rows.Scan(&linea, &orden, &precio, &cantidad); err != nil {
+			return nil, err
+		}
+		t, err := totalLinea(precio, mods[linea], cantidad)
+		if err != nil {
+			return nil, err
+		}
+		id, _ := ids.Parse(orden)
+		out[id] = out[id].Add(t)
+	}
+	return out, rows.Err()
 }
 
 // avisarMesa difunde el estado vivo de una mesa tras un cambio de su orden (p95 ≤ 300 ms).

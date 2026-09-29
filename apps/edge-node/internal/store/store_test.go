@@ -204,3 +204,95 @@ func TestAyudanteEscritor(t *testing.T) {
 		})
 	}
 }
+
+// Confirmación agrupada: escrituras concurrentes comparten commits, pero cada una es atómica
+// por sí misma. Las que fallan o entran en pánico se deshacen sin tocar a sus vecinas.
+func TestGrupoAislaFallosYPanicos(t *testing.T) {
+	s := abrir(t, filepath.Join(t.TempDir(), "nodo.db"))
+	ctx := context.Background()
+	const n = 300
+	var wg sync.WaitGroup
+	for i := range n {
+		wg.Go(func() {
+			flujo := fmt.Sprintf("f%03d", i)
+			insertar := func(tx *Tx) error {
+				_, err := tx.Exec("INSERT INTO inbox_cursores (flujo, cursor, updated_at) VALUES (?, 1, '')", flujo)
+				return err
+			}
+			switch i % 3 {
+			case 0: // se escribe y queda
+				if err := s.Write(ctx, insertar); err != nil {
+					t.Error(err)
+				}
+			case 1: // escribe y luego falla: no debe quedar nada suyo
+				err := s.Write(ctx, func(tx *Tx) error {
+					if err := insertar(tx); err != nil {
+						return err
+					}
+					return fmt.Errorf("fallo a propósito")
+				})
+				if err == nil || err.Error() != "fallo a propósito" {
+					t.Errorf("%s: se esperaba su propio error, llegó %v", flujo, err)
+				}
+			case 2: // escribe y entra en pánico: el pánico vuelve a quien llamó
+				func() {
+					defer func() {
+						if r := recover(); r != "pánico a propósito" {
+							t.Errorf("%s: pánico %v", flujo, r)
+						}
+					}()
+					_ = s.Write(ctx, func(tx *Tx) error {
+						_ = insertar(tx)
+						panic("pánico a propósito")
+					})
+				}()
+			}
+		})
+	}
+	wg.Wait()
+	var quedaron int
+	if err := s.Read().QueryRow("SELECT count(*) FROM inbox_cursores").Scan(&quedaron); err != nil {
+		t.Fatal(err)
+	}
+	if quedaron != n/3 {
+		t.Fatalf("quedaron %d filas, se esperaban %d (solo las que no fallaron)", quedaron, n/3)
+	}
+}
+
+// Quien ya no espera (contexto cancelado antes de su turno) no escribe nada.
+func TestContextoCanceladoNoEscribe(t *testing.T) {
+	s := abrir(t, filepath.Join(t.TempDir(), "nodo.db"))
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	err := s.Write(ctx, func(tx *Tx) error {
+		_, err := tx.Exec("INSERT INTO inbox_cursores (flujo, cursor, updated_at) VALUES ('x', 1, '')")
+		return err
+	})
+	if err == nil {
+		t.Fatal("con el contexto cancelado no debía escribir")
+	}
+	var n int
+	_ = s.Read().QueryRow("SELECT count(*) FROM inbox_cursores").Scan(&n)
+	if n != 0 {
+		t.Fatalf("escribió %d filas", n)
+	}
+}
+
+// Una escritura después de cerrar la base no se queda esperando para siempre.
+func TestEscribirConLaBaseCerrada(t *testing.T) {
+	s, err := Open(context.Background(), filepath.Join(t.TempDir(), "nodo.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = s.Close()
+	hecho := make(chan error, 1)
+	go func() { hecho <- s.Write(context.Background(), func(*Tx) error { return nil }) }()
+	select {
+	case err := <-hecho:
+		if err == nil {
+			t.Fatal("escribir con la base cerrada debía fallar")
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("Write se quedó esperando con la base cerrada")
+	}
+}

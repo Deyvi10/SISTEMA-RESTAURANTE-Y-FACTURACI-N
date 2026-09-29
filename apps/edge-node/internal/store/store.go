@@ -4,6 +4,12 @@
 // escritura se serializa y los secuenciales, bloqueos y reservas son atómicos sin locks
 // distribuidos. Las lecturas van por un pool aparte en modo solo lectura y, gracias a WAL,
 // nunca esperan al escritor.
+//
+// Confirmación agrupada: con synchronous=FULL cada commit espera al disco (fsync). Con el
+// restaurante lleno, las escrituras que llegan a la vez se ejecutan una tras otra en la misma
+// transacción, cada una en su SAVEPOINT (si falla, se deshace solo la suya), y se confirman
+// con un único fsync. Nadie recibe respuesta antes de que el disco confirme; con poca carga el
+// grupo es de una sola escritura y todo sigue igual.
 package store
 
 import (
@@ -14,6 +20,7 @@ import (
 	"io/fs"
 	"net/url"
 	"runtime"
+	"sync"
 
 	"github.com/pressly/goose/v3"
 	_ "modernc.org/sqlite" // driver SQLite sin CGO (ADR-0002)
@@ -25,7 +32,24 @@ import (
 type Store struct {
 	w *sql.DB
 	r *sql.DB
+
+	cola      chan *escritura
+	fin       chan struct{}
+	cerrar    sync.Once
+	terminado chan struct{}
 }
+
+// escritura es un pedido de Write esperando su turno en el escritor.
+type escritura struct {
+	ctx   context.Context
+	fn    func(*Tx) error
+	err   error
+	panic any
+	listo chan struct{}
+}
+
+// maxGrupo limita cuántas escrituras comparten un commit (acota la latencia del grupo).
+const maxGrupo = 64
 
 // Tx es la transacción de escritura que reciben los servicios del nodo.
 type Tx = sql.Tx
@@ -68,7 +92,9 @@ func Open(ctx context.Context, path string) (*Store, error) {
 		return nil, err
 	}
 	r.SetMaxOpenConns(max(4, runtime.NumCPU()))
-	return &Store{w: w, r: r}, nil
+	s := &Store{w: w, r: r, cola: make(chan *escritura, maxGrupo), fin: make(chan struct{}), terminado: make(chan struct{})}
+	go s.escritor()
+	return s, nil
 }
 
 func migrate(ctx context.Context, db *sql.DB) error {
@@ -86,25 +112,120 @@ func migrate(ctx context.Context, db *sql.DB) error {
 	return nil
 }
 
-// Write ejecuta fn en una transacción de escritura; commit si fn no falla.
-func (s *Store) Write(ctx context.Context, fn func(*Tx) error) (err error) {
-	tx, err := s.w.BeginTx(ctx, nil)
-	if err != nil {
-		return err
+// Write ejecuta fn en una transacción de escritura; sus cambios quedan en disco al volver sin
+// error. Si fn falla, no queda nada de lo suyo. fn no debe llamar a Write (el escritor es uno).
+func (s *Store) Write(ctx context.Context, fn func(*Tx) error) error {
+	e := &escritura{ctx: ctx, fn: fn, listo: make(chan struct{})}
+	select {
+	case s.cola <- e:
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-s.fin:
+		return errCerrado
 	}
-	defer func() {
-		if p := recover(); p != nil {
-			_ = tx.Rollback()
-			panic(p)
+	// Una vez en la cola se espera el resultado real: devolver antes dejaría la duda de si
+	// la escritura quedó o no. Si la base se cerró sin atenderla, no se hizo.
+	select {
+	case <-e.listo:
+	case <-s.terminado:
+		select {
+		case <-e.listo:
+		default:
+			return errCerrado
 		}
-		if err != nil {
-			_ = tx.Rollback()
+	}
+	if e.panic != nil {
+		panic(e.panic)
+	}
+	return e.err
+}
+
+var errCerrado = errors.New("store: la base está cerrada")
+
+// escritor es el único que escribe: toma lo que haya en la cola y lo confirma en grupo.
+func (s *Store) escritor() {
+	defer close(s.terminado)
+	grupo := make([]*escritura, 0, maxGrupo)
+	for {
+		var e *escritura
+		select {
+		case e = <-s.cola:
+		case <-s.fin:
+			return
+		}
+		grupo = append(grupo[:0], e)
+	juntar:
+		for len(grupo) < maxGrupo {
+			select {
+			case e := <-s.cola:
+				grupo = append(grupo, e)
+			default:
+				break juntar
+			}
+		}
+		s.confirmar(grupo)
+		for _, e := range grupo {
+			close(e.listo)
+		}
+	}
+}
+
+// confirmar corre el grupo en una transacción, cada escritura en su SAVEPOINT, y hace un commit.
+func (s *Store) confirmar(grupo []*escritura) {
+	tx, err := s.w.BeginTx(context.Background(), nil)
+	if err != nil {
+		for _, e := range grupo {
+			e.err = err
+		}
+		return
+	}
+	var hechas []*escritura
+	for _, e := range grupo {
+		if err := e.ctx.Err(); err != nil { // quien pidió ya no espera: ni se empieza
+			e.err = err
+			continue
+		}
+		if _, err := tx.Exec(`SAVEPOINT escritura`); err != nil {
+			e.err = err
+			continue
+		}
+		e.panic, e.err = correr(e, tx)
+		if e.err != nil || e.panic != nil {
+			if _, err := tx.Exec(`ROLLBACK TO escritura; RELEASE escritura`); err != nil {
+				// La transacción quedó inservible: nada del grupo se confirma.
+				_ = tx.Rollback()
+				for _, h := range hechas {
+					h.err = fmt.Errorf("store: se deshizo el grupo: %w", err)
+				}
+				for _, x := range grupo {
+					if x.err == nil && x.panic == nil {
+						x.err = fmt.Errorf("store: se deshizo el grupo: %w", err)
+					}
+				}
+				return
+			}
+			continue
+		}
+		if _, err := tx.Exec(`RELEASE escritura`); err != nil {
+			e.err = err
+			continue
+		}
+		hechas = append(hechas, e)
+	}
+	if err := tx.Commit(); err != nil {
+		for _, h := range hechas {
+			h.err = err
+		}
+	}
+}
+
+func correr(e *escritura, tx *Tx) (p any, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			p = r
 		}
 	}()
-	if err = fn(tx); err != nil {
-		return err
-	}
-	return tx.Commit()
+	return nil, e.fn(tx)
 }
 
 // Read es el pool de lectura (solo lectura: una escritura por aquí falla).
@@ -127,5 +248,9 @@ func (s *Store) Check(ctx context.Context) error {
 }
 
 func (s *Store) Close() error {
+	s.cerrar.Do(func() {
+		close(s.fin)
+		<-s.terminado
+	})
 	return errors.Join(s.r.Close(), s.w.Close())
 }
