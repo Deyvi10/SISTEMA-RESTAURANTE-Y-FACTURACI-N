@@ -2,8 +2,8 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { type Catalogo, nodo, type OrdenSinMesa, type Producto } from "../api/nodo";
 import { AtajosProvider } from "../components/atajos";
-import { filtrarSinMesa } from "../pages/Mesas";
-import { agregar, precioLinea, validarMods, Venta } from "../pages/Venta";
+import { filtrarSinMesa, iconoTipo } from "../pages/Mesas";
+import { agregar, anotar, MAX_NOTA, precioLinea, TIPOS, validarMods, Venta } from "../pages/Venta";
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -87,5 +87,75 @@ describe("venta en mostrador", () => {
       }),
     );
     expect(cobrar).toHaveBeenCalledWith("o9", "Llevar #4 · Ana");
+  });
+});
+
+describe("pedido para una mesa desde la caja", () => {
+  it("envía a la mesa sin tipo ni nombre corto", async () => {
+    vi.spyOn(nodo, "catalogo").mockResolvedValue(catalogo);
+    const enviar = vi.spyOn(nodo, "enviarOrden").mockResolvedValue({ orden: { id: "o1", mesa: "Mesa 4" } as never, comandaNumero: 7 });
+    const volver = vi.fn();
+    render(
+      <AtajosProvider>
+        <Venta mesa={{ id: "m4", nombre: "Mesa 4" }} volver={volver} cobrar={() => {}} />
+      </AtajosProvider>,
+    );
+    expect(screen.getByTestId("titulo-venta")).toHaveTextContent("Pedido para Mesa 4");
+    expect(screen.queryByRole("radiogroup", { name: "Tipo de orden" })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("etiqueta")).not.toBeInTheDocument();
+    fireEvent.click(await screen.findByTestId("producto-Cerveza"));
+    fireEvent.click(screen.getByTestId("enviar"));
+    await waitFor(() => expect(volver).toHaveBeenCalled());
+    expect(enviar).toHaveBeenCalledWith(expect.objectContaining({ tipo: "MESA", mesaId: "m4", etiqueta: "" }));
+  });
+
+  it("agrega platos a la orden abierta de la mesa", async () => {
+    vi.spyOn(nodo, "catalogo").mockResolvedValue(catalogo);
+    const enviar = vi.spyOn(nodo, "enviarOrden").mockResolvedValue({ orden: { id: "o1", mesa: "Mesa 4" } as never, comandaNumero: 8 });
+    render(
+      <AtajosProvider>
+        <Venta existente={{ ordenId: "o1", tipo: "MESA", mesaId: "m4", etiqueta: "", nombre: "Mesa 4" }} volver={() => {}} cobrar={() => {}} />
+      </AtajosProvider>,
+    );
+    expect(screen.getByTestId("titulo-venta")).toHaveTextContent("Agregar a Mesa 4");
+    fireEvent.click(await screen.findByTestId("producto-Cerveza"));
+    fireEvent.click(screen.getByTestId("enviar"));
+    await waitFor(() => expect(enviar).toHaveBeenCalledWith(expect.objectContaining({ ordenId: "o1", tipo: "MESA", mesaId: "m4" })));
+  });
+
+  it("ya no ofrece delivery", () => {
+    expect(TIPOS.map((t) => t.nombre)).toEqual(["Para llevar", "Barra"]);
+  });
+});
+
+describe("observaciones por plato", () => {
+  it("un plato con observación queda en su propia línea y la nota viaja a cocina", async () => {
+    const p = catalogo.productos[2]!; // Cerveza
+    let c = agregar([], p, []);
+    c = anotar(c, c[0]!.id, "sin hielo");
+    c = agregar(c, p, []); // otra cerveza normal: no se mezcla con la «sin hielo»
+    c = agregar(c, p, []);
+    expect(c.map((i) => [i.nota, i.cantidad])).toEqual([["sin hielo", 1], ["", 2]]);
+    expect(anotar(c, c[0]!.id, "x".repeat(200))[0]!.nota).toHaveLength(MAX_NOTA);
+
+    vi.spyOn(nodo, "catalogo").mockResolvedValue(catalogo);
+    const enviar = vi.spyOn(nodo, "enviarOrden").mockResolvedValue({ orden: { id: "o1", mesa: "Mesa 4" } as never, comandaNumero: 9 });
+    render(
+      <AtajosProvider>
+        <Venta mesa={{ id: "m4", nombre: "Mesa 4" }} volver={() => {}} cobrar={() => {}} />
+      </AtajosProvider>,
+    );
+    fireEvent.click(await screen.findByTestId("producto-Cerveza"));
+    fireEvent.change(screen.getByTestId("nota-Cerveza"), { target: { value: "  sin hielo " } });
+    fireEvent.click(screen.getByTestId("enviar"));
+    await waitFor(() => expect(enviar).toHaveBeenCalled());
+    expect(enviar.mock.calls[0]![0].lineas[0]).toEqual(expect.objectContaining({ productoId: "Cerveza", nota: "sin hielo" }));
+  });
+});
+
+describe("órdenes viejas", () => {
+  it("una orden de un tipo que ya no existe (delivery) se muestra con un icono de respaldo", () => {
+    expect(iconoTipo("DELIVERY")).toBe(iconoTipo("LLEVAR"));
+    expect(iconoTipo("MESA")).not.toBe(iconoTipo("LLEVAR"));
   });
 });

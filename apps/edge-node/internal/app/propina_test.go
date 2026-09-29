@@ -87,10 +87,10 @@ func TestPropinaLegal(t *testing.T) {
 	}
 }
 
-// El servicio es por atender en el local: no se cobra en Para llevar ni Delivery.
+// El servicio es por atender en el local: no se cobra en Para llevar.
 func TestSinServicioParaLlevar(t *testing.T) {
 	c := nuevaCaja(t, nocheDel25)
-	for tipo, conServicio := range map[string]bool{"LLEVAR": false, "DELIVERY": false, "BARRA": true} {
+	for tipo, conServicio := range map[string]bool{"LLEVAR": false, "BARRA": true} {
 		orden := ids.New()
 		st, out := c.pos.req("POST", "/v1/ordenes/enviar", map[string]any{"idempotencyKey": "srv-" + tipo, "ordenId": orden, "tipo": tipo, "lineas": []any{plato(c.ceviche, "1")}})
 		if st != 200 {

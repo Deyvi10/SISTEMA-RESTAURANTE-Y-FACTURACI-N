@@ -12,7 +12,7 @@ import { formatUSD } from "../lib/money";
 
 export const ROLES: { rol: Rol; nombre: string; icono: string; tint: string; texto: string }[] = [
   { rol: "MESERO", nombre: "Mesero", icono: "utensils", tint: "orange", texto: "Toma pedidos en la app con su PIN" },
-  { rol: "CAJERO", nombre: "Cajero", icono: "caja", tint: "green", texto: "Cobra y factura en la caja" },
+  { rol: "CAJERO", nombre: "Caja principal", icono: "caja", tint: "green", texto: "Toma pedidos y cobra en la computadora principal" },
   { rol: "COCINA", nombre: "Cocina", icono: "chef-hat", tint: "red", texto: "Ve y despacha comandas" },
   { rol: "BODEGA", nombre: "Bodega", icono: "tienda", tint: "teal", texto: "Inventario y tomas físicas" },
   { rol: "ADMIN", nombre: "Administrador", icono: "dueno", tint: "indigo", texto: "Configura todo el restaurante" },

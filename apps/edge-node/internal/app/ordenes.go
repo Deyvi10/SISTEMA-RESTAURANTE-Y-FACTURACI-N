@@ -52,7 +52,7 @@ type Orden struct {
 	ID           ids.ID       `json:"id"`
 	MesaID       *ids.ID      `json:"mesaId"`
 	Mesa         string       `json:"mesa"`
-	Tipo         string       `json:"tipo"`     // MESA, LLEVAR, BARRA, DELIVERY
+	Tipo         string       `json:"tipo"`     // MESA, LLEVAR, BARRA
 	Etiqueta     string       `json:"etiqueta"` // nombre corto del cliente (órdenes sin mesa)
 	MeseroID     ids.ID       `json:"meseroId"`
 	MeseroNombre string       `json:"meseroNombre"`
@@ -68,7 +68,7 @@ type Orden struct {
 }
 
 // tiposSinMesa y cómo se nombran en pantalla y en la comanda (RF-03-11).
-var tiposSinMesa = map[string]string{"LLEVAR": "Llevar", "BARRA": "Barra", "DELIVERY": "Delivery"}
+var tiposSinMesa = map[string]string{"LLEVAR": "Llevar", "BARRA": "Barra"}
 
 // nombreOrden: «Mesa 4» o, sin mesa, «Llevar #12 · Ana».
 func nombreOrden(tipo, mesa string, numero int, etiqueta string) string {
@@ -218,7 +218,7 @@ func (a *App) OrdenDeMesa(ctx context.Context, mesa ids.ID) (Orden, error) {
 	return leerOrden(ctx, a.Store.Read(), oid)
 }
 
-// OrdenSinMesa es el resumen de una orden para llevar, de barra o delivery (F4-04).
+// OrdenSinMesa es el resumen de una orden para llevar o de barra (F4-04).
 type OrdenSinMesa struct {
 	ID           ids.ID    `json:"id"`
 	Tipo         string    `json:"tipo"`
@@ -283,7 +283,7 @@ type EnviarOrdenIn struct {
 	IdempotencyKey string       `json:"idempotencyKey"`
 	OrdenID        ids.ID       `json:"ordenId"` // UUID v7 del teléfono si la mesa está libre (o de la orden sin mesa)
 	MesaID         ids.ID       `json:"mesaId"`
-	Tipo           string       `json:"tipo"`     // MESA (por defecto), LLEVAR, BARRA, DELIVERY
+	Tipo           string       `json:"tipo"`     // MESA (por defecto), LLEVAR, BARRA
 	Etiqueta       string       `json:"etiqueta"` // nombre corto del cliente en órdenes sin mesa
 	Comensales     *int         `json:"comensales"`
 	Lineas         []LineaNueva `json:"lineas"`
@@ -374,7 +374,7 @@ func (in *EnviarOrdenIn) validar() error {
 		in.Etiqueta = ""
 	case sinMesa:
 		if in.MesaID != ids.Nil {
-			return invalido("Una orden para llevar, de barra o delivery no lleva mesa.")
+			return invalido("Una orden para llevar o de barra no lleva mesa.")
 		}
 		if in.OrdenID.Version() != 7 {
 			return invalido("Falta el identificador de la orden.")
@@ -383,7 +383,7 @@ func (in *EnviarOrdenIn) validar() error {
 			return invalido("El nombre corto va hasta 20 caracteres.")
 		}
 	default:
-		return invalido("El tipo de orden es Mesa, Para llevar, Barra o Delivery.")
+		return invalido("El tipo de orden es Mesa, Para llevar o Barra.")
 	}
 	if len(in.Lineas) == 0 || len(in.Lineas) > 100 {
 		return invalido("Agrega entre 1 y 100 platos.")
@@ -748,8 +748,8 @@ func (a *App) calcularTotales(ctx context.Context, q queryer, o Orden) (Totales,
 	if err := q.QueryRowContext(ctx, `SELECT precios_incluyen_iva, propina_legal_activa, propina_porcentaje FROM locales LIMIT 1`).Scan(&incluye, &propActiva, &propPct); err != nil {
 		incluye, propActiva, propPct = 1, 0, "0"
 	}
-	// El servicio se cobra por atender en el local: no aplica a lo que se lleva ni al delivery.
-	if o.Tipo == "LLEVAR" || o.Tipo == "DELIVERY" {
+	// El servicio se cobra por atender en el local (mesa o barra): no a lo que se lleva.
+	if o.Tipo != "MESA" && o.Tipo != "BARRA" {
 		propActiva = 0
 	}
 	ds, err := leerDescuentos(ctx, q, o.ID)

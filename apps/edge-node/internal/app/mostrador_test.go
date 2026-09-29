@@ -9,7 +9,7 @@ import (
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/ids"
 )
 
-// F4-04: venta directa en mostrador desde la caja (Para llevar, Barra, Delivery).
+// F4-04: venta directa en mostrador desde la caja (Para llevar y Barra; sin delivery por ahora).
 func TestVentaEnMostrador(t *testing.T) {
 	c := nuevaCaja(t, nocheDel25)
 	c.pos.req("POST", "/v1/turnos", map[string]any{"cajaId": c.caja1, "fondoInicial": "0"})
@@ -27,6 +27,7 @@ func TestVentaEnMostrador(t *testing.T) {
 		"con mesa":         {"mesaId": c.mesa1},
 		"sin id de orden":  {"ordenId": nil},
 		"tipo desconocido": {"tipo": "DRIVE"},
+		"delivery":         {"tipo": "DELIVERY"}, // pospuesto: no se acepta
 		"nombre muy largo": {"etiqueta": "Una persona con un nombre larguísimo"},
 		"mesa sin mesaId":  {"tipo": "MESA"},
 	} {

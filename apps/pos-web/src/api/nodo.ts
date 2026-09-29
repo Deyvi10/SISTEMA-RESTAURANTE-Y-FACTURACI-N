@@ -232,11 +232,12 @@ export interface LineaOrden {
   producto: string;
   cantidad: string;
   modificadores: { nombre: string }[];
+  nota?: string; // observaciones para cocina
   estado: string; // EN_ESPERA, ENVIADA, ANULADA
   total: string;
 }
 
-export type TipoOrden = "MESA" | "LLEVAR" | "BARRA" | "DELIVERY";
+export type TipoOrden = "MESA" | "LLEVAR" | "BARRA";
 
 export interface Orden {
   id: string;
@@ -250,7 +251,7 @@ export interface Orden {
   lineas: LineaOrden[];
 }
 
-/** Orden abierta sin mesa (para llevar, barra o delivery). */
+/** Orden abierta sin mesa (para llevar o barra). */
 export interface OrdenSinMesa {
   id: string;
   tipo: TipoOrden;
@@ -468,7 +469,7 @@ export const nodo = {
     api<CierreOut>("POST", "/v1/turnos/cerrar", b),
   catalogo: () => api<Catalogo>("GET", "/v1/catalogo"),
   ordenesSinMesa: () => api<OrdenSinMesa[]>("GET", "/v1/ordenes/sin-mesa"),
-  enviarOrden: (b: { idempotencyKey: string; ordenId: string; tipo: TipoOrden; etiqueta: string; lineas: LineaNueva[] }) =>
+  enviarOrden: (b: { idempotencyKey: string; ordenId: string; tipo: TipoOrden; mesaId?: string; etiqueta: string; lineas: LineaNueva[] }) =>
     api<{ orden: Orden; comandaNumero: number }>("POST", "/v1/ordenes/enviar", b),
   buscarCliente: (identificacion: string, tipo = "") =>
     api<BusquedaCliente>("GET", `/v1/clientes/buscar?${new URLSearchParams({ identificacion, tipo })}`),

@@ -1,7 +1,7 @@
 // Mesas y órdenes abiertas (F4-04 empieza aquí): en vivo por WebSocket, búsqueda por número o
 // nombre con «/», flechas para moverse e Intro para abrir.
 import { formatMoney } from "@restpos/ui";
-import { Bike, Clock, Coffee, Lock, Plus, Receipt, Search, ShoppingBag, Users } from "lucide-react";
+import { Clock, Coffee, Lock, Plus, Receipt, Search, ShoppingBag, Users } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ApiError, type Mesa, nodo, type OrdenSinMesa, type Salon } from "../api/nodo";
 import { useSesion } from "../api/sesion";
@@ -35,7 +35,9 @@ export function minutosDesde(iso: string | null, ahora = Date.now()): number | n
   return iso ? Math.max(0, Math.floor((ahora - Date.parse(iso)) / 60_000)) : null;
 }
 
-const ICONO_TIPO = { LLEVAR: ShoppingBag, BARRA: Coffee, DELIVERY: Bike, MESA: Users } as const;
+const ICONO_TIPO: Record<string, typeof Users> = { LLEVAR: ShoppingBag, BARRA: Coffee, MESA: Users };
+/** Icono del tipo de orden; uno que ya no existe (una orden vieja de delivery) no tumba la caja. */
+export const iconoTipo = (tipo: string) => ICONO_TIPO[tipo] ?? ShoppingBag;
 
 export function Mesas({ abrir, abrirOrden, nuevaVenta }: { abrir: (m: Mesa) => void; abrirOrden: (o: OrdenSinMesa) => void; nuevaVenta: () => void }) {
   const { tiempoReal } = useSesion();
@@ -134,7 +136,7 @@ export function Mesas({ abrir, abrirOrden, nuevaVenta }: { abrir: (m: Mesa) => v
           <Plus aria-hidden="true" /> Nueva venta <kbd className="tecla">N</kbd>
         </button>
         {filtrarSinMesa(sinMesa, q).map((o) => {
-          const Icono = ICONO_TIPO[o.tipo];
+          const Icono = iconoTipo(o.tipo);
           const min = minutosDesde(o.abiertaAt);
           return (
             <button key={o.id} className="orden-sin-mesa" onClick={() => abrirOrden(o)} data-testid={`orden-${o.nombre}`}>

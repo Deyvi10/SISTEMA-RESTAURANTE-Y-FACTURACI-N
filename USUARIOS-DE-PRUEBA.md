@@ -29,7 +29,7 @@ Se elige la persona en la pantalla y se escribe el PIN.
 | Persona | Rol | PIN | Qué puede probar |
 |---|---|---|---|
 | Pepe Andrade | Dueño (ADMIN) | `4826` | Todo: cobrar, dividir, descuentos sin tope, abrir cajón, cerrar turno. También autoriza como **supervisor** (anulaciones, cortesías, descuentos grandes) |
-| Luis P. | Cajero | `7391` | Abrir y cerrar turno, cobrar, pago mixto, dividir cuentas, retiros/ingresos/gastos |
+| Luis P. | Caja principal (Cajero) | `7391` | En la computadora principal: toma pedidos de mesas y mostrador (con observaciones por plato) y cobra; abre y cierra turno, pago mixto, dividir cuentas, retiros/ingresos/gastos |
 | Carlos M. | Mesero | `8899` | Tomar pedidos en la app de meseros, pre-cuenta, mover/unir mesas |
 | Ana R. | Mesera | `1024` | Igual que Carlos (sirve para probar dos meseros a la vez) |
 | María C. | Cocina | `5821` | Existe en la demo; su pantalla (KDS) llega en una fase posterior |
@@ -52,9 +52,13 @@ Para abrirlo a mano y probarlo en el navegador: `go run ./apps/edge-node/cmd/nod
 ## 5. Recorrido sugerido en la caja
 
 1. Entra como **Luis P.** (`7391`) → pestaña **Turno** → *Abrir turno* con $50.
-2. Desde la app de meseros (o con Pepe en otra sesión) envía un pedido a una mesa.
+2. Toca una mesa libre para tomar el pedido desde la misma PC (o envíalo desde la app de meseros).
+   Cada plato tiene su campo de observaciones («sin cebolla», «poco picante»).
 3. **Mesas** → toca la mesa → cobra con un billete (teclas `1`–`4`), `M` para pago mixto,
    `V` para dividir la cuenta, `D` para descuento (si supera el límite pide el PIN de Pepe).
+   Al cobrar, el ticket del cliente sale en la impresora de la caja (Panel › Impresoras ›
+   «Impresora de la caja»; con `make dev` usa «Caja (simulador)», puerto 9102, y se ve en
+   http://localhost:8090).
 4. **Turno** → *Cerrar turno*: cuenta billetes y monedas y declara las tarjetas → Cierre Z.
 
 Pulsa `?` en la caja para ver todos los atajos de teclado.

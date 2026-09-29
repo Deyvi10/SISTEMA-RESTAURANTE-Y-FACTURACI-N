@@ -1,6 +1,7 @@
-// Venta directa en mostrador (F4-04): para llevar, barra o delivery. Búsqueda predictiva con
-// la misma regla que los meseros, modificadores obligatorios, carrito y envío a cocina; luego
-// el cobro en el mismo flujo. Todo se maneja con el teclado.
+// Pedido desde la computadora principal: venta en mostrador (F4-04, para llevar o barra) o para
+// una mesa (el Cajero toma pedidos y cobra en la misma PC). Búsqueda predictiva con la misma
+// regla que los meseros, modificadores obligatorios, carrito y envío a cocina; luego el cobro en
+// el mismo flujo. Todo se maneja con el teclado.
 import { formatMoney } from "@restpos/ui";
 import { ArrowLeft, Minus, Plus, Search, Trash2 } from "lucide-react";
 import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
@@ -13,28 +14,41 @@ import { centavos, verCentavos } from "../lib/dinero";
 export const TIPOS: { id: Exclude<TipoOrden, "MESA">; nombre: string }[] = [
   { id: "LLEVAR", nombre: "Para llevar" },
   { id: "BARRA", nombre: "Barra" },
-  { id: "DELIVERY", nombre: "Delivery" },
 ];
 
 export interface ItemCarrito {
+  id: string; // de la línea en pantalla
   clave: string; // producto + modificadores: el mismo plato se suma en una línea
   producto: Producto;
   mods: Modificador[];
   cantidad: number;
+  nota: string; // observaciones para cocina: «sin cebolla», «alérgico al maní»
 }
+
+/** Largo máximo de una observación (el nodo admite 140). */
+export const MAX_NOTA = 140;
+
+let lineas = 0;
 
 /** Precio de una línea en centavos: (precio + modificadores) × cantidad. */
 export function precioLinea(i: ItemCarrito): number {
   return (centavos(i.producto.precio) + i.mods.reduce((t, m) => t + centavos(m.precioAdicional), 0)) * i.cantidad;
 }
 
-/** Agrega al carrito sumando la cantidad si ya está el mismo plato con los mismos modificadores. */
+/**
+ * Agrega al carrito sumando la cantidad si ya está el mismo plato con los mismos modificadores y
+ * sin observaciones. Uno con observación queda aparte: «sin cebolla» es solo para ese plato.
+ */
 export function agregar(carrito: ItemCarrito[], producto: Producto, mods: Modificador[]): ItemCarrito[] {
   const clave = producto.id + ":" + mods.map((m) => m.id).sort().join(",");
-  const i = carrito.findIndex((x) => x.clave === clave);
+  const i = carrito.findIndex((x) => x.clave === clave && !x.nota.trim());
   if (i >= 0) return carrito.map((x, j) => (j === i ? { ...x, cantidad: x.cantidad + 1 } : x));
-  return [...carrito, { clave, producto, mods, cantidad: 1 }];
+  return [...carrito, { id: `l${++lineas}`, clave, producto, mods, cantidad: 1, nota: "" }];
 }
+
+/** Cambia la observación de una línea (recortada al largo que admite el nodo). */
+export const anotar = (carrito: ItemCarrito[], id: string, nota: string): ItemCarrito[] =>
+  carrito.map((x) => (x.id === id ? { ...x, nota: nota.slice(0, MAX_NOTA) } : x));
 
 /** Mínimo efectivo de un grupo: los obligatorios piden al menos uno. */
 export const minimoGrupo = (g: GrupoModificadores) => Math.max(g.min, g.obligatorio ? 1 : 0);
@@ -51,18 +65,36 @@ export function validarMods(grupos: GrupoModificadores[], elegidos: Set<string>)
 
 export interface OrdenExistente {
   ordenId: string;
-  tipo: Exclude<TipoOrden, "MESA">;
+  tipo: TipoOrden;
+  mesaId?: string | null;
   etiqueta: string;
   nombre: string;
 }
 
-export function Venta({ existente, volver, cobrar }: { existente?: OrdenExistente; volver: () => void; cobrar: (ordenId: string, nombre: string) => void }) {
+/** Mesa libre para la que se toma un pedido nuevo desde la caja. */
+export interface MesaParaPedir {
+  id: string;
+  nombre: string;
+}
+
+export function Venta({
+  existente,
+  mesa,
+  volver,
+  cobrar,
+}: {
+  existente?: OrdenExistente;
+  mesa?: MesaParaPedir;
+  volver: () => void;
+  cobrar: (ordenId: string, nombre: string) => void;
+}) {
+  const mesaId = existente?.tipo === "MESA" ? (existente.mesaId ?? undefined) : mesa?.id;
   const [catalogo, setCatalogo] = useState<Catalogo | null>(null);
   const [q, setQ] = useState("");
   const [sel, setSel] = useState(0);
   const [categoria, setCategoria] = useState<string | null>(null);
   const [carrito, setCarrito] = useState<ItemCarrito[]>([]);
-  const [tipo, setTipo] = useState<Exclude<TipoOrden, "MESA">>(existente?.tipo ?? "LLEVAR");
+  const [tipo, setTipo] = useState<Exclude<TipoOrden, "MESA">>(existente && existente.tipo !== "MESA" ? existente.tipo : "LLEVAR");
   const [etiqueta, setEtiqueta] = useState(existente?.etiqueta ?? "");
   const [pidiendo, setPidiendo] = useState<Producto | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -107,9 +139,9 @@ export function Venta({ existente, volver, cobrar }: { existente?: OrdenExistent
       .enviarOrden({
         idempotencyKey: uuidv7(),
         ordenId,
-        tipo,
-        etiqueta: etiqueta.trim(),
-        lineas: carrito.map((i) => ({ id: uuidv7(), productoId: i.producto.id, cantidad: String(i.cantidad), modificadores: i.mods.map((m) => m.id), nota: "" })),
+        ...(mesaId ? { tipo: "MESA" as const, mesaId } : { tipo }),
+        etiqueta: mesaId ? "" : etiqueta.trim(),
+        lineas: carrito.map((i) => ({ id: uuidv7(), productoId: i.producto.id, cantidad: String(i.cantidad), modificadores: i.mods.map((m) => m.id), nota: i.nota.trim() })),
       })
       .then((r) => (luegoCobrar ? cobrar(r.orden.id, r.orden.mesa) : volver()))
       .catch((e) => {
@@ -142,7 +174,9 @@ export function Venta({ existente, volver, cobrar }: { existente?: OrdenExistent
           <button className="rp-btn rp-btn--plain rp-btn--sm" onClick={volver}>
             <ArrowLeft aria-hidden="true" /> Volver <kbd className="tecla">Esc</kbd>
           </button>
-          <h1 className="rp-large-title">{existente ? `Agregar a ${existente.nombre}` : "Nueva venta"}</h1>
+          <h1 className="rp-large-title" data-testid="titulo-venta">
+            {existente ? `Agregar a ${existente.nombre}` : mesa ? `Pedido para ${mesa.nombre}` : "Nueva venta"}
+          </h1>
         </div>
         <label className="rp-search venta__buscador">
           <Search aria-hidden="true" />
@@ -189,38 +223,52 @@ export function Venta({ existente, volver, cobrar }: { existente?: OrdenExistent
       </div>
 
       <aside className="venta__carrito" aria-label="Orden">
-        <div className="rp-segmented" role="radiogroup" aria-label="Tipo de orden">
-          {TIPOS.map((t) => (
-            <label key={t.id}>
-              <input type="radio" name="tipo" checked={tipo === t.id} disabled={!!existente} onChange={() => setTipo(t.id)} />
-              <span>{t.nombre}</span>
-            </label>
-          ))}
-        </div>
-        <div className="rp-field">
-          <label htmlFor="etiqueta">Nombre corto (sale en la comanda)</label>
-          <input id="etiqueta" value={etiqueta} maxLength={20} disabled={!!existente} onChange={(e) => setEtiqueta(e.target.value)} placeholder="Ej.: Ana" data-testid="etiqueta" />
-        </div>
+        {!mesaId && (
+          <>
+            <div className="rp-segmented" role="radiogroup" aria-label="Tipo de orden">
+              {TIPOS.map((t) => (
+                <label key={t.id}>
+                  <input type="radio" name="tipo" checked={tipo === t.id} disabled={!!existente} onChange={() => setTipo(t.id)} />
+                  <span>{t.nombre}</span>
+                </label>
+              ))}
+            </div>
+            <div className="rp-field">
+              <label htmlFor="etiqueta">Nombre corto (sale en la comanda)</label>
+              <input id="etiqueta" value={etiqueta} maxLength={20} disabled={!!existente} onChange={(e) => setEtiqueta(e.target.value)} placeholder="Ej.: Ana" data-testid="etiqueta" />
+            </div>
+          </>
+        )}
         {carrito.length === 0 ? (
           <p className="rp-secondary venta__vacio">Busca un producto y pulsa Intro para agregarlo.</p>
         ) : (
           <div className="rp-group venta__lineas" data-testid="carrito">
             {carrito.map((i) => (
-              <div className="rp-cell" key={i.clave}>
+              <div className="rp-cell venta__linea" key={i.id}>
                 <span className="rp-cell__body">
                   <span className="rp-cell__title">{i.producto.nombre}</span>
                   {i.mods.length > 0 && <span className="rp-cell__subtitle">{i.mods.map((m) => m.nombre).join(", ")}</span>}
+                  <input
+                    className="venta__nota"
+                    value={i.nota}
+                    maxLength={MAX_NOTA}
+                    onChange={(e) => setCarrito((c) => anotar(c, i.id, e.target.value))}
+                    onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), buscador.current?.focus())}
+                    placeholder="Observaciones: sin cebolla, poco picante…"
+                    aria-label={`Observaciones de ${i.producto.nombre}`}
+                    data-testid={`nota-${i.producto.nombre}`}
+                  />
                 </span>
                 <span className="rp-stepper" role="group" aria-label={`Cantidad de ${i.producto.nombre}`}>
                   <button
                     type="button"
                     aria-label={i.cantidad === 1 ? "Quitar" : "Menos"}
-                    onClick={() => setCarrito((c) => c.flatMap((x) => (x.clave !== i.clave ? [x] : x.cantidad > 1 ? [{ ...x, cantidad: x.cantidad - 1 }] : [])))}
+                    onClick={() => setCarrito((c) => c.flatMap((x) => (x.id !== i.id ? [x] : x.cantidad > 1 ? [{ ...x, cantidad: x.cantidad - 1 }] : [])))}
                   >
                     {i.cantidad === 1 ? <Trash2 aria-hidden="true" /> : <Minus aria-hidden="true" />}
                   </button>
                   <output>{i.cantidad}</output>
-                  <button type="button" aria-label="Más" onClick={() => setCarrito((c) => c.map((x) => (x.clave === i.clave ? { ...x, cantidad: x.cantidad + 1 } : x)))}>
+                  <button type="button" aria-label="Más" onClick={() => setCarrito((c) => c.map((x) => (x.id === i.id ? { ...x, cantidad: x.cantidad + 1 } : x)))}>
                     <Plus aria-hidden="true" />
                   </button>
                 </span>

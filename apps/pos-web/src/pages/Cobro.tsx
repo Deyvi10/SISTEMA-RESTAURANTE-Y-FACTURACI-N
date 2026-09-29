@@ -193,7 +193,7 @@ export function Cobro({
     setComprador((x) => ({ ...x, modo: "ID" }));
     requestAnimationFrame(() => campoId.current?.focus());
   }, "Cobro", !hecho && !dividiendo && otroMonto === null && hojaPago === null);
-  useAtajo("a", "Agregar platos a la orden", () => datos && agregar?.(datos.orden), "Cobro", !!datos && datos.orden.tipo !== "MESA" && !!agregar && !hecho && !dividiendo && otroMonto === null);
+  useAtajo("a", "Agregar platos a la orden", () => datos && agregar?.(datos.orden), "Cobro", !!datos && !division && !!agregar && !hecho && !dividiendo && otroMonto === null);
   useAtajo("Escape", hecho ? "Siguiente cliente" : "Volver a las mesas", volver, "Cobro", !dividiendo && otroMonto === null && hojaPago === null);
   useAtajo("Enter", hecho?.cerrada === false ? "Cobrar la siguiente cuenta" : "Siguiente cliente", () => (hecho?.cerrada === false ? siguienteCuenta() : volver()), "Cobro", !!hecho);
 
@@ -232,7 +232,7 @@ export function Cobro({
         <p className="rp-secondary">
           {datos ? `Orden #${datos.orden.numero} · ${datos.orden.meseroNombre}` : error ? "" : "Cargando…"}
         </p>
-        {datos && datos.orden.tipo !== "MESA" && agregar && !hecho && (
+        {datos && !division && agregar && !hecho && (
           <button className="rp-btn rp-btn--gray rp-btn--sm cobro__agregar" onClick={() => agregar(datos.orden)} data-testid="agregar-platos">
             Agregar platos <kbd className="tecla">A</kbd>
           </button>
@@ -248,6 +248,7 @@ export function Cobro({
                     <span className="rp-cell__title">{l.producto}</span>
                     {parteDe(l.id) && <span className="rp-cell__subtitle">Compartido · {parteDe(l.id)}</span>}
                     {l.modificadores.length > 0 && <span className="rp-cell__subtitle">{l.modificadores.map((m) => m.nombre).join(", ")}</span>}
+                    {l.nota && <span className="rp-cell__subtitle cobro__nota">«{l.nota}»</span>}
                     {descuentosDe(l.id).map((d) => (
                       <ChipDescuento key={d.id} d={d} quitar={hecho ? undefined : () => quitarDescuento(d.id)} />
                     ))}

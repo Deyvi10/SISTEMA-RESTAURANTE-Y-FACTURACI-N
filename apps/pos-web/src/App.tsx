@@ -9,7 +9,7 @@ import { Mesas } from "./pages/Mesas";
 import { type ACobrar, Cobro } from "./pages/Cobro";
 import { Personal } from "./pages/Personal";
 import { Turno, useCaja } from "./pages/Turno";
-import { type OrdenExistente, Venta } from "./pages/Venta";
+import { type MesaParaPedir, type OrdenExistente, Venta } from "./pages/Venta";
 
 export function App() {
   const { fase } = useSesion();
@@ -26,9 +26,11 @@ export function App() {
 }
 
 function Caja() {
-  const { usuario, salir } = useSesion();
+  const { usuario, salir, puede } = useSesion();
+  // Quien toma pedidos (el Cajero, «Caja principal») también pide para mesas desde esta PC.
+  const tomaPedidos = puede("TOMAR_PEDIDO");
   const [cobrando, setCobrando] = useState<ACobrar | null>(null);
-  const [venta, setVenta] = useState<{ existente?: OrdenExistente } | null>(null);
+  const [venta, setVenta] = useState<{ existente?: OrdenExistente; mesa?: MesaParaPedir } | null>(null);
   const [seccion, setSeccion] = useState<"mesas" | "turno" | "cobro" | "venta">("mesas");
   const [aviso, setAviso] = useState<string | null>(null);
   const caja = useCaja();
@@ -88,19 +90,29 @@ function Caja() {
             volver={alSalon}
             irATurno={() => setSeccion("turno")}
             usuarioId={usuario?.id}
-            agregar={(o) => {
-              setVenta({ existente: { ordenId: o.id, tipo: o.tipo as OrdenExistente["tipo"], etiqueta: o.etiqueta, nombre: o.mesa } });
-              setSeccion("venta");
-            }}
+            agregar={
+              tomaPedidos
+                ? (o) => {
+                    setVenta({ existente: { ordenId: o.id, tipo: o.tipo, mesaId: o.mesaId, etiqueta: o.etiqueta, nombre: o.mesa } });
+                    setSeccion("venta");
+                  }
+                : undefined
+            }
           />
         ) : seccion === "venta" && venta ? (
-          <Venta existente={venta.existente} volver={alSalon} cobrar={(ordenId, nombre) => aCobrar({ ordenId, nombre })} />
+          <Venta existente={venta.existente} mesa={venta.mesa} volver={alSalon} cobrar={(ordenId, nombre) => aCobrar({ ordenId, nombre })} />
         ) : seccion === "turno" ? (
           <Turno caja={caja} />
         ) : (
           <>
             <Mesas
-              abrir={(m) => (m.ordenId ? aCobrar({ ordenId: m.ordenId, nombre: m.nombre }) : setAviso(`${m.nombre} está libre: no hay nada que cobrar.`))}
+              abrir={(m) => {
+                if (m.ordenId) aCobrar({ ordenId: m.ordenId, nombre: m.nombre });
+                else if (tomaPedidos) {
+                  setVenta({ mesa: { id: m.id, nombre: m.nombre } });
+                  setSeccion("venta");
+                } else setAviso(`${m.nombre} está libre: no hay nada que cobrar.`);
+              }}
               abrirOrden={(o) => aCobrar({ ordenId: o.id, nombre: o.nombre })}
               nuevaVenta={() => {
                 setVenta({});

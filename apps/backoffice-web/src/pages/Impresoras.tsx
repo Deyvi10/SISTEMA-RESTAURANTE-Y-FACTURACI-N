@@ -217,6 +217,40 @@ function ColumnaEstacion({ e, categorias, impresoras, todas, estaciones, onMover
   );
 }
 
+/** Estación de caja: la impresora junto a la computadora principal (ticket del cliente al cobrar). */
+function EstacionCaja({ e, impresoras, todas, onAsignar }: { e: Estacion; impresoras: Impresora[]; todas: Impresora[]; onAsignar: (ids: string[]) => void }) {
+  const [eligiendo, setEligiendo] = useState(false);
+  const asignadas = new Set(impresoras.map((i) => i.id));
+  return (
+    <section className="estacion-col estacion-caja" aria-label={`Estación ${e.nombre}`} data-testid={`estacion-caja-${e.nombre}`}>
+      <header>
+        <AppIcon icono={e.icono || "caja"} tint={e.color || "green"} size={38} />
+        <div><b>{e.nombre}</b><small className="rp-secondary">Ticket del cliente, pre-cuentas y cajón</small></div>
+      </header>
+      <div className="estacion-col__imps">
+        {impresoras.length === 0
+          ? <p className="estacion-col__aviso"><Icon name="error" size={15} /> Sin impresora: el ticket del cliente saldrá en la estación por defecto.</p>
+          : impresoras.map((i) => <span key={i.id} className="imp-chip" data-tono={describirEstado(i).tono}><Icon name="printer" size={14} /> {i.nombre}</span>)}
+        <button type="button" className="rp-btn rp-btn--plain rp-btn--sm" onClick={() => setEligiendo((x) => !x)} disabled={todas.length === 0}>
+          <Icon name="agregar" size={15} /> {impresoras.length ? "Cambiar" : "Asignar impresora"}
+        </button>
+        {eligiendo && (
+          <div className="imp-elegir">
+            {todas.map((i) => (
+              <label key={i.id}>
+                <input type="checkbox" checked={asignadas.has(i.id)} onChange={(ev) => {
+                  const nuevas = ev.target.checked ? [...asignadas, i.id] : [...asignadas].filter((x) => x !== i.id);
+                  onAsignar(nuevas);
+                }} /> {i.nombre}
+              </label>
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
 function ImpresoraSheet({ imp, localId, onClose }: { imp: Impresora | null; localId: string; onClose: () => void }) {
   const { toast, confirm } = useFeedback();
   const [id] = useState(() => imp?.id ?? uuidv7());
@@ -284,6 +318,7 @@ export function Impresoras() {
   if (impresoras.isLoading || estaciones.isLoading || categorias.isLoading) return <Spinner />;
   const imps = impresoras.data ?? [];
   const produccion = (estaciones.data ?? []).filter((e) => e.tipo === "PRODUCCION");
+  const deCaja = (estaciones.data ?? []).filter((e) => e.tipo === "CAJA");
   const cats = categorias.data ?? [];
   const nodoEnLinea = imps.some((i) => i.nodoEnLinea);
 
@@ -372,6 +407,20 @@ export function Impresoras() {
           <p className="rp-secondary" style={{ margin: "0 0 12px" }}>Impresoras que ya están instaladas en Windows. Conéctalas para usarlas en el sistema.</p>
           <div className="rp-group inst-lista" style={{ margin: 0 }}>
             {instaladas.data!.map((i) => <FilaInstalada key={i.localId + i.nombre} i={i} onConectar={() => setConectar(i)} />)}
+          </div>
+        </section>
+      )}
+
+      {deCaja.length > 0 && (
+        <section className="seccion">
+          <h2 className="rp-t-title3" style={{ marginBottom: 4 }}>Impresora de la caja</h2>
+          <p className="rp-secondary" style={{ margin: "0 0 14px" }}>
+            La que está junto a la computadora principal. Al cobrar imprime el ticket con todo lo pedido, el total y cómo pagó, para entregarlo al cliente.
+          </p>
+          <div className="estaciones-tablero">
+            {deCaja.map((e) => (
+              <EstacionCaja key={e.id} e={e} impresoras={imps.filter((i) => i.estaciones.includes(e.id))} todas={imps} onAsignar={(l) => void asignar(e.id, l)} />
+            ))}
           </div>
         </section>
       )}

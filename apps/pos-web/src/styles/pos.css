@@ -320,3 +320,11 @@ button { font: inherit; }
 .division__cuenta--pagada b { margin-left: auto; color: var(--rp-color-label); }
 .division__cuenta--pagada svg { width: 16px; height: 16px; }
 .division__nota { font-size: 13px; }
+
+/* ---------- Observaciones por plato ---------- */
+.venta__linea { align-items: flex-start; }
+.venta__nota { width: 100%; margin-top: 6px; padding: 6px 10px; border-radius: 10px; border: 1px solid var(--rp-color-separator);
+  background: var(--rp-color-background); color: var(--rp-color-label); font: inherit; font-size: 14px; }
+.venta__nota::placeholder { color: var(--rp-color-label-tertiary, var(--rp-color-label-secondary)); }
+.venta__nota:focus { outline: 2px solid var(--rp-color-accent); outline-offset: 1px; }
+.cobro__nota { font-style: italic; }
