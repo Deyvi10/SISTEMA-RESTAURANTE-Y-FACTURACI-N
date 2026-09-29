@@ -51,6 +51,25 @@ navegador; con `curl -4 -A "Mozilla/5.0 …"` descarga normal.
 | Servicios web | Pruebas: `https://celcer.sri.gob.ec/comprobantes-electronicos-ws/{RecepcionComprobantesOffline,AutorizacionComprobantesOffline}?wsdl`; producción: mismo camino en `https://cel.sri.gob.ec` (§7.2) | ✅ |
 | Revisión por contador o tributarista | — | ⏳ DP-07 |
 
+## Hallazgos del motor de impuestos (F5-04)
+
+- **Tolerancia del error 52 (🔎, DP-07).** La ficha no publica cuánto margen admite la
+  validación de diferencias. Con precios con IVA incluido existe un límite matemático: al
+  subir la base de centavo en centavo, `base + redondeo(base × 15 %)` salta 2 centavos cerca
+  de 1 de cada 7,7 veces, así que ≈ 13 % de los montos con IVA incluido **no** pueden
+  expresarse con un IVA exactamente igual a `redondeo(base × 15 %)`. Medido sobre 10 000
+  ventas al azar (`packages/go/sri/desglose_test.go`): 12,0 % de las líneas y 5,75 % de los
+  totales por tarifa quedan con un centavo de diferencia frente a ese redondeo; el comprobante
+  igual suma exactamente lo cobrado. Si el SRI no tolera ese centavo, la alternativa es que el
+  total cobrado se mueva un centavo en esos casos (el plato de $15,00 ya no facturaría $15,00).
+  Se confirma en el ambiente de pruebas del SRI (requiere el `.p12`, DP-04) o con el
+  tributarista.
+- **Propina.** La Tabla 21 dice que no puede superar el 10 % del subtotal: desde F5-04 el nodo
+  la redondea hacia abajo ($10,05 de base → $1,00, no $1,01). 🔎 Con la cuenta dividida cada
+  cuenta será un comprobante: el reparto del servicio puede dejar a una cuenta un centavo sobre
+  su 10 %; respetarlo en cada cuenta cambiaría el total de la mesa al dividir. Se decide en F5-05
+  según DP-07.
+
 Hallazgo: dos claves de ejemplo de la ficha tienen el dígito verificador mal (una es de una
 consulta RECHAZADA y otra reutiliza el final de otra clave). Recalculado con dos
 implementaciones independientes; quedan en `packages/testdata/sri-claves-acceso.json` como

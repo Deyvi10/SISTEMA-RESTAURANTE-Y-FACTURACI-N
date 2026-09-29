@@ -46,7 +46,7 @@ func TestCobroZeroClick(t *testing.T) {
 	tel := c.emparejar(t, "Tablet de Carlos")
 	tel.entrar(c.carlos, pinCarlos)
 	orden, total := c.ordenEnMesa(t, tel, "orden-mesa-1", c.mesa1, plato(c.cerveza, "2"), plato(c.ceviche, "1"))
-	if total.String() != "20.11" { // 18.50 con IVA 15 % incluido + 10 % de servicio sobre la base
+	if total.String() != "20.10" { // 18.50 con IVA 15 % incluido + 10 % de servicio sobre la base (1.609 → 1.60)
 		t.Fatalf("total: %s", total)
 	}
 
@@ -79,7 +79,7 @@ func TestCobroZeroClick(t *testing.T) {
 		t.Fatalf("límite: %d %v", st, raw)
 	}
 	param("50.00")
-	if st, _, _ := c.cobrar(orden, efectivo, "20.10", "cobro-no-alcanza"); st != 422 {
+	if st, _, _ := c.cobrar(orden, efectivo, "20.09", "cobro-no-alcanza"); st != 422 {
 		t.Fatalf("recibido insuficiente: %d", st)
 	}
 	if st, raw := c.pos.req("POST", "/v1/ordenes/"+orden+"/cobrar", map[string]any{"cajaId": c.caja1, "metodoId": efectivo, "consumidorFinal": false, "idempotencyKey": "cobro-con-datos"}); st != 422 {
@@ -92,7 +92,7 @@ func TestCobroZeroClick(t *testing.T) {
 		t.Fatalf("cobro: %d %v", st, raw)
 	}
 	d := out.Documento
-	if d.Codigo != "INT-000001" || d.Vuelto != "29.89" || d.Recibido != "50.00" || !d.AbreCajon || d.Totales.Total != "20.11" || d.Comprador != "CONSUMIDOR FINAL" {
+	if d.Codigo != "INT-000001" || d.Vuelto != "29.90" || d.Recibido != "50.00" || !d.AbreCajon || d.Totales.Total != "20.10" || d.Comprador != "CONSUMIDOR FINAL" {
 		t.Fatalf("documento: %+v", d)
 	}
 	// Doble toque o reintento: el mismo documento; otra clave: ya está cobrada.
@@ -137,14 +137,14 @@ func TestCobroZeroClick(t *testing.T) {
 	}
 
 	// El Cierre Z cuadra con la suma de los pagos (F4-16): fondo + efectivo y el voucher.
-	// Efectivo esperado: 20 + 20.11 = 40.11 = 2×$20 + 10¢ + 1¢.
-	st, z, raw := c.cerrar("cierre-cobros", []cierrez.Conteo{{Clave: "B20", Cantidad: 2}, {Clave: "M0.10", Cantidad: 1}, {Clave: "M0.01", Cantidad: 1}},
+	// Efectivo esperado: 20 + 20.10 = 40.10 = 2×$20 + 10¢.
+	st, z, raw := c.cerrar("cierre-cobros", []cierrez.Conteo{{Clave: "B20", Cantidad: 2}, {Clave: "M0.10", Cantidad: 1}},
 		map[string]any{"metodoId": tarjeta, "monto": total2.String()})
 	if st != 200 || z.Cierre.Resultado != cierrez.Cuadrado {
 		t.Fatalf("cierre: %d %v", st, raw)
 	}
 	for _, l := range z.Cierre.Lineas {
-		if l.Tipo == "EFECTIVO" && (l.Cobrado.String() != "20.11" || l.Esperado.String() != "40.11") {
+		if l.Tipo == "EFECTIVO" && (l.Cobrado.String() != "20.10" || l.Esperado.String() != "40.10") {
 			t.Fatalf("efectivo en el Z: %+v", l)
 		}
 	}
@@ -184,7 +184,7 @@ func TestPagoMixto(t *testing.T) {
 	tel := c.emparejar(t, "Tablet")
 	tel.entrar(c.carlos, pinCarlos)
 	c.pos.req("POST", "/v1/turnos", map[string]any{"cajaId": c.caja1, "fondoInicial": "0"})
-	orden, total := c.ordenEnMesa(t, tel, "orden-mixta", c.mesa1, plato(c.cerveza, "2"), plato(c.ceviche, "1")) // 20.11
+	orden, total := c.ordenEnMesa(t, tel, "orden-mixta", c.mesa1, plato(c.cerveza, "2"), plato(c.ceviche, "1")) // 20.10
 	pagar := func(clave string, pagos ...map[string]any) (int, CobroOut, map[string]any) {
 		st, raw := c.pos.req("POST", "/v1/ordenes/"+orden+"/cobrar", map[string]any{"cajaId": c.caja1, "consumidorFinal": true, "idempotencyKey": clave, "pagos": pagos})
 		var out CobroOut
@@ -200,11 +200,11 @@ func TestPagoMixto(t *testing.T) {
 	}
 	for nombre, pagos := range map[string][]map[string]any{
 		"no suman el total":       {ef("10", ""), tj("10", "")},
-		"se pasan del total":      {ef("10", ""), tj("10.12", "")},
-		"dos pagos en efectivo":   {ef("10", ""), ef("10.11", "")},
-		"monto en cero":           {ef("20.11", ""), tj("0", "")},
-		"últimos 4 inválidos":     {ef("10", ""), tj("10.11", "12a4")},
-		"efectivo que no alcanza": {ef("10", "5"), tj("10.11", "")},
+		"se pasan del total":      {ef("10", ""), tj("10.11", "")},
+		"dos pagos en efectivo":   {ef("10", ""), ef("10.10", "")},
+		"monto en cero":           {ef("20.10", ""), tj("0", "")},
+		"últimos 4 inválidos":     {ef("10", ""), tj("10.10", "12a4")},
+		"efectivo que no alcanza": {ef("10", "5"), tj("10.10", "")},
 		"más de dos decimales":    {ef("10.005", ""), tj("10.105", "")},
 	} {
 		if st, _, raw := pagar("mixto-malo-"+strings.ReplaceAll(nombre, " ", "-"), pagos...); st != 422 {
@@ -212,7 +212,7 @@ func TestPagoMixto(t *testing.T) {
 		}
 	}
 
-	st, out, raw := pagar("mixto-bueno", ef("10", "20"), tj("10.11", "4821"))
+	st, out, raw := pagar("mixto-bueno", ef("10", "20"), tj("10.10", "4821"))
 	if st != 200 {
 		t.Fatalf("pago mixto: %d %v", st, raw)
 	}
@@ -220,7 +220,7 @@ func TestPagoMixto(t *testing.T) {
 	if d.Metodo != "Efectivo + Tarjeta crédito" || len(d.Pagos) != 2 || d.Recibido != "20.00" || d.Vuelto != "10.00" || !d.AbreCajon || d.Totales.Total != total.String() {
 		t.Fatalf("documento: %+v", d)
 	}
-	if p := d.Pagos[1]; p.CodigoSRI != "19" || p.Ultimos4 != "4821" || p.Lote != "L-017" || p.Referencia != "123456" || p.Monto != "10.11" {
+	if p := d.Pagos[1]; p.CodigoSRI != "19" || p.Ultimos4 != "4821" || p.Lote != "L-017" || p.Referencia != "123456" || p.Monto != "10.10" {
 		t.Fatalf("pago con tarjeta: %+v", p)
 	}
 	// Dos filas en pagos, con el voucher para el cuadre.
@@ -234,8 +234,8 @@ func TestPagoMixto(t *testing.T) {
 		return slices.ContainsFunc(c.cocina.Textos(), func(s string) bool { return strings.Contains(s, "Tarjeta crédito ****4821") })
 	})
 
-	// El Cierre Z separa lo cobrado por método: $10 en efectivo y $10.11 en tarjeta.
-	st, z, raw := c.cerrar("cierre-mixto", []cierrez.Conteo{{Clave: "B10", Cantidad: 1}}, map[string]any{"metodoId": tarjeta, "monto": "10.11"})
+	// El Cierre Z separa lo cobrado por método: $10 en efectivo y $10.10 en tarjeta.
+	st, z, raw := c.cerrar("cierre-mixto", []cierrez.Conteo{{Clave: "B10", Cantidad: 1}}, map[string]any{"metodoId": tarjeta, "monto": "10.10"})
 	if st != 200 || z.Cierre.Resultado != cierrez.Cuadrado {
 		t.Fatalf("cierre: %d %v", st, raw)
 	}

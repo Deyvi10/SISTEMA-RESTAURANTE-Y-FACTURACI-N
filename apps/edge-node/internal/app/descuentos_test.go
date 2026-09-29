@@ -121,9 +121,9 @@ func TestDescuentosYCortesias(t *testing.T) {
 	}
 
 	// 10 % de la cuenta (dentro del límite del local): 18.50 − 1.85 = 16.65 con IVA incluido
-	// → base 14.48, IVA 2.17, servicio 10 % de la base 1.45 → 18.10.
+	// → base 14.48, IVA 2.17, servicio 10 % de la base 1.448 → 1.44 (hacia abajo) → 18.09.
 	st, tot := descontar(map[string]any{"tipo": "PORCENTAJE", "valor": "10", "motivoId": frecuente})
-	if st != 200 || tot["descuento"] != "1.85" || tot["subtotal"] != "14.48" || tot["iva"] != "2.17" || tot["propina"] != "1.45" || tot["total"] != "18.10" {
+	if st != 200 || tot["descuento"] != "1.85" || tot["subtotal"] != "14.48" || tot["iva"] != "2.17" || tot["propina"] != "1.44" || tot["total"] != "18.09" {
 		t.Fatalf("10 %%: %d %v", st, tot)
 	}
 	// 15 % pasa el límite: supervisor. Con su PIN, reemplaza al 10 % (uno por cuenta).

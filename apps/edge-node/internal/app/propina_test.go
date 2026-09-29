@@ -28,9 +28,10 @@ func TestPropinaLegal(t *testing.T) {
 		return
 	}
 
-	// 18.50 con IVA 15 % incluido → base 16.09, IVA 2.41; servicio 10 % de la base = 1.61 (sin IVA).
+	// 18.50 con IVA 15 % incluido → base 16.09, IVA 2.41; servicio 10 % de la base = 1.609 → 1.60
+	// (hacia abajo: no puede superar el 10 % del subtotal, Tabla 21 de la ficha del SRI).
 	orden, _ := c.ordenEnMesa(t, tel, "orden-propina", c.mesa1, plato(c.cerveza, "2"), plato(c.ceviche, "1"))
-	if tt := totales(orden); tt["subtotal"] != "16.09" || tt["iva"] != "2.41" || tt["propina"] != "1.61" || tt["total"] != "20.11" || tt["propinaActiva"] != true {
+	if tt := totales(orden); tt["subtotal"] != "16.09" || tt["iva"] != "2.41" || tt["propina"] != "1.60" || tt["total"] != "20.10" || tt["propinaActiva"] != true {
 		t.Fatalf("totales: %v", tt)
 	}
 
@@ -44,10 +45,10 @@ func TestPropinaLegal(t *testing.T) {
 	}
 	var detalle string
 	_ = c.a.Store.Read().QueryRow(`SELECT detalle FROM auditoria WHERE accion = 'PROPINA_RETIRADA'`).Scan(&detalle)
-	if detalle == "" || !strings.Contains(detalle, "1.61") || !strings.Contains(detalle, "no quiere pagar servicio") {
+	if detalle == "" || !strings.Contains(detalle, "1.60") || !strings.Contains(detalle, "no quiere pagar servicio") {
 		t.Fatalf("detalle de la auditoría: %s", detalle)
 	}
-	if st, tt := propina(orden, false, ""); st != 200 || tt["total"] != "20.11" || auditorias("PROPINA_REPUESTA") != 1 {
+	if st, tt := propina(orden, false, ""); st != 200 || tt["total"] != "20.10" || auditorias("PROPINA_REPUESTA") != 1 {
 		t.Fatalf("reponer: %d %v", st, tt)
 	}
 	propina(orden, true, "")
@@ -70,7 +71,7 @@ func TestPropinaLegal(t *testing.T) {
 	if err := c.a.Store.Read().QueryRow(`SELECT mesero_nombre, monto, fecha_negocio FROM propinas WHERE orden_id = ?`, orden2).Scan(&mesero, &monto, &fecha); err != nil {
 		t.Fatal(err)
 	}
-	if mesero != "Carlos M." || monto != "1.61" || fecha != "2026-09-25" {
+	if mesero != "Carlos M." || monto != "1.60" || fecha != "2026-09-25" {
 		t.Fatalf("propina registrada: %s %s %s", mesero, monto, fecha)
 	}
 	if err := c.a.Store.Write(context.Background(), func(tx *store.Tx) error { _, err := tx.Exec(`UPDATE propinas SET monto = '0'`); return err }); err == nil {

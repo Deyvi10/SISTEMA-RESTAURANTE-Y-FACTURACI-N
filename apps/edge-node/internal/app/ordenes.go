@@ -807,10 +807,12 @@ func (a *App) calcularTotales(ctx context.Context, q queryer, o Orden) (Totales,
 	}
 	propina := money.Money{}
 	// 10 % de la base imponible (sin IVA; los descuentos de F4-09 ya la reducen) y sin gravar IVA.
+	// Se redondea hacia abajo: la propina no puede superar el 10 % del subtotal (Tabla 21 de la
+	// ficha técnica offline v2.34); con $10,05 de base son $1,00 y no $1,01.
 	if propActiva == 1 && !o.PropinaRetirada {
 		p, err := decimal.NewFromString(propPct)
 		if err == nil {
-			propina = base.Mul(p.Div(decimal.NewFromInt(100))).Round2()
+			propina = money.FromDecimal(base.Decimal().Mul(p.Div(decimal.NewFromInt(100))).RoundFloor(2))
 		}
 	}
 	total := base.Add(iva).Add(propina)

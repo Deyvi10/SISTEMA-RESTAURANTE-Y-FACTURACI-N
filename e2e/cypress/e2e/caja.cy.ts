@@ -52,10 +52,10 @@ describe("caja: del turno al Cierre Z", { testIsolation: false }, () => {
     ordenEnMesa("Mesa 1", [["Ceviche de camarón", 1], ["Cerveza", 2]]);
     cy.getByTestId("tab-mesas").click();
     cy.getByTestId("mesa-Mesa 1").should("have.attr", "data-estado", "ocupada").click();
-    cy.getByTestId("total").should("contain.text", "$20.11"); // 18.50 con IVA + 10 % de servicio sobre la base
+    cy.getByTestId("total").should("contain.text", "$20.10"); // 18.50 con IVA + servicio: 10 % de 16.09 = 1.609 → 1.60 (hacia abajo)
     cy.get("body").type("2"); // $21.00
     cy.wait("@cobro");
-    cy.getByTestId("vuelto").should("have.attr", "aria-label", "Vuelto $0.89");
+    cy.getByTestId("vuelto").should("have.attr", "aria-label", "Vuelto $0.90");
     cy.getByTestId("cobro-listo").should("contain.text", "INT-").and("contain.text", "Mesa 1 libre");
     cy.get("body").type("{enter}");
     cy.getByTestId("mesa-Mesa 1").should("have.attr", "data-estado", "libre");
@@ -64,7 +64,7 @@ describe("caja: del turno al Cierre Z", { testIsolation: false }, () => {
   it("cobra otra mesa con pago mixto: $10 en efectivo y el resto con tarjeta", () => {
     ordenEnMesa("Mesa 2", [["Arroz marinero", 1], ["Jugo natural", 2]]);
     cy.getByTestId("mesa-Mesa 2").should("have.attr", "data-estado", "ocupada").click();
-    cy.getByTestId("total").should("contain.text", "$");
+    cy.getByTestId("dividir").should("be.visible"); // la orden ya cargó: los atajos están activos
     cy.get("body").type("m");
     cy.getByTestId("agregar-Efectivo").click();
     cy.get('[aria-label="Monto de Efectivo"]').clear().type("10.00");
@@ -81,6 +81,7 @@ describe("caja: del turno al Cierre Z", { testIsolation: false }, () => {
   it("divide una mesa en dos cuentas, comparte la cerveza y cobra cada una", () => {
     ordenEnMesa("Mesa 3", [["Ceviche de camarón", 1], ["Pizza personal", 1], ["Cerveza", 2]]);
     cy.getByTestId("mesa-Mesa 3").should("have.attr", "data-estado", "ocupada").click();
+    cy.getByTestId("dividir").should("be.visible"); // la orden ya cargó: el total es el real
     cy.getByTestId("total")
       .invoke("text")
       .then((totalOrden) => {
