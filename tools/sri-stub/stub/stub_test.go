@@ -1,4 +1,4 @@
-package main
+package stub
 
 import (
 	"encoding/base64"
@@ -42,12 +42,12 @@ func enviar(t *testing.T, base, c string) string {
 	xmlComp := fmt.Sprintf(`<factura id="comprobante"><infoTributaria><claveAcceso>%s</claveAcceso></infoTributaria></factura>`, c)
 	body := `<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ec="http://ec.gob.sri.ws.recepcion"><soapenv:Body><ec:validarComprobante><xml>` +
 		base64.StdEncoding.EncodeToString([]byte(xmlComp)) + `</xml></ec:validarComprobante></soapenv:Body></soapenv:Envelope>`
-	_, out := post(t, base+rutaRecepcion, body)
+	_, out := post(t, base+RutaRecepcion, body)
 	return out
 }
 
 func consultar(t *testing.T, base, c string) string {
-	_, out := post(t, base+rutaAutorizacion, `<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"><soapenv:Body><ec:autorizacionComprobante xmlns:ec="http://ec.gob.sri.ws.autorizacion"><claveAccesoComprobante>`+c+`</claveAccesoComprobante></ec:autorizacionComprobante></soapenv:Body></soapenv:Envelope>`)
+	_, out := post(t, base+RutaAutorizacion, `<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"><soapenv:Body><ec:autorizacionComprobante xmlns:ec="http://ec.gob.sri.ws.autorizacion"><claveAccesoComprobante>`+c+`</claveAccesoComprobante></ec:autorizacionComprobante></soapenv:Body></soapenv:Envelope>`)
 	return elemento([]byte(out), "estado")
 }
 
@@ -104,11 +104,11 @@ func TestEscenarios(t *testing.T) {
 
 func TestErroresTransitorios(t *testing.T) {
 	base := server(t)
-	if code, _ := post(t, base+rutaRecepcion, `<x><xml>`+base64.StdEncoding.EncodeToString([]byte(`<f><claveAcceso>`+clave(t, 903)+`</claveAcceso></f>`))+`</xml></x>`); code != 503 {
+	if code, _ := post(t, base+RutaRecepcion, `<x><xml>`+base64.StdEncoding.EncodeToString([]byte(`<f><claveAcceso>`+clave(t, 903)+`</claveAcceso></f>`))+`</xml></x>`); code != 503 {
 		t.Errorf("903 debería responder 503, respondió %d", code)
 	}
 	client := &http.Client{Timeout: 20 * time.Millisecond}
-	res, err := client.Post(base+rutaRecepcion, "text/xml", strings.NewReader(`<x><xml>`+base64.StdEncoding.EncodeToString([]byte(`<f><claveAcceso>`+clave(t, 902)+`</claveAcceso></f>`))+`</xml></x>`))
+	res, err := client.Post(base+RutaRecepcion, "text/xml", strings.NewReader(`<x><xml>`+base64.StdEncoding.EncodeToString([]byte(`<f><claveAcceso>`+clave(t, 902)+`</claveAcceso></f>`))+`</xml></x>`))
 	if err == nil {
 		_ = res.Body.Close()
 		t.Error("902 debería provocar timeout en el cliente")
@@ -118,7 +118,7 @@ func TestErroresTransitorios(t *testing.T) {
 func TestRechazaBasura(t *testing.T) {
 	base := server(t)
 	for _, body := range []string{`<x><xml>no-es-base64</xml></x>`, `<x/>`, `<x><xml>` + base64.StdEncoding.EncodeToString([]byte(`<f><claveAcceso>123</claveAcceso></f>`)) + `</xml></x>`} {
-		_, out := post(t, base+rutaRecepcion, body)
+		_, out := post(t, base+RutaRecepcion, body)
 		if elemento([]byte(out), "estado") != "DEVUELTA" {
 			t.Errorf("%s debería ser DEVUELTA: %s", body, out)
 		}

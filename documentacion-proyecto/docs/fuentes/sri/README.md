@@ -12,6 +12,8 @@ modificar; si el SRI publica una versión nueva se agrega al lado y se anota aqu
 | `xml-xsd-factura.zip` | XSD y XML de ejemplo de factura 1.0.0, 1.1.0, 2.0.0 y 2.1.0 | `ba1ff0c4e329fe759c3f88dc75f2975780b315b6eb3d0069071b77c1f26fec03` |
 | `xml-xsd-nota-credito.zip` | XSD y XML de ejemplo de nota de crédito 1.0.0 y 1.1.0 | `9b7e9c1a240ae39a858aa8fbaf91c41c761417e7bd763ccb20ffc0b81ad1bd43` |
 | `xsd-nc-nd-devolucion-iva.zip` | XSD de nota de crédito 1.0.0/1.1.0 y débito 1.0.0 con el campo «Devolución IVA» | `29cf04c7848c27a2f98200582d5595a57b3d7767206cfb04188e373653c55702` |
+| `RecepcionComprobantesOffline.wsdl` | WSDL oficial del servicio de recepción (ambiente de pruebas, `celcer.sri.gob.ec`), descargado el 2026-09-29 | `4a71faf1c349d564b42ce74e64d0f47d4d7d532568359daafca0c16683e2236b` |
+| `AutorizacionComprobantesOffline.wsdl` | WSDL oficial del servicio de autorización (ambiente de pruebas) | `5fe7b3519009dca5ecb887455e3cb95936940cfe45c0ef56a06915237cce7851` |
 
 Nota técnica de la descarga: el sitio no responde por IPv6 ni a clientes sin cabecera de
 navegador; con `curl -4 -A "Mozilla/5.0 …"` descarga normal.
@@ -50,6 +52,15 @@ navegador; con `curl -4 -A "Mozilla/5.0 …"` descarga normal.
 | Tamaño | Envío individual hasta 320 KB por comprobante; lote hasta 500 KB o ~50 comprobantes (§7) | ✅ |
 | Servicios web | Pruebas: `https://celcer.sri.gob.ec/comprobantes-electronicos-ws/{RecepcionComprobantesOffline,AutorizacionComprobantesOffline}?wsdl`; producción: mismo camino en `https://cel.sri.gob.ec` (§7.2) | ✅ |
 | Revisión por contador o tributarista | — | ⏳ DP-07 |
+
+## Servicios web (F5-10)
+
+Según los WSDL: la operación va en su namespace (`http://ec.gob.sri.ws.recepcion` /
+`…autorizacion`) y sus hijos **sin** namespace (`elementFormDefault="unqualified"`),
+`SOAPAction` vacío; el comprobante firmado viaja en base64 en `<xml>` y la consulta lleva
+`<claveAccesoComprobante>`. Hallazgo: el ejemplo oficial de «no autorizado» (ficha §7.2.3)
+responde `<estado>RECHAZADO</estado>`, no «NO AUTORIZADO»; el cliente acepta ambos. Los
+valores de las respuestas pueden traer saltos de línea (la clave consultada, por ejemplo).
 
 ## Hallazgos del motor de impuestos (F5-04)
 
