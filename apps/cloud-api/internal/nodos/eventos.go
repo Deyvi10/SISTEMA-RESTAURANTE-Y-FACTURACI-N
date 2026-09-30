@@ -14,6 +14,7 @@ import (
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/auditoria"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/auth"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/caja"
+	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/facturacion"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/edgesync"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/ids"
 )
@@ -114,6 +115,8 @@ func (s *Service) Aplicador(n auth.Nodo) edgesync.Applier {
 			return err
 		case caja.EventoCierreZ:
 			return caja.RegistrarCierre(ctx, tx, n.TenantID, n.LocalID, e.Payload)
+		case facturacion.EventoComprobanteEmitido:
+			return facturacion.RegistrarComprobante(ctx, tx, n.TenantID, n.LocalID, n.ID, e.Payload)
 		case caja.EventoClienteGuardado:
 			return caja.RegistrarCliente(ctx, tx, n.TenantID, e.Payload)
 		case auditoria.EventoNodo:

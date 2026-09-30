@@ -288,3 +288,17 @@ describe("cuenta invitada", () => {
     expect(await screen.findByTestId("cobro-listo")).toHaveTextContent("Cortesía · INT-000010");
   });
 });
+
+describe("factura electrónica", () => {
+  it("al cobrar con la facturación activa muestra la factura emitida", async () => {
+    vi.spyOn(nodo, "orden").mockResolvedValue({ orden, totales: totales("14.50") });
+    vi.spyOn(nodo, "cobrar").mockResolvedValue({
+      documento: { ...docCF, id: "d", tipo: "FACTURA", codigo: "001-002-000000067", claveAcceso: "2909202601171003406500110010020000000671234567818", ambiente: 1,
+        mesa: "Mesa 4", totales: totales("14.50"), metodo: "Efectivo", pagos: [], recibido: "14.50", vuelto: "0.00", abreCajon: true },
+      impresoras: ["Caja"],
+    });
+    montar();
+    fireEvent.click(await screen.findByTestId("billete-14.50"));
+    expect(await screen.findByTestId("factura-emitida")).toHaveTextContent("Factura 001-002-000000067 emitida en ambiente de pruebas");
+  });
+});

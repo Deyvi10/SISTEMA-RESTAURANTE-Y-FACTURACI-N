@@ -397,8 +397,11 @@ export interface Division {
 
 export interface DocumentoVenta {
   id: string;
+  tipo?: "INTERNO" | "FACTURA";
   cuenta?: number;
-  codigo: string; // INT-000123
+  codigo: string; // INT-000123 o, en una factura, 001-002-000000067
+  claveAcceso?: string; // factura electrónica (F5-05): número de autorización
+  ambiente?: 1 | 2;
   mesa: string;
   totales: Totales;
   comprador: string;

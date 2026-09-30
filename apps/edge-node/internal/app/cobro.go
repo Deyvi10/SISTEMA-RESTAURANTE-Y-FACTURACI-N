@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 	"regexp"
 	"strings"
@@ -72,15 +71,18 @@ type PagoDoc struct {
 
 // DocumentoVenta es lo que devuelve el cobro: el documento emitido y el vuelto.
 type DocumentoVenta struct {
-	ID        ids.ID  `json:"id"`
-	Tipo      string  `json:"tipo"` // INTERNO (en F5, el comprobante electrónico)
-	Numero    int     `json:"numero"`
-	Codigo    string  `json:"codigo"` // INT-000123
-	OrdenID   ids.ID  `json:"ordenId"`
-	CuentaID  *ids.ID `json:"cuentaId,omitempty"`
-	Cuenta    int     `json:"cuenta,omitempty"` // número de la cuenta si la orden se dividió
-	Mesa      string  `json:"mesa"`
-	Comprador string  `json:"comprador"` // nombre o razón social
+	ID     ids.ID `json:"id"`
+	Tipo   string `json:"tipo"` // INTERNO o FACTURA (F5-05, con la facturación electrónica activa)
+	Numero int    `json:"numero"`
+	Codigo string `json:"codigo"` // INT-000123 o, en una factura, 001-002-000000067
+	// Factura (F5-05): clave de acceso (= número de autorización) y ambiente (1 pruebas).
+	ClaveAcceso string  `json:"claveAcceso,omitempty"`
+	Ambiente    int     `json:"ambiente,omitempty"`
+	OrdenID     ids.ID  `json:"ordenId"`
+	CuentaID    *ids.ID `json:"cuentaId,omitempty"`
+	Cuenta      int     `json:"cuenta,omitempty"` // número de la cuenta si la orden se dividió
+	Mesa        string  `json:"mesa"`
+	Comprador   string  `json:"comprador"` // nombre o razón social
 	// Identificación del comprador con su código SRI (07 = consumidor final).
 	CompradorTipo           string    `json:"compradorTipo"`
 	CompradorIdentificacion string    `json:"compradorIdentificacion"`
@@ -211,6 +213,7 @@ func (a *App) Cobrar(ctx context.Context, u Usuario, orden ids.ID, in CobrarIn) 
 		if err != nil {
 			return err
 		}
+		totOrden := tot // la orden completa (reparto por plato y tarifas), aun si se cobra una cuenta
 		// Orden dividida (F4-08): se cobra una cuenta, con sus propios totales.
 		_, cuentas, res, _, errCuentas := a.cuentasDe(ctx, tx, o)
 		var cuenta *CuentaTotales
@@ -270,12 +273,24 @@ func (a *App) Cobrar(ctx context.Context, u Usuario, orden ids.ID, in CobrarIn) 
 		if docPagos == nil {
 			docPagos = []PagoDoc{}
 		}
+		// Con la facturación electrónica activa el documento es la factura (F5-05); una cuenta
+		// invitada completa ($0) sigue siendo un documento interno.
+		tipoDoc := "INTERNO"
+		var cfg *configFiscal
+		if !todoCortesia {
+			if cfg, err = leerConfigFiscal(ctx, tx); err != nil {
+				return err
+			}
+			if cfg != nil {
+				tipoDoc = "FACTURA"
+			}
+		}
 		var numero int
-		if err := tx.QueryRowContext(ctx, `INSERT INTO contadores (clave, valor) VALUES ('documento:INTERNO', 1)
-			ON CONFLICT (clave) DO UPDATE SET valor = valor + 1 RETURNING valor`).Scan(&numero); err != nil {
+		if err := tx.QueryRowContext(ctx, `INSERT INTO contadores (clave, valor) VALUES ('documento:' || ?, 1)
+			ON CONFLICT (clave) DO UPDATE SET valor = valor + 1 RETURNING valor`, tipoDoc).Scan(&numero); err != nil {
 			return err
 		}
-		doc := DocumentoVenta{ID: ids.New(), Tipo: "INTERNO", Numero: numero, Codigo: escpos.NumeroInterno(numero), OrdenID: o.ID, CuentaID: in.CuentaID, Mesa: o.Mesa,
+		doc := DocumentoVenta{ID: ids.New(), Tipo: tipoDoc, Numero: numero, Codigo: escpos.NumeroInterno(numero), OrdenID: o.ID, CuentaID: in.CuentaID, Mesa: o.Mesa,
 			Comprador: comprador.RazonSocial, CompradorTipo: comprador.TipoIdentificacion, CompradorIdentificacion: comprador.Identificacion,
 			CompradorEmail: comprador.Email, CompradorDireccion: comprador.Direccion, CompradorTelefono: comprador.Telefono, Totales: tot, Metodo: metodo, Pagos: docPagos, Recibido: recibido.String(), Vuelto: vuelto.String(),
 			AbreCajon: abreCajon, Cajero: u.Nombre, TurnoID: t.ID, EmitidoAt: now}
@@ -289,16 +304,31 @@ func (a *App) Cobrar(ctx context.Context, u Usuario, orden ids.ID, in CobrarIn) 
 		if cuenta != nil {
 			doc.Cuenta = cuenta.Numero
 		}
+		var fact *facturaEmitida
+		if cfg != nil {
+			f, err := prepararFactura(ctx, tx, cfg, emisionIn{CajaID: in.CajaID, Orden: o, Totales: totOrden, Cuenta: cuenta, Cuentas: cuentas,
+				Total: total, Propina: propina, Comprador: comprador, Pagos: docPagos, Ahora: now, Zona: loc})
+			if err != nil {
+				return err
+			}
+			fact = &f
+			doc.Codigo, doc.ClaveAcceso, doc.Ambiente = f.Numero, f.Clave.String(), f.Ambiente
+		}
 		raw, err := json.Marshal(doc)
 		if err != nil {
 			return err
 		}
 		ts := now.Format(time.RFC3339Nano)
-		if _, err := tx.ExecContext(ctx, `INSERT INTO documentos_venta (id, numero, orden_id, turno_id, comprador_tipo, comprador_identificacion, comprador_nombre,
-			subtotal, iva, propina, total, datos, idempotency_key, emitido_por, created_at, cuenta_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			doc.ID.String(), numero, o.ID.String(), t.ID.String(), comprador.TipoIdentificacion, comprador.Identificacion, comprador.RazonSocial,
+		if _, err := tx.ExecContext(ctx, `INSERT INTO documentos_venta (id, tipo, numero, orden_id, turno_id, comprador_tipo, comprador_identificacion, comprador_nombre,
+			subtotal, iva, propina, total, datos, idempotency_key, emitido_por, created_at, cuenta_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			doc.ID.String(), doc.Tipo, numero, o.ID.String(), t.ID.String(), comprador.TipoIdentificacion, comprador.Identificacion, comprador.RazonSocial,
 			base.String(), iva.String(), propina.String(), total.String(), string(raw), in.IdempotencyKey, u.ID.String(), ts, idOrNil(in.CuentaID)); err != nil {
 			return err
+		}
+		if fact != nil {
+			if err := guardarComprobante(ctx, tx, *fact, doc.ID, now); err != nil {
+				return err
+			}
 		}
 		for _, p := range docPagos {
 			if _, err := tx.ExecContext(ctx, `INSERT INTO pagos (id, orden_id, cuenta_id, turno_id, metodo_pago_id, monto, recibido, vuelto, referencia, lote, ultimos4, documento_id, created_at)
@@ -368,18 +398,31 @@ func (a *App) Cobrar(ctx context.Context, u Usuario, orden ids.ID, in CobrarIn) 
 		}
 		var local string
 		_ = tx.QueryRowContext(ctx, `SELECT nombre FROM locales LIMIT 1`).Scan(&local)
+		fracciones, err := fraccionesDeCuenta(ctx, tx, cuenta)
+		if err != nil {
+			return err
+		}
 		ticket := escpos.DocumentoVenta{Local: local, Numero: numero, Hora: now.In(loc), Mesa: o.Mesa, Cajero: u.Nombre, Comprador: comprador.RazonSocial,
 			CompradorID: map[bool]string{true: "", false: comprador.Identificacion}[esCF],
-			Lineas:      lineasTicket(o, cuenta, cuentas), Descuento: money.MustParse(tot.Descuento), Subtotal: base, IVA: iva, Propina: propina, Total: total, Recibido: recibido, Vuelto: vuelto}
+			Lineas:      lineasTicket(o, cuenta, fracciones), Descuento: money.MustParse(tot.Descuento), Subtotal: base, IVA: iva, Propina: propina, Total: total, Recibido: recibido, Vuelto: vuelto}
 		for _, p := range docPagos {
 			ticket.Pagos = append(ticket.Pagos, escpos.PagoTicket{Metodo: p.Metodo, Monto: money.MustParse(p.Monto), Ultimos4: p.Ultimos4})
 		}
 		out.Impresoras = []string{}
 		oid := o.ID.String()
+		var ride escpos.Ride
+		if fact != nil {
+			ride = rideDe(cfg, *fact, o.Mesa, u.Nombre, comprador, docPagos, recibido, vuelto)
+		}
 		for i, imp := range imps {
 			ticket.AbrirCajon = abreCajon && i == 0 // un solo pulso: el cajón cuelga de la primera
+			contenido := escpos.ImprimirDocumentoVenta(imp.Ancho, ticket)
+			if fact != nil { // la factura sale como RIDE (F5-05)
+				ride.AbrirCajon = ticket.AbrirCajon
+				contenido = escpos.ImprimirRide(imp.Ancho, ride)
+			}
 			tr := impresion.Trabajo{ID: ids.New(), ImpresoraID: imp.ID, Tipo: "VENTA", ComandaID: &oid}
-			if err := impresion.Encolar(ctx, tx, tr, nil, escpos.ImprimirDocumentoVenta(imp.Ancho, ticket), nil, now); err != nil {
+			if err := impresion.Encolar(ctx, tx, tr, nil, contenido, nil, now); err != nil {
 				return err
 			}
 			out.Impresoras = append(out.Impresoras, imp.Nombre)
@@ -391,8 +434,20 @@ func (a *App) Cobrar(ctx context.Context, u Usuario, orden ids.ID, in CobrarIn) 
 		}
 		out.Documento = doc
 		out.Cerrada = cerrar
-		return a.eventoCaja(ctx, tx, EventoVentaCobrada, doc.ID, map[string]any{"documento": doc, "lineas": o.Lineas, "cuenta": cuenta,
-			"meseroId": o.MeseroID, "meseroNombre": o.MeseroNombre, "propina": propina.String(), "propinaRetirada": o.PropinaRetirada}, now)
+		if err := a.eventoCaja(ctx, tx, EventoVentaCobrada, doc.ID, map[string]any{"documento": doc, "lineas": o.Lineas, "cuenta": cuenta,
+			"meseroId": o.MeseroID, "meseroNombre": o.MeseroNombre, "propina": propina.String(), "propinaRetirada": o.PropinaRetirada}, now); err != nil {
+			return err
+		}
+		if fact == nil {
+			return nil
+		}
+		// La nube firma y envía al SRI (el .p12 no sale de ella); el hash asegura que el
+		// contenido tributario llega intacto (F5-05, F5-08).
+		return a.eventoCaja(ctx, tx, EventoComprobanteEmitido, fact.ID, map[string]any{
+			"id": fact.ID, "documentoId": doc.ID, "tipo": "01", "ambiente": fact.Ambiente, "puntoEmisionId": fact.Punto.ID,
+			"serie": fact.Punto.Serie(), "secuencial": fact.Secuencial, "claveAcceso": fact.Clave.String(),
+			"fechaEmision": fact.FechaLocal.Format(time.DateOnly), "importeTotal": fact.Desglose.ImporteTotal.String(),
+			"xml": string(fact.XML), "hash": fact.Hash}, now)
 	})
 	if err != nil {
 		return CobroOut{}, err
@@ -464,19 +519,9 @@ func resolverPagos(ctx context.Context, tx *store.Tx, pagos []pagoValido, total 
 
 // lineasTicket: el detalle del documento. Con división, lo que lleva esa cuenta de cada plato
 // («1/3 Pizza» si se repartió); sin división, la orden completa.
-func lineasTicket(o Orden, cuenta *CuentaTotales, cuentas []cuentaReparto) []escpos.LineaCuenta {
+func lineasTicket(o Orden, cuenta *CuentaTotales, fracciones map[ids.ID]string) []escpos.LineaCuenta {
 	if cuenta == nil {
 		return lineasCuenta(o.Lineas)
-	}
-	var pesos map[ids.ID]int64
-	suma := map[ids.ID]int64{}
-	for _, c := range cuentas {
-		if c.ID == cuenta.ID {
-			pesos = c.Pesos
-		}
-		for l, p := range c.Pesos {
-			suma[l] += p
-		}
 	}
 	var out []escpos.LineaCuenta
 	for _, l := range o.Lineas {
@@ -485,8 +530,8 @@ func lineasTicket(o Orden, cuenta *CuentaTotales, cuentas []cuentaReparto) []esc
 			continue
 		}
 		cant := l.Cantidad
-		if p := pesos[l.ID]; p > 0 && suma[l.ID] > p {
-			cant = fmt.Sprintf("%d/%d", p, suma[l.ID])
+		if fr := fracciones[l.ID]; fr != "" {
+			cant = fr
 		}
 		out = append(out, escpos.LineaCuenta{Cantidad: cant, Producto: l.Producto, Total: m})
 	}

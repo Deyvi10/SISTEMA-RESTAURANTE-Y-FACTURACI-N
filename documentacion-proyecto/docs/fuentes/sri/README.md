@@ -62,6 +62,16 @@ Según los WSDL: la operación va en su namespace (`http://ec.gob.sri.ws.recepci
 responde `<estado>RECHAZADO</estado>`, no «NO AUTORIZADO»; el cliente acepta ambos. Los
 valores de las respuestas pueden traer saltos de línea (la clave consultada, por ejemplo).
 
+## RIDE y RUC del proveedor (F5-05)
+
+- El ticket sigue el Anexo 2: el número de autorización es la clave de acceso, la fecha de
+  autorización no es obligatoria en el RIDE del emisor y el código de barras es opcional
+  (§9.20); se imprime la clave en texto y en un QR.
+- **Anexo 26** (Res. NAC-DGERCGC26-00000027): quien usa un sistema de facturación de terceros
+  debe incluir `<campoAdicional nombre="RUC Proveedor">` con el RUC del proveedor del sistema.
+  Se toma de `parametros_globales.ruc_proveedor_sistema` (vacío hasta que el proveedor de este
+  software lo defina: **pendiente**).
+
 ## Firma (F5-09)
 
 Implementada según §6 y el Anexo 4 con un certificado de prueba y verificada con `signxml`

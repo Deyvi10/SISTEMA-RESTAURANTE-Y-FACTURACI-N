@@ -16,6 +16,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/caja"
+	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/facturacion"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/impresoras"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/nodos"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/salon"
@@ -107,6 +108,10 @@ func (c *cliente) nodoOperativo() *nodoSim {
 	// Facturación configurada con el punto de emisión de la caja (F5-02).
 	c.do("PUT", "/v1/cajas/"+cajas[0].ID.String()+"/punto-emision", map[string]any{"establecimiento": "001", "puntoEmision": "001"}, 200, nil)
 	c.do("PUT", "/v1/facturacion", map[string]any{"ambiente": 1, "razonSocial": "Emisor de prueba", "direccionMatriz": "Quito", "regimen": "GENERAL"}, 201, nil)
+	// Y un comprobante emitido por el nodo (F5-05).
+	var fcfg facturacion.Config
+	c.do("GET", "/v1/facturacion", nil, 200, &fcfg)
+	n.comprobante(fcfg.RUC, *fcfg.Cajas[0].PuntoID, 1, false)
 	n.cierreZ(cajas[0].ID, 1, "", "-0.50")
 	c.e.notificarCierres()
 	n.cliente(caja.Cliente{ID: ids.New(), TipoIdentificacion: "05", Identificacion: "1710034065", RazonSocial: "María Pérez", Email: "maria@example.com",

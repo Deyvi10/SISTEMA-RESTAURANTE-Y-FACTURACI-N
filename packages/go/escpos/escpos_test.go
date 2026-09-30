@@ -297,3 +297,52 @@ func TestGoldenAperturaCajon(t *testing.T) {
 	}
 	golden(t, "cajon-58", Decode(raw).Text())
 }
+
+func rideDePrueba() Ride {
+	return Ride{
+		NombreComercial: "Cevichería Don Pepe", RazonSocial: "ANDRADE JOSÉ LUIS", RUC: "1710034065001",
+		DirMatriz: "Malecón 2000 y Av. 9 de Octubre, Guayaquil", DirEstablecimiento: "Malecón 2000 y Av. 9 de Octubre, Guayaquil",
+		ObligadoContabilidad: false, RIMPE: true, Numero: "001-002-000000067",
+		ClaveAcceso: "2909202601171003406500110010020000000671234567818", Pruebas: true,
+		Emision: time.Date(2026, 9, 29, 13, 30, 0, 0, time.UTC), Mesa: "Mesa 4", Cajero: "Luis P.",
+		Comprador: "CONSUMIDOR FINAL",
+		Lineas: []LineaRide{
+			{Cantidad: "1", Descripcion: "Ceviche de camarón", PrecioUnitario: "10.869565", Total: money.MustParse("10.87")},
+			{Cantidad: "2", Descripcion: "Cerveza", PrecioUnitario: "2.608696", Descuento: money.MustParse("0.52"), Total: money.MustParse("4.70")},
+		},
+		Subtotales:           []ValorRide{{Etiqueta: "SUBTOTAL 15%", Valor: money.MustParse("15.57")}},
+		SubtotalSinImpuestos: money.MustParse("15.57"), TotalDescuento: money.MustParse("0.52"),
+		IVAs:    []ValorRide{{Etiqueta: "IVA 15%", Valor: money.MustParse("2.33")}},
+		Propina: money.MustParse("1.55"), Total: money.MustParse("19.45"),
+		Pagos:    []PagoRide{{Codigo: "01", Metodo: "Efectivo", Monto: money.MustParse("19.45")}},
+		Recibido: money.MustParse("20.00"), Vuelto: money.MustParse("0.55"),
+		Adicionales: []ValorTexto{{Nombre: "RUC Proveedor", Valor: "1790011674001"}},
+		AbrirCajon:  true,
+	}
+}
+
+func TestGoldenRide(t *testing.T) {
+	r := rideDePrueba()
+	doc := Decode(ImprimirRide(Paper80, r))
+	golden(t, "ride-80", doc.Text())
+	golden(t, "ride-58", Decode(ImprimirRide(Paper58, r)).Text())
+	var qr bool
+	for _, e := range doc.Elements {
+		if e.Kind == KindQR && e.Data == r.ClaveAcceso {
+			qr = true
+		}
+	}
+	if !qr {
+		t.Fatal("la clave de acceso va también en un QR")
+	}
+	for _, quiero := range []string{"FACTURA", "No. 001-002-000000067", "AMBIENTE DE PRUEBAS - SIN VALIDEZ TRIBUTARIA", "pendiente de autorización del SRI", "01 - SIN UTILIZACION DEL SISTEMA FINANCIERO", "RUC Proveedor: 1790011674001"} {
+		if !strings.Contains(doc.Text(), quiero) {
+			t.Errorf("falta %q", quiero)
+		}
+	}
+	// En producción no aparece la leyenda de pruebas.
+	r.Pruebas = false
+	if strings.Contains(Decode(ImprimirRide(Paper80, r)).Text(), "SIN VALIDEZ") {
+		t.Fatal("producción no lleva la leyenda de pruebas")
+	}
+}

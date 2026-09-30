@@ -539,6 +539,11 @@ function Listo({ out, conMesa, volver, siguiente }: { out: CobroOut; conMesa: bo
         {d.metodo} · {d.codigo} · {d.cuenta ? `cuenta ${d.cuenta} de ${d.mesa}` : d.mesa} {siguiente ? "cobrada" : conMesa ? "libre" : "cobrada"}
         {d.abreCajon ? " · cajón abierto" : ""}
       </p>
+      {d.tipo === "FACTURA" && (
+        <p className="rp-secondary cobro-listo__factura" data-testid="factura-emitida">
+          Factura {d.codigo} emitida{d.ambiente === 1 ? " en ambiente de pruebas" : ""}; se autoriza con el SRI en segundo plano.
+        </p>
+      )}
       {out.aviso && <p className="cobro__aviso">{out.aviso}</p>}
       {siguiente ? (
         <button className="rp-btn rp-btn--primary" onClick={siguiente} autoFocus data-testid="siguiente-cuenta">

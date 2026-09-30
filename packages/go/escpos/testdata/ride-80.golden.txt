@@ -1,0 +1,52 @@
+[abrir cajón]
+Cevichería Don Pepe
+ANDRADE JOSÉ LUIS
+R.U.C.: 1710034065001
+Matriz: Malecón 2000 y Av. 9 de Octubre,
+  Guayaquil
+OBLIGADO A LLEVAR CONTABILIDAD: NO
+CONTRIBUYENTE RÉGIMEN RIMPE
+------------------------------------------------
+FACTURA
+No. 001-002-000000067
+Emitida                         29/09/2026 13:30
+Ambiente: PRUEBAS
+Emisión: NORMAL
+NÚMERO DE AUTORIZACIÓN / CLAVE DE ACCESO:
+2909202601171003406500110
+010020000000671234567818
+[QR 2909202601171003406500110010020000000671234567818]
+Comprobante pendiente de autorización del SRI
+AMBIENTE DE PRUEBAS - SIN VALIDEZ TRIBUTARIA
+------------------------------------------------
+Razón Social / Nombres: CONSUMIDOR FINAL
+Mesa 4                             Caja: Luis P.
+------------------------------------------------
+1 x Ceviche de camarón
+P.U. 10.869565                             10.87
+2 x Cerveza
+P.U. 2.608696 Desc. 0.52                    4.70
+------------------------------------------------
+SUBTOTAL 15%                               15.57
+SUBTOTAL SIN IMPUESTOS                     15.57
+TOTAL DESCUENTO                             0.52
+IVA 15%                                     2.33
+PROPINA                                     1.55
+VALOR TOTAL                               $19.45
+------------------------------------------------
+Forma de pago
+01 - SIN UTILIZACION DEL SISTEMA FINANCIERO
+Efectivo                                  $19.45
+Recibido                                  $20.00
+Vuelto                                     $0.55
+------------------------------------------------
+Información adicional
+RUC Proveedor: 1790011674001
+------------------------------------------------
+Consulte su comprobante en www.sri.gob.ec con la
+clave de acceso.
+¡Gracias por su visita!
+
+
+
+-------- corte --------
