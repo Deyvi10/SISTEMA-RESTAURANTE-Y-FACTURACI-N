@@ -93,6 +93,8 @@ jobs:
           version: latest
       - name: xmllint para validar los comprobantes contra el XSD oficial del SRI
         run: sudo apt-get update -qq && sudo apt-get install -y -qq libxml2-utils
+      - name: signxml para verificar la firma XAdES con una implementación independiente
+        run: python3 -m pip install --quiet --user signxml
       - name: Pruebas con detector de carreras
         run: go test -race -count=1 -coverprofile=coverage.out ./...
       - name: Cobertura de dominios críticos

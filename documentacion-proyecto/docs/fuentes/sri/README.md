@@ -62,6 +62,13 @@ Según los WSDL: la operación va en su namespace (`http://ec.gob.sri.ws.recepci
 responde `<estado>RECHAZADO</estado>`, no «NO AUTORIZADO»; el cliente acepta ambos. Los
 valores de las respuestas pueden traer saltos de línea (la clave consultada, por ejemplo).
 
+## Firma (F5-09)
+
+Implementada según §6 y el Anexo 4 con un certificado de prueba y verificada con `signxml`
+(otra implementación, sobre libxml2). 🔎 Queda por confirmar con el `.p12` real y el SRI de
+pruebas: el formato de `X509IssuerName` (se usa el RFC 2253 de Go, p. ej.
+`SERIALNUMBER=…,CN=…,C=EC`; el ejemplo del Anexo 4 muestra `CN=…,L=…,OU=…,O=…,C=EC`).
+
 ## Hallazgos del motor de impuestos (F5-04)
 
 - **Tolerancia del error 52 (🔎, DP-07).** La ficha no publica cuánto margen admite la

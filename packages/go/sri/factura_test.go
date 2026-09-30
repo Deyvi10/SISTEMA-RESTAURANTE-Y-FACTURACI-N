@@ -114,6 +114,7 @@ func TestFacturaXMLValidaContraElXSDOficial(t *testing.T) {
 		comprador Comprador
 	}{
 		"plato de $15 a consumidor final": {totalesComoElNodo([]LineaVenta{linea("Ceviche de camarón", "1", "15.00", "15.00", iva15)}, true, false), consumidorFinal},
+		"sin campos adicionales ni pagos": {totalesComoElNodo([]LineaVenta{linea("Cerveza", "2", "6.00", "6.00", iva15)}, true, false), consumidorFinal},
 		"con RUC, descuento, dos tarifas y servicio": {totalesComoElNodo([]LineaVenta{
 			linea("Parrillada\npara dos", "1", "24.00", "21.60", iva15), // salto de línea: el XSD no lo admite
 			linea("Agua sin gas", "2", "2.00", "2.00", iva0),
@@ -125,7 +126,11 @@ func TestFacturaXMLValidaContraElXSDOficial(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s: %v", nombre, err)
 		}
-		doc, err := FacturaXML(datosPrueba(t, f, 67, c.comprador), f)
+		datos := datosPrueba(t, f, 67, c.comprador)
+		if strings.HasPrefix(nombre, "sin campos") { // antes salían <infoAdicional/> y <pagos/> vacíos
+			datos.Adicionales, datos.Pagos = nil, nil
+		}
+		doc, err := FacturaXML(datos, f)
 		if err != nil {
 			t.Fatalf("%s: %v", nombre, err)
 		}

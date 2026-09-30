@@ -124,8 +124,11 @@ func FacturaXML(d DatosFactura, f Factura) ([]byte, error) {
 	} else {
 		inf.Propina = "0.00"
 	}
-	for _, p := range d.Pagos {
-		inf.Pagos = append(inf.Pagos, xmlPago{FormaPago: p.FormaPago, Total: p.Total.String()})
+	if len(d.Pagos) > 0 {
+		inf.Pagos = &xmlPagos{}
+		for _, p := range d.Pagos {
+			inf.Pagos.Pagos = append(inf.Pagos.Pagos, xmlPago{FormaPago: p.FormaPago, Total: p.Total.String()})
+		}
 	}
 	x.InfoFactura = inf
 	for _, l := range f.Lineas {
@@ -139,7 +142,10 @@ func FacturaXML(d DatosFactura, f Factura) ([]byte, error) {
 	}
 	for _, a := range d.Adicionales {
 		if v := texto(a.Valor, 300); v != "" {
-			x.InfoAdicional = append(x.InfoAdicional, xmlCampoAdicional{Nombre: texto(a.Nombre, 300), Valor: v})
+			if x.InfoAdicional == nil {
+				x.InfoAdicional = &xmlInfoAdicional{}
+			}
+			x.InfoAdicional.Campos = append(x.InfoAdicional.Campos, xmlCampoAdicional{Nombre: texto(a.Nombre, 300), Valor: v})
 		}
 	}
 	out, err := xml.Marshal(x)
@@ -217,13 +223,22 @@ func tarifaXML(t Tarifa) string {
 
 // Estructura XML en el orden del XSD factura 1.1.0 (los opcionales vacíos se omiten).
 type xmlFactura struct {
-	XMLName        xml.Name            `xml:"factura"`
-	ID             string              `xml:"id,attr"`
-	Version        string              `xml:"version,attr"`
-	InfoTributaria xmlInfoTributaria   `xml:"infoTributaria"`
-	InfoFactura    xmlInfoFactura      `xml:"infoFactura"`
-	Detalles       []xmlDetalle        `xml:"detalles>detalle"`
-	InfoAdicional  []xmlCampoAdicional `xml:"infoAdicional>campoAdicional,omitempty"`
+	XMLName        xml.Name          `xml:"factura"`
+	ID             string            `xml:"id,attr"`
+	Version        string            `xml:"version,attr"`
+	InfoTributaria xmlInfoTributaria `xml:"infoTributaria"`
+	InfoFactura    xmlInfoFactura    `xml:"infoFactura"`
+	Detalles       []xmlDetalle      `xml:"detalles>detalle"`
+	// Puntero: sin campos no debe salir <infoAdicional/> vacío (el XSD exige al menos uno).
+	InfoAdicional *xmlInfoAdicional `xml:"infoAdicional,omitempty"`
+}
+
+type xmlInfoAdicional struct {
+	Campos []xmlCampoAdicional `xml:"campoAdicional"`
+}
+
+type xmlPagos struct {
+	Pagos []xmlPago `xml:"pago"`
 }
 
 type xmlInfoTributaria struct {
@@ -257,7 +272,7 @@ type xmlInfoFactura struct {
 	Propina                     string             `xml:"propina"`
 	ImporteTotal                string             `xml:"importeTotal"`
 	Moneda                      string             `xml:"moneda"`
-	Pagos                       []xmlPago          `xml:"pagos>pago,omitempty"`
+	Pagos                       *xmlPagos          `xml:"pagos,omitempty"` // sin pagos no sale <pagos/> vacío
 }
 
 type xmlTotalImpuesto struct {

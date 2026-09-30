@@ -60,4 +60,5 @@ require (
 	modernc.org/libc v1.75.7 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.12.1 // indirect
+	software.sslmate.com/src/go-pkcs12 v0.7.3 // indirect
 )
