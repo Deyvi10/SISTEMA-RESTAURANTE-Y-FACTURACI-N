@@ -5,6 +5,9 @@
 //	cloud-api tenant-crear …     da de alta un restaurante (Super Admin, RF-01-01)
 //	cloud-api galeria            sube la galería de fotos de platos al almacenamiento
 //	cloud-api demo               crea el restaurante de demostración con fotos
+//	cloud-api fiscal             worker fiscal: firma y lleva los comprobantes al SRI (F5-07, F5-10)
+//	cloud-api kek-generar        crea la KEK local de la firma electrónica en .secrets/ (solo desarrollo)
+//	cloud-api p12-prueba         crea un .p12 ficticio para probar la firma contra el stub del SRI
 package main
 
 import (
@@ -22,6 +25,7 @@ import (
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/auth"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/caja"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/catalogo"
+	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/certificados"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/facturacion"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/imagenes"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/impresoras"
@@ -134,8 +138,14 @@ func run(ctx context.Context, cmd string, args []string) error {
 		return tenantCrear(ctx, args)
 	case "demo":
 		return demo(ctx, args)
+	case "fiscal":
+		return workerFiscal(ctx)
+	case "kek-generar":
+		return kekGenerar(args)
+	case "p12-prueba":
+		return p12Prueba(args)
 	default:
-		return fmt.Errorf("comando desconocido %q: usa serve, migrate, tenant-crear, galeria o demo", cmd)
+		return fmt.Errorf("comando desconocido %q: usa serve, migrate, tenant-crear, galeria, demo, fiscal, kek-generar o p12-prueba", cmd)
 	}
 }
 
@@ -156,12 +166,22 @@ func serve(ctx context.Context) error {
 			slog.Info("galería sembrada", "fotos", n)
 		}
 	}
+	// La API solo tiene la KEK pública: guarda certificados, no los puede abrir (F5-07).
+	var kek certificados.Envolvedor
+	if pemData, err := os.ReadFile(cfg.KEKPublicaFile); err == nil {
+		if kek, err = certificados.CargarKEKPublica(pemData); err != nil {
+			return err
+		}
+	} else {
+		slog.Warn("sin KEK pública: no se pueden subir firmas electrónicas", "archivo", cfg.KEKPublicaFile)
+	}
 	deps := server.Deps{
 		DB: app.DB, Signer: app.Signer, Now: app.Clock.Now, BackofficeURL: cfg.BackofficeURL,
 		Auth:  &auth.Handlers{Svc: &auth.Service{DB: app.DB, Signer: app.Signer, Mail: app.Mail, Clock: app.Clock, BackofficeURL: cfg.BackofficeURL}, CookieSecure: cfg.CookieSecure},
 		Salon: app.Salon, Catalogo: app.Catalogo, Personal: app.Personal, Imagenes: app.Imagenes,
 		Nodos: nodos.New(app.DB, app.Clock, cfg.PINPepper), Impresoras: &impresoras.Service{DB: app.DB, Clock: app.Clock},
 		Caja: &caja.Service{DB: app.DB}, Clientes: &caja.Clientes{DB: app.DB}, Facturacion: &facturacion.Service{DB: app.DB},
+		Certificados: &certificados.Service{DB: app.DB, KEK: kek, Now: app.Clock.Now},
 	}
 	go deps.Nodos.Avisos.Escuchar(ctx, app.DB.Pool, slog.Default())
 	go (&caja.Notificador{DB: app.DB, Mail: app.Mail, Log: slog.Default()}).Correr(ctx, app.DB.Pool)

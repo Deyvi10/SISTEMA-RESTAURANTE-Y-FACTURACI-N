@@ -55,6 +55,8 @@ flowchart LR
 - La contraseña del P12 se **cifra** (reversible, porque es necesaria para usar el certificado). **No** se *hashea* (corrige el error X-01).
 - Solo el worker fiscal tiene permiso de descifrado (IAM de mínimo privilegio). La API puede cifrar, pero no descifrar.
 - Cada descifrado queda registrado en un log de acceso.
+
+**Implementación (F5-07, `apps/cloud-api/internal/certificados`).** La KEK es **asimétrica** (RSA-3072, OAEP-SHA256): la API tiene solo la llave pública (envuelve DEK, no puede desenvolverlas) y el worker fiscal (`cloud-api fiscal`, proceso aparte) solo la privada. En Azure es una llave de Key Vault con permiso `wrapKey` para la identidad de la API y `unwrapKey` para la del worker (pendiente con la IaC de F1-14); en local son PEM en `.secrets/` (fuera del repositorio, `make api` los crea). Cada parte cifrada lleva como dato asociado de GCM el restaurante, el certificado y su posición: un sobre copiado a otra fila, o con el .p12 y la contraseña intercambiados, no se abre. `certificados_firma` no admite reescribir lo cifrado, reactivar uno reemplazado ni borrar; `certificados_accesos` es append-only. La respuesta de la API nunca incluye el archivo ni la contraseña y la auditoría solo guarda titular, serial y vencimiento.
 - Secretos de la aplicación (DB, SMTP, pasarela, pepper): en el gestor de secretos, inyectados en tiempo de ejecución. Escaneo de secretos en el CI (gitleaks) y protección de push de GitHub.
 
 ## 5. Seguridad de red y transporte

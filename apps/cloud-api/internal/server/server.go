@@ -10,6 +10,7 @@ import (
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/auth"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/caja"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/catalogo"
+	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/certificados"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/facturacion"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/imagenes"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/impresoras"
@@ -51,6 +52,7 @@ type Deps struct {
 	Caja          *caja.Service
 	Clientes      *caja.Clientes
 	Facturacion   *facturacion.Service
+	Certificados  *certificados.Service
 	BackofficeURL string
 }
 
@@ -143,6 +145,8 @@ func Routes(d Deps) []Route {
 		{"GET", "/v1/facturacion", sri, list(d.Facturacion.Obtener)},
 		{"PUT", "/v1/facturacion", sri, create(d.Facturacion.Guardar)},
 		{"PUT", "/v1/cajas/{id}/punto-emision", sri, update(d.Facturacion.AsignarPunto)},
+		{"GET", "/v1/facturacion/certificado", sri, d.Certificados.HandleActivo},
+		{"POST", "/v1/facturacion/certificado", sri, d.Certificados.HandleSubir},
 		{"GET", "/v1/metodos-pago", cja, list(d.Caja.Metodos)},
 		{"POST", "/v1/metodos-pago", cja, create(d.Caja.CrearMetodo)},
 		{"PUT", "/v1/metodos-pago/{id}", cja, update(d.Caja.ActualizarMetodo)},

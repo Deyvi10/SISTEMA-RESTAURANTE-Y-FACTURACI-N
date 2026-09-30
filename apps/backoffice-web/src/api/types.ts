@@ -267,7 +267,24 @@ export interface ConfigFiscal {
   regimen: Regimen;
   facturacionActiva: boolean;
   cajas: PuntoCaja[];
+  certificado: Certificado | null;
+  pruebaAprobada: boolean;
   pendientes: string[];
+  avisos: string[];
+}
+
+/** Firma electrónica activa (F5-07): solo sus datos visibles, nunca el archivo. */
+export interface Certificado {
+  id: string;
+  titular: string;
+  ruc: string | null;
+  emisor: string;
+  serial: string;
+  validoDesde: string;
+  validoHasta: string;
+  subidoAt: string;
+  diasRestantes: number;
+  aviso?: string;
 }
 
 export interface Caja {

@@ -94,8 +94,17 @@ flutter-ui: ## Analiza y prueba el paquete Flutter restpos_ui con Docker (no req
 waiter: ## Analiza y prueba la app de meseros con Docker (tools/flutter.sh)
 	tools/flutter.sh apps/waiter-app "flutter pub get && flutter analyze && flutter test"
 
-api: ## Corre la API en :8080 (migra y siembra la galería en local; requiere `make dev`)
+api: .secrets/kek-publica.pem ## Corre la API en :8080 (migra y siembra la galería en local; requiere `make dev`)
 	$(GO) run ./apps/cloud-api/cmd/cloud-api serve
+
+fiscal: .secrets/kek-publica.pem ## Worker fiscal: firma los comprobantes y los lleva al SRI (en local, al stub :8091)
+	$(GO) run ./apps/cloud-api/cmd/cloud-api fiscal
+
+.secrets/kek-publica.pem:
+	$(GO) run ./apps/cloud-api/cmd/cloud-api kek-generar
+
+p12-demo: ## Crea .secrets/demo.p12 (firma ficticia del restaurante demo, clave Demo2026) para probar con el stub
+	$(GO) run ./apps/cloud-api/cmd/cloud-api p12-prueba -demo -titular "CEVICHERIA DON PEPE (PRUEBA)" -clave Demo2026 -out .secrets/demo.p12
 
 demo: ## Crea el restaurante de demostración «Cevichería Don Pepe» con fotos (demo@donpepe.ec / DonPepe2026)
 	$(GO) run ./apps/cloud-api/cmd/cloud-api demo
@@ -124,4 +133,4 @@ bo-test: ## Tipos, pruebas y build del backoffice
 backlog: ## Regenera docs/12-backlog-tickets.md desde el JSON
 	python3 documentacion-proyecto/docs/backlog/generar.py
 
-.PHONY: help hooks dev down reset logs test test-long cover fmt lint check-float golden printer-sim sri-stub tokens tokens-check ui-test sri-ts-test ui-docs flutter-ui waiter api demo pos pos-dev e2e bo bo-test backlog
+.PHONY: fiscal p12-demo help hooks dev down reset logs test test-long cover fmt lint check-float golden printer-sim sri-stub tokens tokens-check ui-test sri-ts-test ui-docs flutter-ui waiter api demo pos pos-dev e2e bo bo-test backlog

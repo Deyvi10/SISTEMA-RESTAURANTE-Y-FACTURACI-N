@@ -2,9 +2,9 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { ConfigFiscal } from "../api/types";
+import type { Certificado, ConfigFiscal } from "../api/types";
 import { FeedbackProvider } from "../components/feedback";
-import { cuerpo, Facturacion, formDe } from "./Facturacion";
+import { cuerpo, Facturacion, formDe, vigencia } from "./Facturacion";
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -13,6 +13,12 @@ const base: ConfigFiscal = {
   direccionMatriz: "Quito", obligadoContabilidad: false, contribuyenteEspecial: null, agenteRetencion: null, regimen: "GENERAL",
   facturacionActiva: false, pendientes: ["Confirma los datos del emisor y guárdalos.", "Asigna un punto de emisión a «Caja 1»."],
   cajas: [{ cajaId: "c1", caja: "Caja 1", localId: "l1", puntoId: null, establecimiento: null, puntoEmision: null, conNodo: false }],
+  certificado: null, pruebaAprobada: false, avisos: ["Sube tu firma electrónica (.p12) para que las facturas lleguen al SRI."],
+};
+
+const cert: Certificado = {
+  id: "k1", titular: "JOSÉ ANDRADE", ruc: "1790011674001", emisor: "ENTIDAD", serial: "1", validoDesde: "2026-01-01T00:00:00Z",
+  validoHasta: "2026-10-20T12:00:00Z", subidoAt: "2026-09-01T00:00:00Z", diasRestantes: 21,
 };
 
 function montar(cfg: ConfigFiscal) {
@@ -50,5 +56,33 @@ describe("facturación SRI", () => {
     await userEvent.click(screen.getByRole("button", { name: "Guardar" }));
     const put = fetch.mock.calls.find(([url, init]) => String(url).includes("/punto-emision") && init?.method === "PUT");
     expect(JSON.parse(String(put?.[1]?.body))).toEqual({ establecimiento: "001", puntoEmision: "002" });
+  });
+
+  it("sube la firma como formulario con el archivo y la contraseña", async () => {
+    const fetch = montar(base);
+    expect(await screen.findByTestId("avisos")).toHaveTextContent("Sube tu firma electrónica");
+    const boton = screen.getByTestId("subir-firma");
+    expect(boton).toBeDisabled();
+    await userEvent.upload(screen.getByLabelText("Archivo .p12"), new File([new Uint8Array([48, 130])], "firma.p12", { type: "application/x-pkcs12" }));
+    await userEvent.type(screen.getByLabelText("Contraseña de la firma"), "secreta");
+    await userEvent.click(boton);
+    const post = fetch.mock.calls.find(([url, init]) => String(url).includes("/v1/facturacion/certificado") && init?.method === "POST");
+    const fd = post?.[1]?.body as FormData;
+    expect(fd.get("clave")).toBe("secreta");
+    expect((fd.get("p12") as File).name).toBe("firma.p12");
+  });
+
+  it("con firma muestra la vigencia y producción solo con una prueba autorizada", async () => {
+    montar({ ...base, guardada: true, pendientes: [], avisos: [], certificado: cert });
+    expect(await screen.findByTestId("certificado")).toHaveTextContent("JOSÉ ANDRADE");
+    expect(screen.queryByTestId("subir-firma")).toBeNull();
+    expect(screen.queryByRole("radio", { name: "Producción" })).toBeNull();
+  });
+
+  it("la vigencia avisa en naranja el último mes y en rojo al vencer", () => {
+    expect(vigencia(cert)).toEqual(expect.objectContaining({ tint: "orange" }));
+    expect(vigencia({ ...cert, diasRestantes: 200 }).tint).toBe("green");
+    expect(vigencia({ ...cert, diasRestantes: 1 }).texto).toContain("quedan 1 día");
+    expect(vigencia({ ...cert, diasRestantes: -1 })).toEqual(expect.objectContaining({ tint: "red" }));
   });
 });

@@ -8,6 +8,7 @@ package facturacion
 import (
 	"context"
 	"errors"
+	"fmt"
 	"regexp"
 	"strings"
 	"time"
@@ -16,6 +17,7 @@ import (
 
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/auditoria"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/auth"
+	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/certificados"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/platform/apperr"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/platform/db"
 	aud "github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/auditoria"
@@ -47,8 +49,14 @@ type Config struct {
 	Regimen               string  `json:"regimen"`
 	FacturacionActiva     bool    `json:"facturacionActiva"`
 	Cajas                 []Punto `json:"cajas"`
+	// Certificado activo (F5-07): solo sus datos visibles, nunca el archivo.
+	Certificado *certificados.Info `json:"certificado"`
+	// PruebaAprobada: el SRI ya autorizó una factura de este restaurante en pruebas (F5-06 paso 6).
+	PruebaAprobada bool `json:"pruebaAprobada"`
 	// Pendientes explica en lenguaje claro qué falta para poder facturar.
 	Pendientes []string `json:"pendientes"`
+	// Avisos no impiden facturar, pero sin resolverlos los comprobantes no llegan al SRI.
+	Avisos []string `json:"avisos"`
 }
 
 // Punto es una caja con su serie (establecimiento-punto).
@@ -98,7 +106,7 @@ func (s *Service) Obtener(ctx context.Context, p auth.Principal) (Config, error)
 }
 
 func leer(ctx context.Context, tx db.Tx) (Config, error) {
-	c := Config{Cajas: []Punto{}, Pendientes: []string{}}
+	c := Config{Cajas: []Punto{}, Pendientes: []string{}, Avisos: []string{}}
 	err := tx.QueryRow(ctx, `SELECT ambiente, ruc, razon_social, nombre_comercial, direccion_matriz, obligado_contabilidad,
 		contribuyente_especial, agente_retencion, regimen, facturacion_activa FROM configuracion_fiscal`).
 		Scan(&c.Ambiente, &c.RUC, &c.RazonSocial, &c.NombreComercial, &c.DireccionMatriz, &c.ObligadoContabilidad,
@@ -127,7 +135,17 @@ func leer(ctx context.Context, tx db.Tx) (Config, error) {
 	if err != nil {
 		return c, err
 	}
-	c.Pendientes = pendientes(c)
+	cert, err := certificados.Leer(ctx, tx, time.Now())
+	switch {
+	case err == nil:
+		c.Certificado = &cert
+	case !errors.Is(err, pgx.ErrNoRows):
+		return c, err
+	}
+	if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM comprobantes WHERE ambiente = 1 AND estado = 'AUTORIZADO')`).Scan(&c.PruebaAprobada); err != nil {
+		return c, err
+	}
+	c.Pendientes, c.Avisos = pendientes(c), avisos(c)
 	return c, nil
 }
 
@@ -144,6 +162,20 @@ func pendientes(c Config) []string {
 		if p.PuntoID == nil {
 			out = append(out, "Asigna un punto de emisión a «"+p.Caja+"».")
 		}
+	}
+	return out
+}
+
+// avisos: la caja factura igual (el nodo emite sin internet), pero la nube no puede firmar.
+func avisos(c Config) []string {
+	out := []string{}
+	switch {
+	case c.Certificado == nil:
+		out = append(out, "Sube tu firma electrónica (.p12) para que las facturas lleguen al SRI.")
+	case c.Certificado.DiasRestantes < 0:
+		out = append(out, "Tu firma electrónica venció: sube la renovada para que las facturas sigan llegando al SRI.")
+	case c.Certificado.DiasRestantes <= 30:
+		out = append(out, fmt.Sprintf("Tu firma electrónica vence en %d días: renuévala con tu entidad certificadora.", c.Certificado.DiasRestantes))
 	}
 	return out
 }
@@ -170,15 +202,16 @@ func (s *Service) Guardar(ctx context.Context, p auth.Principal, in ConfigInput)
 	if err := in.validar(); err != nil {
 		return Config{}, err
 	}
-	// Producción solo con la firma electrónica cargada y probada (F5-06 paso 6, F5-07).
-	if in.Ambiente == 2 {
-		return Config{}, apperr.New(apperr.Conflict, "PRODUCCION_SIN_FIRMA", "El ambiente de producción se habilita cuando esté cargada tu firma electrónica y aprobada una factura de prueba.")
-	}
 	var out Config
 	err := s.DB.InTenant(ctx, p.TenantID, func(tx db.Tx) error {
 		antes, err := leer(ctx, tx)
 		if err != nil {
 			return err
+		}
+		// Producción solo con la firma vigente y una factura de prueba autorizada (F5-06 paso 6).
+		if in.Ambiente == 2 && antes.Ambiente != 2 &&
+			(antes.Certificado == nil || antes.Certificado.DiasRestantes < 0 || !antes.PruebaAprobada) {
+			return apperr.New(apperr.Conflict, "PRODUCCION_SIN_FIRMA", "El ambiente de producción se habilita cuando esté cargada tu firma electrónica y el SRI haya autorizado una factura de prueba.")
 		}
 		if in.FacturacionActiva {
 			if in.Regimen == RimpeNegocioPopular {

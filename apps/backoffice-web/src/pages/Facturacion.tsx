@@ -1,10 +1,11 @@
-// Facturación electrónica SRI (F5-02, pasos 3 a 5 de F5-06): datos del emisor, régimen, puntos
-// de emisión por caja y el interruptor para facturar. La firma electrónica (.p12) se carga en
-// F5-07; mientras tanto solo existe el ambiente de pruebas.
-import { useEffect, useState } from "react";
+// Facturación electrónica SRI (F5-02, F5-06, F5-07): datos del emisor, régimen, puntos de
+// emisión por caja, la firma electrónica (.p12, se guarda cifrada y solo la usa el worker
+// fiscal) y el interruptor para facturar. Producción se abre con la firma vigente y una
+// factura de prueba autorizada por el SRI.
+import { useEffect, useRef, useState } from "react";
 import { ApiError } from "../api/client";
 import { api, useFacturacion, useGuardar } from "../api/hooks";
-import type { ConfigFiscal, PuntoCaja, Regimen } from "../api/types";
+import type { Certificado, ConfigFiscal, PuntoCaja, Regimen } from "../api/types";
 import { useFeedback } from "../components/feedback";
 import { AppIcon, Field, Segmented, Spinner, ToggleRow } from "../components/ui";
 import { Icon } from "../lib/icons";
@@ -25,6 +26,7 @@ export function formDe(c: ConfigFiscal) {
     contribuyenteEspecial: c.contribuyenteEspecial ?? "",
     agenteRetencion: c.agenteRetencion ?? "",
     regimen: c.regimen,
+    ambiente: String(c.ambiente) as "1" | "2",
   };
 }
 type Form = ReturnType<typeof formDe>;
@@ -32,7 +34,7 @@ type Form = ReturnType<typeof formDe>;
 /** Cuerpo del PUT: los opcionales vacíos viajan como null. */
 export function cuerpo(f: Form, activa: boolean) {
   const nulo = (s: string) => (s.trim() === "" ? null : s.trim());
-  return { ...f, ambiente: 1, nombreComercial: nulo(f.nombreComercial), contribuyenteEspecial: nulo(f.contribuyenteEspecial), agenteRetencion: nulo(f.agenteRetencion), facturacionActiva: activa };
+  return { ...f, ambiente: Number(f.ambiente), nombreComercial: nulo(f.nombreComercial), contribuyenteEspecial: nulo(f.contribuyenteEspecial), agenteRetencion: nulo(f.agenteRetencion), facturacionActiva: activa };
 }
 
 export function Facturacion() {
@@ -62,6 +64,8 @@ function FacturacionForm({ cfg }: { cfg: ConfigFiscal }) {
     }
   }
   const puedeActivar = cfg.guardada && cfg.pendientes.length === 0;
+  const produccion = cfg.ambiente === 2;
+  const puedeProduccion = produccion || (!!cfg.certificado && cfg.certificado.diasRestantes >= 0 && cfg.pruebaAprobada);
 
   return (
     <>
@@ -77,9 +81,13 @@ function FacturacionForm({ cfg }: { cfg: ConfigFiscal }) {
           <div className="rp-cell">
             <AppIcon icono="receipt" tint={cfg.facturacionActiva ? "green" : "pink"} size={30} />
             <span className="rp-cell__body">
-              <span className="rp-cell__title">{cfg.facturacionActiva ? "Facturando en ambiente de pruebas" : "Facturación apagada"}</span>
+              <span className="rp-cell__title">{!cfg.facturacionActiva ? "Facturación apagada" : produccion ? "Facturando en producción" : "Facturando en ambiente de pruebas"}</span>
               <span className="rp-cell__subtitle">
-                {cfg.facturacionActiva ? "Los comprobantes salen con la leyenda «AMBIENTE DE PRUEBAS – SIN VALIDEZ TRIBUTARIA»." : "La caja emite documentos internos sin valor tributario."}
+                {!cfg.facturacionActiva
+                  ? "La caja emite documentos internos sin valor tributario."
+                  : produccion
+                    ? "Cada cobro emite una factura con validez tributaria."
+                    : "Los comprobantes salen con la leyenda «AMBIENTE DE PRUEBAS – SIN VALIDEZ TRIBUTARIA»."}
               </span>
             </span>
           </div>
@@ -89,7 +97,7 @@ function FacturacionForm({ cfg }: { cfg: ConfigFiscal }) {
             checked={cfg.facturacionActiva}
             onChange={(v) => {
               if (v && !puedeActivar) return;
-              void onGuardar(v, v ? "Facturación activada (pruebas)" : "Facturación apagada");
+              void onGuardar(v, v ? (produccion ? "Facturación activada" : "Facturación activada (pruebas)") : "Facturación apagada");
             }}
           />
         </div>
@@ -98,6 +106,15 @@ function FacturacionForm({ cfg }: { cfg: ConfigFiscal }) {
             {cfg.pendientes.map((p) => (
               <li key={p}>
                 <Icon name="error" size={15} /> {p}
+              </li>
+            ))}
+          </ul>
+        )}
+        {cfg.avisos.length > 0 && (
+          <ul className="pendientes avisos" data-testid="avisos">
+            {cfg.avisos.map((p) => (
+              <li key={p}>
+                <Icon name="info" size={15} /> {p}
               </li>
             ))}
           </ul>
@@ -131,8 +148,17 @@ function FacturacionForm({ cfg }: { cfg: ConfigFiscal }) {
           </Field>
           <Segmented label="Régimen tributario" value={f.regimen} options={REGIMENES.map((r) => ({ value: r.value, label: r.label }))} onChange={(v) => set("regimen", v)} />
           <p className="rp-secondary">{REGIMENES.find((r) => r.value === f.regimen)?.detalle}</p>
-          <Segmented label="Ambiente" value="1" options={[{ value: "1", label: "Pruebas" }]} onChange={() => {}} />
-          <p className="rp-secondary">Producción se habilita cuando cargues tu firma electrónica (.p12) y se apruebe una factura de prueba.</p>
+          <Segmented
+            label="Ambiente"
+            value={f.ambiente}
+            options={puedeProduccion ? [{ value: "1", label: "Pruebas" }, { value: "2", label: "Producción" }] : [{ value: "1", label: "Pruebas" }]}
+            onChange={(v) => set("ambiente", v)}
+          />
+          <p className="rp-secondary">
+            {puedeProduccion
+              ? "Producción: las facturas tienen validez tributaria. Pruebas: el SRI las revisa pero no valen."
+              : "Producción se habilita con tu firma electrónica vigente y una factura de prueba autorizada por el SRI."}
+          </p>
           {errores.general && (
             <p className="rp-field__error" role="alert">
               {errores.general}
@@ -154,18 +180,7 @@ function FacturacionForm({ cfg }: { cfg: ConfigFiscal }) {
         </div>
       </section>
 
-      <section className="seccion">
-        <h2>Firma electrónica</h2>
-        <div className="rp-group">
-          <div className="rp-cell">
-            <AppIcon icono="seguro" tint="gray" size={30} />
-            <span className="rp-cell__body">
-              <span className="rp-cell__title">Certificado .p12</span>
-              <span className="rp-cell__subtitle">Pronto podrás subirlo aquí; se guarda cifrado y solo se usa para firmar en la nube.</span>
-            </span>
-          </div>
-        </div>
-      </section>
+      <FirmaSeccion cert={cfg.certificado} ruc={cfg.ruc} />
     </>
   );
 }
@@ -201,5 +216,99 @@ function PuntoFila({ p }: { p: PuntoCaja }) {
         Guardar
       </button>
     </div>
+  );
+}
+
+/** Días que faltan, en palabras. */
+export function vigencia(c: Certificado): { texto: string; tint: string } {
+  const fecha = new Date(c.validoHasta).toLocaleDateString("es-EC", { day: "numeric", month: "long", year: "numeric" });
+  if (c.diasRestantes < 0) return { texto: `Venció el ${fecha}`, tint: "red" };
+  if (c.diasRestantes === 0) return { texto: `Vence hoy (${fecha})`, tint: "red" };
+  const dias = c.diasRestantes === 1 ? "1 día" : `${c.diasRestantes} días`;
+  return { texto: `Vigente hasta el ${fecha} · quedan ${dias}`, tint: c.diasRestantes <= 30 ? "orange" : "green" };
+}
+
+// Paso 1 y 2 de F5-06: subir el .p12 con su contraseña. La nube lo valida (vigencia, llave,
+// RUC del restaurante) y lo guarda cifrado; nunca se vuelve a mostrar ni descargar.
+function FirmaSeccion({ cert, ruc }: { cert: Certificado | null; ruc: string }) {
+  const { toast } = useFeedback();
+  const [abierto, setAbierto] = useState(!cert);
+  const [archivo, setArchivo] = useState<File | null>(null);
+  const [clave, setClave] = useState("");
+  const [error, setError] = useState("");
+  const input = useRef<HTMLInputElement>(null);
+  const subir = useGuardar(() => api.subirCertificado(archivo as File, clave), ["facturacion"]);
+  useEffect(() => setAbierto(!cert), [cert]);
+
+  async function onSubir() {
+    setError("");
+    try {
+      const c = await subir.mutateAsync(undefined);
+      setClave("");
+      setArchivo(null);
+      if (input.current) input.current.value = "";
+      toast(c.aviso ?? "Firma electrónica guardada");
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "No se pudo subir la firma.");
+    }
+  }
+  const v = cert && vigencia(cert);
+
+  return (
+    <section className="seccion" data-testid="firma">
+      <h2>Firma electrónica</h2>
+      <p>Tu certificado .p12 firma cada factura antes de enviarla al SRI. Se guarda cifrado y no se puede descargar ni ver otra vez.</p>
+      {cert && v && (
+        <div className="rp-group">
+          <div className="rp-cell" data-testid="certificado">
+            <AppIcon icono="seguro" tint={v.tint} size={30} />
+            <span className="rp-cell__body">
+              <span className="rp-cell__title">{cert.titular}</span>
+              <span className="rp-cell__subtitle">
+                {v.texto}
+                {cert.ruc ? ` · RUC ${cert.ruc}` : ""}
+              </span>
+            </span>
+            {!abierto && (
+              <button className="rp-btn rp-btn--gray rp-btn--sm" onClick={() => setAbierto(true)}>
+                Reemplazar
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+      {abierto && (
+        <div className="form">
+          <Field label="Archivo .p12" hint={`El de la firma del titular del RUC ${ruc}. Lo entrega tu entidad certificadora.`} error={error || undefined}>
+            {(fid, desc) => (
+              <input
+                id={fid}
+                ref={input}
+                type="file"
+                accept=".p12,.pfx,application/x-pkcs12"
+                aria-describedby={desc}
+                onChange={(e) => {
+                  setArchivo(e.target.files?.[0] ?? null);
+                  setError("");
+                }}
+              />
+            )}
+          </Field>
+          <Field label="Contraseña de la firma">
+            {(fid) => <input id={fid} type="password" autoComplete="off" value={clave} onChange={(e) => setClave(e.target.value)} />}
+          </Field>
+          <div className="acciones">
+            <button className="rp-btn rp-btn--primary" disabled={!archivo || !clave || subir.isPending} onClick={() => void onSubir()} data-testid="subir-firma">
+              {subir.isPending ? "Verificando…" : cert ? "Reemplazar firma" : "Subir firma"}
+            </button>
+            {cert && (
+              <button className="rp-btn rp-btn--plain" onClick={() => setAbierto(false)}>
+                Cancelar
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+    </section>
   );
 }

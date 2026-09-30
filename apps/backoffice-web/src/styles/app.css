@@ -332,6 +332,8 @@ h1, h2, h3 { text-wrap: balance; margin: 0; }
 /* ---------- Facturación SRI (F5-02) ---------- */
 .pendientes { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; color: var(--rp-color-warning-text); }
 .pendientes li { display: flex; align-items: center; gap: 8px; }
+.avisos { color: var(--rp-color-label-secondary); }
+.form .acciones { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .punto-fila { flex-wrap: wrap; }
 .punto-fila .serie { width: 58px; min-height: 36px; text-align: center; font: 600 16px/1 var(--rp-font-text); letter-spacing: 1px; border-radius: 10px;
   border: 1px solid var(--rp-color-separator); background: var(--rp-color-background); color: var(--rp-color-label); }

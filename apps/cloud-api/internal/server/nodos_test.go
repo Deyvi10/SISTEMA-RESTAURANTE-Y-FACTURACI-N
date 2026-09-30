@@ -112,6 +112,9 @@ func (c *cliente) nodoOperativo() *nodoSim {
 	var fcfg facturacion.Config
 	c.do("GET", "/v1/facturacion", nil, 200, &fcfg)
 	n.comprobante(fcfg.RUC, *fcfg.Cajas[0].PuntoID, 1, false)
+	// Con su firma electrónica, el worker fiscal lo firma (F5-07): deja el acceso registrado.
+	c.subirP12(p12De(c.e.t, fcfg.RUC, time.Now().Add(-time.Hour), time.Now().AddDate(1, 0, 0)), claveP12, 201)
+	drenar(c.e.t, c.e.worker("fiscal@qa"))
 	n.cierreZ(cajas[0].ID, 1, "", "-0.50")
 	c.e.notificarCierres()
 	n.cliente(caja.Cliente{ID: ids.New(), TipoIdentificacion: "05", Identificacion: "1710034065", RazonSocial: "María Pérez", Email: "maria@example.com",

@@ -15,11 +15,13 @@ import (
 	"net/http/cookiejar"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/auth"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/caja"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/catalogo"
+	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/certificados"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/facturacion"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/imagenes"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/impresoras"
@@ -39,6 +41,33 @@ type env struct {
 	srv  *httptest.Server
 	mail *mail.Memory
 	ten  *tenants.Service
+	// kek es la llave privada que en producción solo tiene el worker fiscal.
+	kek *certificados.KEKPrivada
+	sri *httptest.Server // stub del SRI para el worker fiscal
+}
+
+var (
+	kekUna  sync.Once
+	kekPub  *certificados.KEKPublica
+	kekPriv *certificados.KEKPrivada
+)
+
+// kekPrueba genera una sola KEK por corrida (RSA 3072 tarda).
+func kekPrueba(t *testing.T) (*certificados.KEKPublica, *certificados.KEKPrivada) {
+	t.Helper()
+	kekUna.Do(func() {
+		pub, priv, err := certificados.GenerarKEK()
+		if err != nil {
+			panic(err)
+		}
+		if kekPub, err = certificados.CargarKEKPublica(pub); err != nil {
+			panic(err)
+		}
+		if kekPriv, err = certificados.CargarKEKPrivada(priv); err != nil {
+			panic(err)
+		}
+	})
+	return kekPub, kekPriv
 }
 
 func newEnv(t *testing.T) *env {
@@ -49,6 +78,7 @@ func newEnv(t *testing.T) *env {
 	_, key, _ := ed25519.GenerateKey(nil)
 	signer := auth.NewSigner(key, clk.Now)
 	img := &imagenes.Service{Store: &imagenes.Memory{}}
+	pub, priv := kekPrueba(t)
 	deps := server.Deps{
 		DB: tdb.App, Signer: signer, Now: clk.Now, BackofficeURL: "http://bo.test",
 		Auth:       &auth.Handlers{Svc: &auth.Service{DB: tdb.App, Signer: signer, Mail: m, Clock: clk, BackofficeURL: "http://bo.test"}},
@@ -59,6 +89,7 @@ func newEnv(t *testing.T) *env {
 		Nodos:      nodos.New(tdb.App, clk, []byte("pepper-de-pruebas-0123456789abcdef")),
 		Impresoras: &impresoras.Service{DB: tdb.App, Clock: clk},
 		Caja:       &caja.Service{DB: tdb.App}, Clientes: &caja.Clientes{DB: tdb.App}, Facturacion: &facturacion.Service{DB: tdb.App},
+		Certificados: &certificados.Service{DB: tdb.App, KEK: pub, Now: clk.Now},
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
@@ -66,7 +97,7 @@ func newEnv(t *testing.T) *env {
 	srv := httptest.NewServer(server.Handler(deps, server.Routes(deps)))
 	img.PublicURL = srv.URL
 	t.Cleanup(srv.Close)
-	return &env{t: t, tdb: tdb, srv: srv, mail: m, ten: &tenants.Service{DB: tdb.App, Mail: m, BackofficeURL: "http://bo.test"}}
+	return &env{t: t, tdb: tdb, srv: srv, mail: m, ten: &tenants.Service{DB: tdb.App, Mail: m, BackofficeURL: "http://bo.test"}, kek: priv}
 }
 
 // cliente simula el backoffice de un usuario con su cookie de refresh.

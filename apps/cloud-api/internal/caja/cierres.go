@@ -236,7 +236,7 @@ func PDFCierre(c cierrez.Cierre, loc *time.Location) []byte {
 // perdió un aviso, cada minuto.
 func (n *Notificador) Correr(ctx context.Context, pool *pgxpool.Pool) {
 	despertar := make(chan struct{}, 1)
-	go escuchar(ctx, pool, despertar, n.Log)
+	go db.Escuchar(ctx, pool, canalCierres, despertar, n.Log)
 	tick := time.NewTicker(time.Minute)
 	defer tick.Stop()
 	for {
@@ -249,42 +249,5 @@ func (n *Notificador) Correr(ctx context.Context, pool *pgxpool.Pool) {
 		case <-tick.C:
 		case <-despertar:
 		}
-	}
-}
-
-func escuchar(ctx context.Context, pool *pgxpool.Pool, despertar chan<- struct{}, log *slog.Logger) {
-	espera := time.Second
-	for ctx.Err() == nil {
-		err := func() error {
-			pc, err := pool.Acquire(ctx)
-			if err != nil {
-				return err
-			}
-			conn := pc.Hijack()
-			defer func() { _ = conn.Close(context.Background()) }()
-			if _, err := conn.Exec(ctx, "LISTEN "+canalCierres); err != nil {
-				return err
-			}
-			espera = time.Second
-			for {
-				if _, err := conn.WaitForNotification(ctx); err != nil {
-					return err
-				}
-				select {
-				case despertar <- struct{}{}:
-				default:
-				}
-			}
-		}()
-		if ctx.Err() != nil {
-			return
-		}
-		log.Warn("cierre z: conexión LISTEN perdida, reintentando", "err", err, "espera", espera)
-		select {
-		case <-ctx.Done():
-			return
-		case <-time.After(espera):
-		}
-		espera = min(espera*2, 30*time.Second)
 	}
 }

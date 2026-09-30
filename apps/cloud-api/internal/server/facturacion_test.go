@@ -17,7 +17,7 @@ func TestConfiguracionFiscalYPuntosDeEmision(t *testing.T) {
 	// La primera vez propone los datos del alta: el dueño solo confirma.
 	var cfg facturacion.Config
 	c.do("GET", "/v1/facturacion", nil, 200, &cfg)
-	if cfg.Guardada || cfg.RUC != "1790011674001" || cfg.RazonSocial != "R 1790011674001" || cfg.Ambiente != 1 || cfg.Regimen != "GENERAL" || len(cfg.Pendientes) != 2 {
+	if cfg.Guardada || cfg.RUC != "1790011674001" || cfg.RazonSocial != "R 1790011674001" || cfg.Ambiente != 1 || cfg.Regimen != "GENERAL" || len(cfg.Pendientes) != 2 || len(cfg.Avisos) != 1 {
 		t.Fatalf("propuesta: %+v", cfg)
 	}
 	datos := map[string]any{"ambiente": 1, "razonSocial": "  Distribuidora\ndel Pacífico S.A. ", "direccionMatriz": "Av. Amazonas N34-120",
@@ -41,7 +41,7 @@ func TestConfiguracionFiscalYPuntosDeEmision(t *testing.T) {
 		t.Fatalf("sin punto: %+v", cfg)
 	}
 	primero := *cfg.Cajas[0].PuntoID // copia: el JSON siguiente se decodifica sobre cfg
-	if *cfg.Cajas[0].Establecimiento != "001" || *cfg.Cajas[0].PuntoEmision != "001" || len(cfg.Pendientes) != 0 {
+	if *cfg.Cajas[0].Establecimiento != "001" || *cfg.Cajas[0].PuntoEmision != "001" || len(cfg.Pendientes) != 0 || cfg.Certificado != nil {
 		t.Fatalf("punto: %+v", cfg)
 	}
 

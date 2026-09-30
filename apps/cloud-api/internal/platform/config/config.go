@@ -36,6 +36,14 @@ type Config struct {
 	// StorageDriver elige el almacenamiento de objetos: "s3" (VersityGW en local) o "azure" (ADR-0013).
 	StorageDriver    string
 	AzureStorageConn string
+
+	// KEK de la firma electrónica (F5-07). La API lee solo la pública; el worker fiscal, solo
+	// la privada. En local son archivos en .secrets/ (`make api` los genera); en la nube la
+	// KEK vive en Key Vault (ADR-0013) y estos archivos no existen.
+	KEKPublicaFile string
+	KEKPrivadaFile string
+	// SRIHost reemplaza el web service del SRI (el stub en local). Vacío: el del ambiente.
+	SRIHost string
 }
 
 // devKey es una llave fija SOLO para desarrollo local: jamás se acepta fuera de APP_ENV=local.
@@ -67,6 +75,9 @@ func Load() (Config, error) {
 		S3Bucket:         get("S3_BUCKET_IMAGENES", "imagenes"),
 		StorageDriver:    get("STORAGE_DRIVER", "s3"),
 		AzureStorageConn: os.Getenv("AZURE_STORAGE_CONNECTION_STRING"),
+		KEKPublicaFile:   get("KEK_PUBLICA_FILE", def(".secrets/kek-publica.pem")),
+		KEKPrivadaFile:   get("KEK_PRIVADA_FILE", def(".secrets/kek-privada.pem")),
+		SRIHost:          get("SRI_HOST", def("http://localhost:8091")),
 	}
 
 	var missing []string
