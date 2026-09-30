@@ -11,7 +11,7 @@ export const SECCIONES = [
   { to: "/nodo", label: "Nodo Local", icono: "servidor", tint: "orange", permiso: "CONFIGURAR_SALON", soloEscritorio: true },
   { to: "/caja", label: "Caja", icono: "caja", tint: "green", permiso: "CONFIGURAR_CAJA" },
   { to: "/impresoras", label: "Impresoras", icono: "printer", tint: "gray", permiso: "CONFIGURAR_SALON", soloEscritorio: true },
-  { to: "/facturacion", label: "Facturación SRI", icono: "receipt", tint: "pink", permiso: "CONFIGURAR_SRI", pronto: true },
+  { to: "/facturacion", label: "Facturación SRI", icono: "receipt", tint: "pink", permiso: "CONFIGURAR_SRI" },
   { to: "/ajustes", label: "Ajustes", icono: "ajustes", tint: "gray", permiso: "CONFIGURAR_SALON" },
 ] as const;
 
@@ -29,7 +29,7 @@ export function Shell() {
           <NavLink key={s.to} to={s.to} end={s.to === "/"} className="navlink">
             <AppIcon icono={s.icono} tint={s.tint} size={30} />
             {s.label}
-            {"pronto" in s && s.pronto && <span className="soon">Pronto</span>}
+            {(s as { pronto?: boolean }).pronto && <span className="soon">Pronto</span>}
           </NavLink>
         ))}
         <div className="sidebar-foot">
@@ -48,7 +48,7 @@ export function Shell() {
         <Outlet />
       </main>
       <nav className="rp-tabbar tabbar-movil" aria-label="Secciones">
-        {visibles.filter((s) => !("pronto" in s && s.pronto) && !("soloEscritorio" in s)).slice(0, 5).map((s) => (
+        {visibles.filter((s) => !((s as { pronto?: boolean }).pronto) && !("soloEscritorio" in s)).slice(0, 5).map((s) => (
           <NavLink key={s.to} to={s.to} end={s.to === "/"} className="rp-tab"
             style={({ isActive }) => ({ color: isActive ? "var(--rp-color-accent)" : undefined })}>
             <Icon name={s.icono} size={24} />

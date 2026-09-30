@@ -10,6 +10,7 @@ import (
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/auth"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/caja"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/catalogo"
+	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/facturacion"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/imagenes"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/impresoras"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/nodos"
@@ -49,6 +50,7 @@ type Deps struct {
 	Impresoras    *impresoras.Service
 	Caja          *caja.Service
 	Clientes      *caja.Clientes
+	Facturacion   *facturacion.Service
 	BackofficeURL string
 }
 
@@ -56,6 +58,7 @@ type Deps struct {
 func Routes(d Deps) []Route {
 	s, c, pe := d.Salon, d.Catalogo, d.Personal
 	menu, sal, per, cja := con(rbac.ConfigurarMenu), con(rbac.ConfigurarSalon), con(rbac.GestionarPersonal), con(rbac.ConfigurarCaja)
+	sri := con(rbac.ConfigurarSRI)
 	return []Route{
 		{"GET", "/health", publico, func(w http.ResponseWriter, r *http.Request) { httpx.JSON(w, 200, map[string]string{"estado": "ok"}) }},
 		{"GET", "/ready", publico, ready(d.DB)},
@@ -137,6 +140,9 @@ func Routes(d Deps) []Route {
 		{"POST", "/v1/cajas", cja, create(d.Caja.CrearCaja)},
 		{"PUT", "/v1/cajas/{id}", cja, update(d.Caja.ActualizarCaja)},
 		{"DELETE", "/v1/cajas/{id}", cja, remove(d.Caja.EliminarCaja)},
+		{"GET", "/v1/facturacion", sri, list(d.Facturacion.Obtener)},
+		{"PUT", "/v1/facturacion", sri, create(d.Facturacion.Guardar)},
+		{"PUT", "/v1/cajas/{id}/punto-emision", sri, update(d.Facturacion.AsignarPunto)},
 		{"GET", "/v1/metodos-pago", cja, list(d.Caja.Metodos)},
 		{"POST", "/v1/metodos-pago", cja, create(d.Caja.CrearMetodo)},
 		{"PUT", "/v1/metodos-pago/{id}", cja, update(d.Caja.ActualizarMetodo)},

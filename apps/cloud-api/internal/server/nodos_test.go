@@ -104,6 +104,9 @@ func (c *cliente) nodoOperativo() *nodoSim {
 	// Un turno cerrado en el nodo: su Cierre Z llega y se envía al dueño.
 	var cajas []caja.Caja
 	c.do("GET", "/v1/cajas", nil, 200, &cajas)
+	// Facturación configurada con el punto de emisión de la caja (F5-02).
+	c.do("PUT", "/v1/cajas/"+cajas[0].ID.String()+"/punto-emision", map[string]any{"establecimiento": "001", "puntoEmision": "001"}, 200, nil)
+	c.do("PUT", "/v1/facturacion", map[string]any{"ambiente": 1, "razonSocial": "Emisor de prueba", "direccionMatriz": "Quito", "regimen": "GENERAL"}, 201, nil)
 	n.cierreZ(cajas[0].ID, 1, "", "-0.50")
 	c.e.notificarCierres()
 	n.cliente(caja.Cliente{ID: ids.New(), TipoIdentificacion: "05", Identificacion: "1710034065", RazonSocial: "María Pérez", Email: "maria@example.com",

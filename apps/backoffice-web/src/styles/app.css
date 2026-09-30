@@ -328,3 +328,10 @@ h1, h2, h3 { text-wrap: balance; margin: 0; }
 .inst-fila__txt b, .inst-fila__txt span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .inst-fila__txt span { font-size: 13px; }
 @media (max-width: 420px) { .inst-fila { flex-wrap: wrap; } .inst-fila__txt { flex-basis: calc(100% - 50px); } }
+
+/* ---------- Facturación SRI (F5-02) ---------- */
+.pendientes { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; color: var(--rp-color-warning-text); }
+.pendientes li { display: flex; align-items: center; gap: 8px; }
+.punto-fila { flex-wrap: wrap; }
+.punto-fila .serie { width: 58px; min-height: 36px; text-align: center; font: 600 16px/1 var(--rp-font-text); letter-spacing: 1px; border-radius: 10px;
+  border: 1px solid var(--rp-color-separator); background: var(--rp-color-background); color: var(--rp-color-label); }

@@ -22,6 +22,7 @@ import (
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/auth"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/caja"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/catalogo"
+	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/facturacion"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/imagenes"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/impresoras"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/nodos"
@@ -160,7 +161,7 @@ func serve(ctx context.Context) error {
 		Auth:  &auth.Handlers{Svc: &auth.Service{DB: app.DB, Signer: app.Signer, Mail: app.Mail, Clock: app.Clock, BackofficeURL: cfg.BackofficeURL}, CookieSecure: cfg.CookieSecure},
 		Salon: app.Salon, Catalogo: app.Catalogo, Personal: app.Personal, Imagenes: app.Imagenes,
 		Nodos: nodos.New(app.DB, app.Clock, cfg.PINPepper), Impresoras: &impresoras.Service{DB: app.DB, Clock: app.Clock},
-		Caja: &caja.Service{DB: app.DB}, Clientes: &caja.Clientes{DB: app.DB},
+		Caja: &caja.Service{DB: app.DB}, Clientes: &caja.Clientes{DB: app.DB}, Facturacion: &facturacion.Service{DB: app.DB},
 	}
 	go deps.Nodos.Avisos.Escuchar(ctx, app.DB.Pool, slog.Default())
 	go (&caja.Notificador{DB: app.DB, Mail: app.Mail, Log: slog.Default()}).Correr(ctx, app.DB.Pool)

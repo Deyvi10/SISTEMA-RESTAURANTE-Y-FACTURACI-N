@@ -268,6 +268,13 @@ func (s *Service) Activar(ctx context.Context, in Activacion, ip string) (Activa
 				}
 				return err
 			}
+			// Los puntos de emisión del local pasan al nodo nuevo si no tenían dueño o era uno
+			// revocado (PC reemplazada); sigue la numeración desde ultimos_secuenciales (F5-02).
+			if _, err := tx.Exec(ctx, `UPDATE puntos_emision SET nodo_id = $2, updated_at = now(), version = version + 1
+				WHERE local_id = $1 AND deleted_at IS NULL
+				AND (nodo_id IS NULL OR nodo_id IN (SELECT id FROM nodos WHERE estado = 'REVOCADO'))`, localID, in.NodoID); err != nil {
+				return err
+			}
 		}
 		return tx.QueryRow(ctx, `SELECT l.nombre, t.nombre_comercial FROM locales l JOIN tenants t ON t.id = l.tenant_id WHERE l.id = $1`, localID).
 			Scan(&out.NombreLocal, &out.NombreComercial)

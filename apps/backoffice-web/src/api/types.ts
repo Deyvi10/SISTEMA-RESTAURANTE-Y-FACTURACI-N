@@ -240,6 +240,36 @@ export interface ImpresoraInstalada {
 
 // ---------- Caja (F4-03, F4-06, F4-09) ----------
 
+export type Regimen = "GENERAL" | "RIMPE_EMPRENDEDOR" | "RIMPE_NEGOCIO_POPULAR";
+
+/** Caja con su serie del SRI (establecimiento-punto). */
+export interface PuntoCaja {
+  cajaId: string;
+  caja: string;
+  localId: string;
+  puntoId: string | null;
+  establecimiento: string | null;
+  puntoEmision: string | null;
+  conNodo: boolean;
+}
+
+/** Datos tributarios del emisor y estado de la facturación electrónica (F5-02, F5-06). */
+export interface ConfigFiscal {
+  guardada: boolean;
+  ambiente: 1 | 2;
+  ruc: string;
+  razonSocial: string;
+  nombreComercial: string | null;
+  direccionMatriz: string;
+  obligadoContabilidad: boolean;
+  contribuyenteEspecial: string | null;
+  agenteRetencion: string | null;
+  regimen: Regimen;
+  facturacionActiva: boolean;
+  cajas: PuntoCaja[];
+  pendientes: string[];
+}
+
 export interface Caja {
   id: string;
   localId: string;

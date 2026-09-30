@@ -1,8 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { del, get, post, put, patch } from "./client";
 import type {
-  Caja, Categoria, CodigoNodo, MetodoPago, MotivoDescuento, ComandoNodo, Estacion, Impresora, ImpresoraInstalada, FotoGaleria, Grupo, IconoCategoria, Imagen, Local, Mesa, NodoLocal, PermisosPersona, Persona, Producto, Resumen, TarifaIVA, Zona,
-} from "./types";
+  Caja, Categoria, CodigoNodo, MetodoPago, MotivoDescuento, ComandoNodo, Estacion, Impresora, ImpresoraInstalada, FotoGaleria, Grupo, IconoCategoria, Imagen, Local, Mesa, NodoLocal, PermisosPersona, Persona, Producto, Resumen, TarifaIVA, Zona, ConfigFiscal } from "./types";
 
 export const useResumen = () => useQuery({ queryKey: ["resumen"], queryFn: () => get<Resumen>("/v1/resumen") });
 export const useTarifas = () => useQuery({ queryKey: ["tarifas"], queryFn: () => get<TarifaIVA[]>("/v1/tarifas-iva"), staleTime: Infinity });
@@ -20,6 +19,7 @@ export const useNodos = () => useQuery({ queryKey: ["nodos"], queryFn: () => get
 export const useInstaladas = () => useQuery({ queryKey: ["impresoras", "instaladas"], queryFn: () => get<ImpresoraInstalada[]>("/v1/impresoras/instaladas"), refetchInterval: 30_000 });
 export const useImpresoras = () => useQuery({ queryKey: ["impresoras"], queryFn: () => get<Impresora[]>("/v1/impresoras"), refetchInterval: 10_000 });
 export const useCajas = () => useQuery({ queryKey: ["cajas"], queryFn: () => get<Caja[]>("/v1/cajas") });
+export const useFacturacion = () => useQuery({ queryKey: ["facturacion"], queryFn: () => get<ConfigFiscal>("/v1/facturacion") });
 export const useMetodosPago = () => useQuery({ queryKey: ["metodos-pago"], queryFn: () => get<MetodoPago[]>("/v1/metodos-pago") });
 export const useMotivos = () => useQuery({ queryKey: ["motivos-descuento"], queryFn: () => get<MotivoDescuento[]>("/v1/motivos-descuento") });
 export const usePersonal = () => useQuery({ queryKey: ["personal"], queryFn: () => get<Persona[]>("/v1/usuarios") });
@@ -40,6 +40,8 @@ export function useGuardar<TIn, TOut>(fn: (v: TIn) => Promise<TOut>, invalida: s
 export const api = {
   crearCaja: (b: object) => post<Caja>("/v1/cajas", b),
   editarCaja: (id: string, b: object) => put<Caja>(`/v1/cajas/${id}`, b),
+  guardarFacturacion: (b: object) => put<ConfigFiscal>("/v1/facturacion", b),
+  asignarPunto: (cajaId: string, b: { establecimiento: string; puntoEmision: string }) => put<ConfigFiscal>(`/v1/cajas/${cajaId}/punto-emision`, b),
   borrarCaja: (id: string) => del(`/v1/cajas/${id}`),
   crearMetodo: (b: object) => post<MetodoPago>("/v1/metodos-pago", b),
   editarMetodo: (id: string, b: object) => put<MetodoPago>(`/v1/metodos-pago/${id}`, b),

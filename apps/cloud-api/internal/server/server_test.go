@@ -20,6 +20,7 @@ import (
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/auth"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/caja"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/catalogo"
+	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/facturacion"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/imagenes"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/impresoras"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/nodos"
@@ -57,7 +58,7 @@ func newEnv(t *testing.T) *env {
 		Imagenes:   img,
 		Nodos:      nodos.New(tdb.App, clk, []byte("pepper-de-pruebas-0123456789abcdef")),
 		Impresoras: &impresoras.Service{DB: tdb.App, Clock: clk},
-		Caja:       &caja.Service{DB: tdb.App}, Clientes: &caja.Clientes{DB: tdb.App},
+		Caja:       &caja.Service{DB: tdb.App}, Clientes: &caja.Clientes{DB: tdb.App}, Facturacion: &facturacion.Service{DB: tdb.App},
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
