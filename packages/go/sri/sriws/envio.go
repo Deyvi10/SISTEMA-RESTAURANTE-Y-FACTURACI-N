@@ -3,6 +3,7 @@ package sriws
 import (
 	"context"
 	"errors"
+	"math/rand/v2"
 	"time"
 
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/sri"
@@ -41,16 +42,20 @@ type Politica struct {
 	EsperaTrasRecepcion time.Duration   // antes de la primera consulta
 	EsperaEnProceso     time.Duration   // entre consultas mientras el SRI procesa
 	Reintentos          []time.Duration // tras errores transitorios (el último se repite)
+	// Jitter suma al azar hasta este porcentaje de la espera, para que muchos comprobantes
+	// detenidos por la misma caída no vuelvan todos en el mismo segundo.
+	Jitter int
 	// Alerta: tiempo tras RECIBIDA en que el SRI debió responder (ficha: hasta 24 h).
 	Alerta time.Duration
 }
 
-// PoliticaPorDefecto: 3 s para la primera consulta, 10 s entre consultas, reintentos de
-// 5 s a 15 min, alerta a las 24 h.
+// PoliticaPorDefecto: 3 s para la primera consulta, 10 s entre consultas, reintentos a 1, 2, 5,
+// 15 y 30 min y luego cada 30 min, con jitter de hasta 20 % (RF-05-04.1), alerta a las 24 h.
 var PoliticaPorDefecto = Politica{
 	EsperaTrasRecepcion: 3 * time.Second,
 	EsperaEnProceso:     10 * time.Second,
-	Reintentos:          []time.Duration{5 * time.Second, 15 * time.Second, time.Minute, 5 * time.Minute, 15 * time.Minute},
+	Reintentos:          []time.Duration{time.Minute, 2 * time.Minute, 5 * time.Minute, 15 * time.Minute, 30 * time.Minute},
+	Jitter:              20,
 	Alerta:              24 * time.Hour,
 }
 
@@ -118,6 +123,9 @@ func (e Envio) fallo(err error, ahora time.Time, p Politica) Envio {
 		e.UltimoError = "no transitorio: " + e.UltimoError
 	}
 	espera := p.Reintentos[min(e.Intentos, len(p.Reintentos)-1)]
+	if p.Jitter > 0 {
+		espera += rand.N(espera*time.Duration(p.Jitter)/100 + 1)
+	}
 	e.Intentos++
 	e.Proximo = ahora.Add(espera)
 	return e

@@ -121,8 +121,11 @@ func TestErroresTransitoriosReintentan(t *testing.T) {
 		if e.Fase != PorEnviar || e.Intentos != 3 || e.UltimoError == "" {
 			t.Fatalf("%d: %+v", sec, e)
 		}
-		if esperas[0] != 5*time.Second || esperas[1] != 15*time.Second || esperas[2] != time.Minute {
-			t.Fatalf("%d: esperas %v", sec, esperas)
+		// RF-05-04.1: 1, 2 y 5 min, cada una con hasta 20 % de jitter.
+		for i, base := range []time.Duration{time.Minute, 2 * time.Minute, 5 * time.Minute} {
+			if esperas[i] < base || esperas[i] > base+base/5 {
+				t.Fatalf("%d: esperas %v", sec, esperas)
+			}
 		}
 	}
 }
@@ -252,5 +255,17 @@ func TestXMLAutorizado(t *testing.T) {
 	}
 	if _, err := XMLAutorizado([]byte("a]]>b"), "1", fecha, sri.AmbientePruebas); err == nil {
 		t.Fatal("]]> no cabe en CDATA")
+	}
+}
+
+func TestExplicarErroresDelSRI(t *testing.T) {
+	if e := Explicar(Mensaje{Identificador: "39", Mensaje: "FIRMA INVALIDA"}); e.Soporte || e.Que == "" || e.Accion == "" {
+		t.Fatalf("39: %+v", e)
+	}
+	if e := Explicar(Mensaje{Identificador: "52"}); !e.Soporte {
+		t.Fatal("las diferencias de cálculo las resuelve el soporte")
+	}
+	if e := Explicar(Mensaje{Identificador: "999", Mensaje: "ALGO NUEVO"}); e.Que != "El SRI respondió: 999 ALGO NUEVO" {
+		t.Fatalf("desconocido: %+v", e)
 	}
 }

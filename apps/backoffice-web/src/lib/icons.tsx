@@ -3,7 +3,7 @@
 import {
   ArrowLeftRight, Armchair, Banknote, CreditCard, Wallet, Beef, Beer, CakeSlice, Camera, Check, ChefHat, Cherry, ChevronLeft, ChevronRight, CircleAlert,
   CircleCheck, Citrus, Clock, CloudOff, Coffee, Copy, HardDrive, RefreshCw, Server, Activity, Cookie, CookingPot, Croissant, Crown, CupSoda, Dessert, Donut,
-  Drumstick, EggFried, Eye, EyeOff, Fish, Flame, GlassWater, GripVertical, Ham, House, IceCreamCone, ImagePlus,
+  Download, Drumstick, EggFried, Eye, EyeOff, Fish, Flame, GlassWater, GripVertical, Ham, House, IceCreamCone, ImagePlus,
   Images, Info, KeyRound, LayoutGrid, LogOut, type LucideIcon, Mail, MapPin, Martini, Milk, Minus, Monitor, Pencil,
   Percent, Pizza, Plus, Popcorn, Printer, QrCode, Receipt, Rocket, Salad, Sandwich, Search, Settings, ShieldCheck,
   Snowflake, Soup, Sparkles, Sprout, Store, Tag, Trash2, TrendingUp, Upload, Users, Utensils, UtensilsCrossed,
@@ -23,7 +23,7 @@ export const ICONOS: Record<string, LucideIcon> = {
   // interfaz
   inicio: House, salon: LayoutGrid, personal: Users, ajustes: Settings, salir: LogOut, agregar: Plus, buscar: Search,
   cerrar: X, ok: Check, chevronRight: ChevronRight, chevronLeft: ChevronLeft, camara: Camera, galeria: Images,
-  subir: Upload, fotoNueva: ImagePlus, eliminar: Trash2, editar: Pencil, correo: Mail, ver: Eye, ocultar: EyeOff,
+  subir: Upload, descargar: Download, fotoNueva: ImagePlus, eliminar: Trash2, editar: Pencil, correo: Mail, ver: Eye, ocultar: EyeOff,
   sinInternet: WifiOff, enLinea: Wifi, magia: Sparkles, tienda: Store, mesa: Armchair, arrastrar: GripVertical,
   etiqueta: Tag, exito: CircleCheck, error: CircleAlert, info: Info, pin: KeyRound, seguro: ShieldCheck,
   tiempo: Clock, ubicacion: MapPin, porcentaje: Percent, nube: CloudOff, cohete: Rocket, qr: QrCode, menos: Minus,

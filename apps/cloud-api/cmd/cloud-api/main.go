@@ -184,6 +184,7 @@ func serve(ctx context.Context) error {
 	} else {
 		slog.Warn("sin KEK pública: no se pueden subir firmas electrónicas", "archivo", cfg.KEKPublicaFile)
 	}
+	archivador := &archivo.Archivador{DB: app.DB, Store: app.Comprobantes, Log: slog.Default(), Now: app.Clock.Now}
 	deps := server.Deps{
 		DB: app.DB, Signer: app.Signer, Now: app.Clock.Now, BackofficeURL: cfg.BackofficeURL,
 		Auth:  &auth.Handlers{Svc: &auth.Service{DB: app.DB, Signer: app.Signer, Mail: app.Mail, Clock: app.Clock, BackofficeURL: cfg.BackofficeURL}, CookieSecure: cfg.CookieSecure},
@@ -191,11 +192,13 @@ func serve(ctx context.Context) error {
 		Nodos: nodos.New(app.DB, app.Clock, cfg.PINPepper), Impresoras: &impresoras.Service{DB: app.DB, Clock: app.Clock},
 		Caja: &caja.Service{DB: app.DB}, Clientes: &caja.Clientes{DB: app.DB}, Facturacion: &facturacion.Service{DB: app.DB},
 		Certificados: &certificados.Service{DB: app.DB, KEK: kek, Now: app.Clock.Now},
+		Boveda: &facturacion.Boveda{DB: app.DB, Correos: &facturacion.Correos{DB: app.DB, Mail: app.Mail, Log: slog.Default()},
+			Archivo: archivador},
 	}
 	go deps.Nodos.Avisos.Escuchar(ctx, app.DB.Pool, slog.Default())
 	go (&caja.Notificador{DB: app.DB, Mail: app.Mail, Log: slog.Default()}).Correr(ctx, app.DB.Pool)
-	go (&facturacion.Correos{DB: app.DB, Mail: app.Mail, Log: slog.Default()}).Correr(ctx, app.DB.Pool)
-	go (&archivo.Archivador{DB: app.DB, Store: app.Comprobantes, Log: slog.Default(), Now: app.Clock.Now}).Correr(ctx)
+	go deps.Boveda.Correos.Correr(ctx, app.DB.Pool)
+	go archivador.Correr(ctx)
 	srv := &http.Server{
 		Addr: cfg.HTTPAddr, Handler: server.Handler(deps, server.Routes(deps)),
 		ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 30 * time.Second, WriteTimeout: 60 * time.Second, IdleTimeout: 120 * time.Second,

@@ -332,3 +332,44 @@ export interface PermisosPersona {
   /** Límite propio de descuento sin autorización; null = el del local. */
   descuentoMaximoPct: string | null;
 }
+
+/** Grupo de estado de un comprobante en la bóveda (RF-05-07). */
+export type GrupoComprobante = "ENVIADO" | "AUTORIZADO" | "NO_AUTORIZADO" | "REQUIERE_ATENCION" | "ANULADO";
+
+export interface Explicacion {
+  que: string;
+  accion: string;
+  soporte: boolean;
+}
+
+export interface FilaComprobante {
+  id: string;
+  tipo: "01" | "04";
+  numero: string;
+  claveAcceso: string;
+  fechaEmision: string;
+  comprador: string | null;
+  identificacion: string | null;
+  importeTotal: string;
+  ambiente: 1 | 2;
+  estado: string;
+  grupo: GrupoComprobante;
+  serie: string;
+  tieneCorreo: boolean;
+  correoEnviado: boolean;
+  explicacion?: Explicacion;
+  fechaAutorizacion: string | null;
+}
+
+export interface ListaComprobantes {
+  filas: FilaComprobante[];
+  siguiente: string | null;
+  pendientes: Partial<Record<GrupoComprobante, number>>;
+}
+
+export interface DetalleComprobante extends FilaComprobante {
+  correo: string | null;
+  eventos: { estado: string; fecha: string; detalle: Record<string, unknown> }[];
+  correos: { destino: string; motivo: string; ok: boolean; fecha: string }[];
+  mensajes: { Identificador: string; Mensaje: string; InformacionAdicional: string; Tipo: string }[];
+}

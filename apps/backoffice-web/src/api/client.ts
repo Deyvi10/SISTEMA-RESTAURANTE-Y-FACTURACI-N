@@ -84,6 +84,29 @@ export async function api<T>(method: string, path: string, body?: Body, retry = 
   return (await r.json()) as T;
 }
 
+/** Descarga un archivo autenticado (XML o PDF de un comprobante) y lo guarda con su nombre. */
+export async function descargar(path: string, retry = true): Promise<void> {
+  const headers: Record<string, string> = {};
+  if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+  let r: Response;
+  try {
+    r = await fetch(path, { headers, credentials: "include" });
+  } catch {
+    throw new ApiError(0, "SIN_CONEXION", "No hay conexión con el servidor. Revisa tu internet.");
+  }
+  if (r.status === 401 && retry && (await refreshSession())) return descargar(path, false);
+  if (!r.ok) throw await toError(r);
+  const nombre = /filename="([^"]+)"/.exec(r.headers.get("Content-Disposition") ?? "")?.[1] ?? "comprobante";
+  const url = URL.createObjectURL(await r.blob());
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = nombre;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 export const get = <T>(p: string) => api<T>("GET", p);
 export const post = <T>(p: string, b?: Body) => api<T>("POST", p, b);
 export const put = <T>(p: string, b?: Body) => api<T>("PUT", p, b);

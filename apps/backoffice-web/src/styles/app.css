@@ -337,3 +337,43 @@ h1, h2, h3 { text-wrap: balance; margin: 0; }
 .punto-fila { flex-wrap: wrap; }
 .punto-fila .serie { width: 58px; min-height: 36px; text-align: center; font: 600 16px/1 var(--rp-font-text); letter-spacing: 1px; border-radius: 10px;
   border: 1px solid var(--rp-color-separator); background: var(--rp-color-background); color: var(--rp-color-label); }
+
+/* Bóveda de comprobantes (F5-12) */
+.pendientes-fiscales { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
+.pendiente-fiscal { display: flex; align-items: baseline; gap: 6px; padding: 10px 14px; border: 0; border-radius: 14px; font: inherit; cursor: pointer;
+  background: var(--rp-color-fill); color: var(--rp-color-label-secondary); }
+.pendiente-fiscal strong { font-size: 22px; color: var(--rp-color-label); font-variant-numeric: tabular-nums; }
+.pendiente-fiscal[data-tono="warning"] { background: var(--rp-color-warning-soft); color: var(--rp-color-warning-text); }
+.pendiente-fiscal[data-tono="warning"] strong { color: var(--rp-color-warning-text); }
+.pendiente-fiscal[data-tono="danger"] { background: var(--rp-color-danger-soft); color: var(--rp-color-danger-text); }
+.pendiente-fiscal[data-tono="danger"] strong { color: var(--rp-color-danger-text); }
+.boveda-filtros { display: flex; flex-direction: column; gap: 10px; }
+.boveda-fechas { display: flex; gap: 12px; flex-wrap: wrap; color: var(--rp-color-label-secondary); font-size: 14px; }
+.boveda-fechas label { display: flex; align-items: center; gap: 6px; }
+.boveda-fechas input { min-height: 36px; padding: 0 8px; border: 0; border-radius: 10px; background: var(--rp-color-fill); color: var(--rp-color-label); font: inherit; }
+.comprobante-fila { width: 100%; text-align: left; }
+.comprobante-fila .rp-cell__subtitle { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.comprobante-total { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
+.comprobante-por-que { color: var(--rp-color-warning-text); }
+.marca-pruebas { margin-left: 8px; padding: 1px 6px; border-radius: 6px; background: var(--rp-color-fill); color: var(--rp-color-label-secondary); font-size: 11px; font-weight: 600; text-transform: uppercase; }
+.cargar-mas { margin-top: 12px; }
+.comprobante-detalle { display: flex; flex-direction: column; gap: 16px; padding: 4px 16px 16px; }
+.comprobante-resumen { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.comprobante-importe { font-size: 34px; font-variant-numeric: tabular-nums; }
+.comprobante-resumen .clave { font-size: 12px; word-break: break-all; color: var(--rp-color-label-secondary); }
+.explicacion-sri { padding: 12px 14px; border-radius: 12px; background: var(--rp-color-warning-soft); color: var(--rp-color-warning-text); }
+.explicacion-sri[data-tono="danger"] { background: var(--rp-color-danger-soft); color: var(--rp-color-danger-text); }
+.explicacion-sri p { margin: 0 0 4px; }
+.acciones-comprobante { display: flex; gap: 8px; flex-wrap: wrap; }
+.acciones-comprobante .rp-btn, .reenviar .rp-btn { display: inline-flex; align-items: center; gap: 6px; }
+.reenviar { display: flex; flex-direction: column; gap: 8px; }
+.historia-titulo { margin: 0; font-size: 15px; }
+.historia { list-style: none; margin: 0; padding: 0 0 0 14px; border-left: 2px solid var(--rp-color-separator); display: flex; flex-direction: column; gap: 10px; }
+.historia li { position: relative; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.historia li::before { content: ""; position: absolute; left: -20px; top: 6px; width: 10px; height: 10px; border-radius: 50%; background: var(--rp-color-accent); }
+.historia time { margin-left: auto; color: var(--rp-color-label-secondary); font-size: 13px; }
+.pildora-movil { display: none; }
+@media (max-width: 640px) {
+  .pildora-escritorio { display: none; }
+  .pildora-movil { display: inline-flex; height: 22px; margin-right: 6px; padding: 0 8px; font-size: 12px; vertical-align: middle; }
+}

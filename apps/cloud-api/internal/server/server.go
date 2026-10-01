@@ -53,6 +53,7 @@ type Deps struct {
 	Clientes      *caja.Clientes
 	Facturacion   *facturacion.Service
 	Certificados  *certificados.Service
+	Boveda        *facturacion.Boveda
 	BackofficeURL string
 }
 
@@ -61,6 +62,7 @@ func Routes(d Deps) []Route {
 	s, c, pe := d.Salon, d.Catalogo, d.Personal
 	menu, sal, per, cja := con(rbac.ConfigurarMenu), con(rbac.ConfigurarSalon), con(rbac.GestionarPersonal), con(rbac.ConfigurarCaja)
 	sri := con(rbac.ConfigurarSRI)
+	reportes := con(rbac.VerReportes)
 	return []Route{
 		{"GET", "/health", publico, func(w http.ResponseWriter, r *http.Request) { httpx.JSON(w, 200, map[string]string{"estado": "ok"}) }},
 		{"GET", "/ready", publico, ready(d.DB)},
@@ -145,6 +147,12 @@ func Routes(d Deps) []Route {
 		{"GET", "/v1/facturacion", sri, list(d.Facturacion.Obtener)},
 		{"PUT", "/v1/facturacion", sri, create(d.Facturacion.Guardar)},
 		{"PUT", "/v1/cajas/{id}/punto-emision", sri, update(d.Facturacion.AsignarPunto)},
+		{"GET", "/v1/comprobantes", reportes, d.Boveda.HandleListar},
+		{"GET", "/v1/comprobantes/{id}", reportes, get(d.Boveda.Obtener)},
+		{"GET", "/v1/comprobantes/{id}/xml", reportes, d.Boveda.HandleDescargar("xml")},
+		{"GET", "/v1/comprobantes/{id}/pdf", reportes, d.Boveda.HandleDescargar("pdf")},
+		{"POST", "/v1/comprobantes/{id}/reenviar", reportes, updateNoContent(d.Boveda.Reenviar)},
+		{"POST", "/v1/comprobantes/{id}/reintentar", sri, update(d.Boveda.Reintentar)},
 		{"GET", "/v1/facturacion/certificado", sri, d.Certificados.HandleActivo},
 		{"POST", "/v1/facturacion/certificado", sri, d.Certificados.HandleSubir},
 		{"GET", "/v1/metodos-pago", cja, list(d.Caja.Metodos)},

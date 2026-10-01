@@ -4,6 +4,7 @@ import { Spinner } from "./components/ui";
 import { Shell } from "./layout/Shell";
 import { CambiarClave, Login, Olvide, Restablecer } from "./pages/Acceso";
 import { Caja } from "./pages/Caja";
+import { Comprobantes } from "./pages/Comprobantes";
 import { Facturacion } from "./pages/Facturacion";
 import { Inicio } from "./pages/Inicio";
 import { Impresoras } from "./pages/Impresoras";
@@ -44,6 +45,7 @@ export function App() {
         <Route path="impresoras" element={<Impresoras />} />
         <Route path="caja" element={<Caja />} />
         <Route path="facturacion" element={<Facturacion />} />
+        <Route path="comprobantes" element={<Comprobantes />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

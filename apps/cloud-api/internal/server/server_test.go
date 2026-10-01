@@ -18,6 +18,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/archivo"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/auth"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/caja"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/catalogo"
@@ -90,6 +91,8 @@ func newEnv(t *testing.T) *env {
 		Impresoras: &impresoras.Service{DB: tdb.App, Clock: clk},
 		Caja:       &caja.Service{DB: tdb.App}, Clientes: &caja.Clientes{DB: tdb.App}, Facturacion: &facturacion.Service{DB: tdb.App},
 		Certificados: &certificados.Service{DB: tdb.App, KEK: pub, Now: clk.Now},
+		Boveda: &facturacion.Boveda{DB: tdb.App, Correos: &facturacion.Correos{DB: tdb.App, Mail: m, Log: slog.Default()},
+			Archivo: &archivo.Archivador{DB: tdb.App, Store: &imagenes.Memory{}, Log: slog.Default(), Now: clk.Now}},
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
