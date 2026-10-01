@@ -3,6 +3,7 @@ package server_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/caja"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/facturacion"
@@ -111,5 +112,50 @@ func TestNodoNuevoHeredaLosPuntosDeEmision(t *testing.T) {
 	nuevo.activar(c.codigoNodo().Codigo, 200)
 	if dueno() != nuevo.id {
 		t.Fatal("al reemplazar la PC, el nodo nuevo es el dueño de la numeración")
+	}
+}
+
+// F5-14: un cambio de régimen se programa con fecha futura, llega al nodo por la réplica y, al
+// llegar su fecha, pasa a ser la configuración actual.
+func TestCambioDeRegimenProgramado(t *testing.T) {
+	e := newEnv(t)
+	c, r := e.restaurante("1790011674001", "reg@f.ec")
+	datos := map[string]any{"ambiente": 1, "razonSocial": "Distribuidora", "direccionMatriz": "Quito", "regimen": "GENERAL", "facturacionActiva": false}
+	cambio := map[string]any{"desde": time.Now().AddDate(0, 0, 10).Format(time.DateOnly), "regimen": "RIMPE_EMPRENDEDOR", "obligadoContabilidad": true, "agenteRetencion": "7"}
+	c.do("PUT", "/v1/facturacion/cambio-programado", cambio, 409, nil) // sin datos del emisor todavía
+	var cfg facturacion.Config
+	c.do("PUT", "/v1/facturacion", datos, 201, &cfg)
+	ayer := map[string]any{"desde": time.Now().AddDate(0, 0, -1).Format(time.DateOnly), "regimen": "RIMPE_EMPRENDEDOR", "obligadoContabilidad": true}
+	c.do("PUT", "/v1/facturacion/cambio-programado", ayer, 422, nil) // no retroactivo
+	c.do("PUT", "/v1/facturacion/cambio-programado", cambio, 201, &cfg)
+	if cfg.Regimen != "GENERAL" || cfg.CambioProgramado == nil || cfg.CambioProgramado.Regimen != "RIMPE_EMPRENDEDOR" || !cfg.CambioProgramado.ObligadoContabilidad ||
+		cfg.CambioProgramado.AgenteRetencion == nil || *cfg.CambioProgramado.AgenteRetencion != "7" {
+		t.Fatalf("programado: %+v", cfg)
+	}
+	ctx := context.Background()
+	// Llega al nodo con la réplica (para que emita con lo vigente en cada fecha).
+	var replicado string
+	_ = e.tdb.Admin.QueryRow(ctx, `SELECT datos->>'cambio_regimen' FROM sync_cambios WHERE tenant_id = $1 AND tabla = 'configuracion_fiscal' ORDER BY seq DESC LIMIT 1`, r.TenantID).Scan(&replicado)
+	if replicado != "RIMPE_EMPRENDEDOR" {
+		t.Fatalf("réplica: %q", replicado)
+	}
+	// Cancelar y volver a programar.
+	c.do("DELETE", "/v1/facturacion/cambio-programado", nil, 200, &cfg)
+	if cfg.CambioProgramado != nil {
+		t.Fatal("cancelado")
+	}
+	c.do("PUT", "/v1/facturacion/cambio-programado", cambio, 201, &cfg)
+	// Llegó la fecha: pasa a ser lo actual.
+	if _, err := e.tdb.Admin.Exec(ctx, `UPDATE configuracion_fiscal SET cambio_desde = current_date - 1 WHERE tenant_id = $1`, r.TenantID); err != nil {
+		t.Fatal(err)
+	}
+	c.do("GET", "/v1/facturacion", nil, 200, &cfg)
+	if cfg.Regimen != "RIMPE_EMPRENDEDOR" || !cfg.ObligadoContabilidad || cfg.AgenteRetencion == nil || *cfg.AgenteRetencion != "7" || cfg.CambioProgramado != nil {
+		t.Fatalf("aplicado: %+v", cfg)
+	}
+	var auditados int
+	_ = e.tdb.Admin.QueryRow(ctx, `SELECT count(*) FROM auditoria WHERE tenant_id = $1 AND accion IN ('REGIMEN_PROGRAMADO', 'REGIMEN_PROGRAMADO_CANCELADO')`, r.TenantID).Scan(&auditados)
+	if auditados != 3 {
+		t.Fatalf("auditoría: %d", auditados)
 	}
 }

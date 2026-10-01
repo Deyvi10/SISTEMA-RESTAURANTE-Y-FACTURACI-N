@@ -147,6 +147,8 @@ func Routes(d Deps) []Route {
 		{"GET", "/v1/facturacion", sri, list(d.Facturacion.Obtener)},
 		{"PUT", "/v1/facturacion", sri, create(d.Facturacion.Guardar)},
 		{"PUT", "/v1/cajas/{id}/punto-emision", sri, update(d.Facturacion.AsignarPunto)},
+		{"PUT", "/v1/facturacion/cambio-programado", sri, create(d.Facturacion.ProgramarCambio)},
+		{"DELETE", "/v1/facturacion/cambio-programado", sri, list(d.Facturacion.CancelarCambio)},
 		{"GET", "/v1/comprobantes", reportes, d.Boveda.HandleListar},
 		{"GET", "/v1/comprobantes/{id}", reportes, get(d.Boveda.Obtener)},
 		{"GET", "/v1/comprobantes/{id}/xml", reportes, d.Boveda.HandleDescargar("xml")},

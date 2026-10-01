@@ -5,7 +5,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ApiError } from "../api/client";
 import { api, useFacturacion, useGuardar } from "../api/hooks";
-import type { Certificado, ConfigFiscal, PuntoCaja, Regimen } from "../api/types";
+import type { CambioRegimen, Certificado, ConfigFiscal, PuntoCaja, Regimen } from "../api/types";
 import { useFeedback } from "../components/feedback";
 import { AppIcon, Field, Segmented, Spinner, ToggleRow } from "../components/ui";
 import { Icon } from "../lib/icons";
@@ -170,6 +170,8 @@ function FacturacionForm({ cfg }: { cfg: ConfigFiscal }) {
         </div>
       </section>
 
+      {cfg.guardada && <CambioSeccion actual={cfg.cambioProgramado} />}
+
       <section className="seccion">
         <h2>Puntos de emisión</h2>
         <p>Cada caja emite con su propia serie, por ejemplo 001-001. Cambiar la serie empieza una numeración nueva.</p>
@@ -306,6 +308,94 @@ function FirmaSeccion({ cert, ruc }: { cert: Certificado | null; ruc: string }) 
                 Cancelar
               </button>
             )}
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+const manana = () => {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  return d.toLocaleDateString("en-CA"); // AAAA-MM-DD en la hora local
+};
+
+// Cambio de régimen con fecha de vigencia (F5-14, RF-05-05): rige para los comprobantes desde
+// esa fecha; lo ya emitido no cambia.
+function CambioSeccion({ actual }: { actual: CambioRegimen | null }) {
+  const { toast } = useFeedback();
+  const [abierto, setAbierto] = useState(false);
+  const [c, setC] = useState<CambioRegimen>({ desde: manana(), regimen: "RIMPE_EMPRENDEDOR", obligadoContabilidad: false, contribuyenteEspecial: null, agenteRetencion: null });
+  const [errores, setErrores] = useState<Record<string, string>>({});
+  const programar = useGuardar(() => api.programarCambio(c), ["facturacion"]);
+  const cancelar = useGuardar(() => api.cancelarCambio(), ["facturacion"]);
+  const nombre = (r: Regimen) => REGIMENES.find((x) => x.value === r)?.label ?? r;
+
+  async function onProgramar() {
+    setErrores({});
+    try {
+      await programar.mutateAsync(undefined);
+      setAbierto(false);
+      toast("Cambio programado");
+    } catch (e) {
+      if (e instanceof ApiError) setErrores({ ...e.fields, general: Object.keys(e.fields).length ? "" : e.message });
+    }
+  }
+  return (
+    <section className="seccion" data-testid="cambio-regimen">
+      <h2>Cambio de régimen</h2>
+      <p>Si el SRI te cambia de régimen o de calificación desde una fecha, prográmalo: rige para lo que se emita desde ese día y lo ya emitido no cambia.</p>
+      {actual ? (
+        <div className="rp-group">
+          <div className="rp-cell" data-testid="cambio-actual">
+            <AppIcon icono="tiempo" tint="orange" size={30} />
+            <span className="rp-cell__body">
+              <span className="rp-cell__title">
+                Desde el {new Date(`${actual.desde}T12:00:00`).toLocaleDateString("es-EC", { day: "numeric", month: "long", year: "numeric" })}: {nombre(actual.regimen)}
+              </span>
+              <span className="rp-cell__subtitle">
+                {actual.obligadoContabilidad ? "Obligado a llevar contabilidad" : "No obligado a llevar contabilidad"}
+                {actual.contribuyenteEspecial ? ` · contribuyente especial ${actual.contribuyenteEspecial}` : ""}
+                {actual.agenteRetencion ? ` · agente de retención ${actual.agenteRetencion}` : ""}
+              </span>
+            </span>
+            <button className="rp-btn rp-btn--gray rp-btn--sm" disabled={cancelar.isPending} onClick={() => void cancelar.mutateAsync(undefined).then(() => toast("Cambio cancelado"))}>
+              Cancelar cambio
+            </button>
+          </div>
+        </div>
+      ) : !abierto ? (
+        <button className="rp-btn rp-btn--gray" onClick={() => setAbierto(true)} data-testid="programar-cambio">
+          Programar un cambio
+        </button>
+      ) : (
+        <div className="form">
+          <Field label="Desde" error={errores.desde}>
+            {(fid) => <input id={fid} type="date" min={manana()} value={c.desde} onChange={(e) => setC({ ...c, desde: e.target.value })} />}
+          </Field>
+          <Segmented label="Régimen desde esa fecha" value={c.regimen} options={REGIMENES.map((r) => ({ value: r.value, label: r.label }))} onChange={(v) => setC({ ...c, regimen: v })} />
+          <div className="rp-group">
+            <ToggleRow label="Obligado a llevar contabilidad" checked={c.obligadoContabilidad} onChange={(v) => setC({ ...c, obligadoContabilidad: v })} />
+          </div>
+          <Field label="Contribuyente especial (opcional)" error={errores.contribuyenteEspecial}>
+            {(fid) => <input id={fid} value={c.contribuyenteEspecial ?? ""} maxLength={13} onChange={(e) => setC({ ...c, contribuyenteEspecial: e.target.value || null })} />}
+          </Field>
+          <Field label="Agente de retención (opcional)" error={errores.agenteRetencion}>
+            {(fid) => <input id={fid} value={c.agenteRetencion ?? ""} inputMode="numeric" maxLength={8} onChange={(e) => setC({ ...c, agenteRetencion: e.target.value.replace(/\D/g, "") || null })} />}
+          </Field>
+          {errores.general && (
+            <p className="rp-field__error" role="alert">
+              {errores.general}
+            </p>
+          )}
+          <div className="acciones">
+            <button className="rp-btn rp-btn--primary" disabled={programar.isPending} onClick={() => void onProgramar()} data-testid="guardar-cambio">
+              Programar
+            </button>
+            <button className="rp-btn rp-btn--plain" onClick={() => setAbierto(false)}>
+              Cancelar
+            </button>
           </div>
         </div>
       )}

@@ -385,6 +385,8 @@ func (a *App) EmitirNotaCredito(ctx context.Context, d Dispositivo, u Usuario, f
 			return err
 		}
 		fecha := now.In(loc)
+		vigente := cfg.vigenteEn(fecha)
+		cfg = &vigente
 		clave, err := sri.NuevaClaveAcceso(sri.ClaveAccesoInput{FechaEmision: fecha, TipoComprobante: sri.TipoNotaCredito, RUC: cfg.RUC,
 			Ambiente: sri.Ambiente(ambiente), Establecimiento: punto.Establecimiento, PuntoEmision: punto.Punto, Secuencial: sec})
 		if err != nil {

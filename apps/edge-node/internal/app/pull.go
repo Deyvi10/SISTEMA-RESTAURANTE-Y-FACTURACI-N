@@ -35,7 +35,8 @@ type CambiosAplicados struct {
 // versionEsquemaReplica sube cuando una migración agrega columnas a tablas ya replicadas:
 // sus valores solo llegan completos con un volcado, que la huella nueva provoca.
 // 2: locales.descuento_maximo_pct y usuarios.descuento_maximo_pct (F4-09).
-const versionEsquemaReplica = 2
+// 3: configuracion_fiscal.cambio_* (cambio de régimen programado, F5-14).
+const versionEsquemaReplica = 3
 
 // huellaTablas identifica el conjunto de tablas replicadas de esta versión del nodo. Si una
 // actualización agrega tablas, sus filas pudieron llegar antes (y descartarse) con la versión

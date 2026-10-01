@@ -412,7 +412,7 @@ func (a *App) Cobrar(ctx context.Context, u Usuario, orden ids.ID, in CobrarIn) 
 		oid := o.ID.String()
 		var ride escpos.Ride
 		if fact != nil {
-			ride = rideDe(cfg, *fact, o.Mesa, u.Nombre, comprador, docPagos, recibido, vuelto)
+			ride = rideDe(&fact.Config, *fact, o.Mesa, u.Nombre, comprador, docPagos, recibido, vuelto)
 		}
 		for i, imp := range imps {
 			ticket.AbrirCajon = abreCajon && i == 0 // un solo pulso: el cajón cuelga de la primera

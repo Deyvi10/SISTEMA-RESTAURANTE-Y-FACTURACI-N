@@ -34,6 +34,22 @@ type configFiscal struct {
 	ContribuyenteEspecial string
 	AgenteRetencion       string
 	Regimen               string
+	// Cambio programado (F5-14): desde esa fecha (AAAA-MM-DD, hora del local) rige lo de abajo.
+	CambioDesde    string
+	CambioRegimen  string
+	CambioObligado bool
+	CambioEspecial string
+	CambioAgente   string
+}
+
+// vigenteEn devuelve la configuración que rige para un comprobante emitido en esa fecha (en la
+// zona del local): la actual o, si ya llegó la fecha del cambio programado, la nueva.
+func (c configFiscal) vigenteEn(fecha time.Time) configFiscal {
+	if c.CambioDesde == "" || fecha.Format(time.DateOnly) < c.CambioDesde {
+		return c
+	}
+	c.Regimen, c.ObligadoContabilidad, c.ContribuyenteEspecial, c.AgenteRetencion = c.CambioRegimen, c.CambioObligado, c.CambioEspecial, c.CambioAgente
+	return c
 }
 
 // leerConfigFiscal devuelve la configuración si la facturación electrónica está activa.
@@ -49,11 +65,15 @@ func leerConfigFiscalSiempre(ctx context.Context, q queryer) (*configFiscal, err
 
 func leerConfig(ctx context.Context, q queryer, soloActiva bool) (*configFiscal, error) {
 	var c configFiscal
-	var nombre, especial, agente sql.NullString
+	var nombre, especial, agente, cDesde, cRegimen, cEspecial, cAgente sql.NullString
 	var obligado, activa int
+	var cObligado sql.NullInt64
 	err := q.QueryRowContext(ctx, `SELECT ambiente, ruc, razon_social, nombre_comercial, direccion_matriz, obligado_contabilidad,
-		contribuyente_especial, agente_retencion, regimen, facturacion_activa FROM configuracion_fiscal LIMIT 1`).
-		Scan(&c.Ambiente, &c.RUC, &c.RazonSocial, &nombre, &c.DirMatriz, &obligado, &especial, &agente, &c.Regimen, &activa)
+		contribuyente_especial, agente_retencion, regimen, facturacion_activa,
+		cambio_desde, cambio_regimen, cambio_obligado_contabilidad, cambio_contribuyente_especial, cambio_agente_retencion
+		FROM configuracion_fiscal LIMIT 1`).
+		Scan(&c.Ambiente, &c.RUC, &c.RazonSocial, &nombre, &c.DirMatriz, &obligado, &especial, &agente, &c.Regimen, &activa,
+			&cDesde, &cRegimen, &cObligado, &cEspecial, &cAgente)
 	if errors.Is(err, sql.ErrNoRows) || (err == nil && activa == 0 && soloActiva) {
 		return nil, nil //nolint:nilnil // sin facturación: el cobro emite el documento interno
 	}
@@ -62,6 +82,10 @@ func leerConfig(ctx context.Context, q queryer, soloActiva bool) (*configFiscal,
 	}
 	c.NombreComercial, c.ContribuyenteEspecial, c.AgenteRetencion = nombre.String, especial.String, agente.String
 	c.ObligadoContabilidad = obligado == 1
+	if cDesde.Valid && len(cDesde.String) >= 10 && cRegimen.Valid {
+		c.CambioDesde, c.CambioRegimen, c.CambioObligado = cDesde.String[:10], cRegimen.String, cObligado.Int64 == 1
+		c.CambioEspecial, c.CambioAgente = cEspecial.String, cAgente.String
+	}
 	return &c, nil
 }
 
@@ -80,6 +104,7 @@ type facturaEmitida struct {
 	DirLocal    string
 	FechaLocal  time.Time
 	RUCProveedo string
+	Config      configFiscal // la vigente en la fecha de emisión (F5-14)
 }
 
 type emisionIn struct {
@@ -119,6 +144,8 @@ func prepararFactura(ctx context.Context, tx *store.Tx, cfg *configFiscal, in em
 		return f, err
 	}
 	fecha := in.Ahora.In(in.Zona)
+	vigente := cfg.vigenteEn(fecha)
+	cfg = &vigente
 	clave, err := sri.NuevaClaveAcceso(sri.ClaveAccesoInput{FechaEmision: fecha, TipoComprobante: sri.TipoFactura, RUC: cfg.RUC,
 		Ambiente: sri.Ambiente(cfg.Ambiente), Establecimiento: punto.Establecimiento, PuntoEmision: punto.Punto, Secuencial: sec})
 	if err != nil {
@@ -156,7 +183,7 @@ func prepararFactura(ctx context.Context, tx *store.Tx, cfg *configFiscal, in em
 	suma := sha256.Sum256(doc)
 	return facturaEmitida{ID: ids.New(), Numero: fmt.Sprintf("%s-%s-%09d", punto.Establecimiento, punto.Punto, sec), Clave: clave, Ambiente: cfg.Ambiente,
 		Secuencial: sec, Punto: punto, Desglose: desglose, Datos: datos, XML: doc, Hash: hex.EncodeToString(suma[:]), DirLocal: dirLocal,
-		FechaLocal: fecha, RUCProveedo: rucProveedor}, nil
+		FechaLocal: fecha, RUCProveedo: rucProveedor, Config: *cfg}, nil
 }
 
 // guardarComprobante registra la factura preparada, ya insertado su documento de venta.

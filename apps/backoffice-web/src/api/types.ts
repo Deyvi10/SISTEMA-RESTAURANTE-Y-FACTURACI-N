@@ -268,9 +268,19 @@ export interface ConfigFiscal {
   facturacionActiva: boolean;
   cajas: PuntoCaja[];
   certificado: Certificado | null;
+  cambioProgramado: CambioRegimen | null;
   pruebaAprobada: boolean;
   pendientes: string[];
   avisos: string[];
+}
+
+/** Cambio de régimen o calificaciones con fecha de vigencia (F5-14). */
+export interface CambioRegimen {
+  desde: string;
+  regimen: Regimen;
+  obligadoContabilidad: boolean;
+  contribuyenteEspecial: string | null;
+  agenteRetencion: string | null;
 }
 
 /** Firma electrónica activa (F5-07): solo sus datos visibles, nunca el archivo. */

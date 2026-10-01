@@ -219,7 +219,7 @@ sección de la ficha de cada punto, está en [`docs/fuentes/sri/README.md`](fuen
 - [x] Ficha técnica offline vigente y XSD descargados en `docs/fuentes/sri/`.
 - [x] Versión del esquema de factura y NC a usar: **1.1.0** (6 decimales en precio y cantidad; 2.1.0 solo agrega campos de transporte).
 - [ ] Plazo máximo para enviar comprobantes al SRI tras la emisión: la ficha no fija las 72 h del documento fuente (solo que el SRI procesa en hasta 24 h). Pendiente de DP-07.
-- [ ] Monto máximo para consumidor final vigente: la ficha registra su actualización (v2.22) sin dar el valor. Pendiente de DP-07; hoy es parámetro.
+- [x] Monto máximo para consumidor final: **50 USD**. Lo da la ficha v2.34 en §9.10: «si el valor de la factura es mayor a 50 USD se deberá especificar obligatoriamente los datos del adquirente». La caja y el nodo exigen comprador cuando el total pasa de 50,00; 50,00 exacto todavía va a consumidor final. Está en el parámetro global `consumidor_final_maximo` por si cambia. En la nota de crédito nunca se admite consumidor final (nota de la Tabla 6).
 - [ ] Contenido mínimo del RIDE y validez del formato ticket: Anexo 2 de la ficha; falta verificar el ticket de 80 mm contra él (F5-05).
 - [ ] Tratamiento de saltos de secuencial: la ficha exige orden cronológico y secuencial sin duplicados (§9.18), no describe los saltos. Pendiente de DP-07.
 - [ ] Procedimiento vigente de anulación vs nota de crédito: estados y errores en la ficha; el procedimiento está en la guía de anulación. Pendiente de DP-07.

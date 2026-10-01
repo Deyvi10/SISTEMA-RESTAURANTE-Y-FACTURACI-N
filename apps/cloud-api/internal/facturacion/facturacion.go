@@ -51,6 +51,8 @@ type Config struct {
 	Cajas                 []Punto `json:"cajas"`
 	// Certificado activo (F5-07): solo sus datos visibles, nunca el archivo.
 	Certificado *certificados.Info `json:"certificado"`
+	// CambioProgramado de régimen o calificaciones, con su fecha de vigencia (F5-14).
+	CambioProgramado *CambioRegimen `json:"cambioProgramado"`
 	// PruebaAprobada: el SRI ya autorizó una factura de este restaurante en pruebas (F5-06 paso 6).
 	PruebaAprobada bool `json:"pruebaAprobada"`
 	// Pendientes explica en lenguaje claro qué falta para poder facturar.
@@ -82,6 +84,15 @@ type ConfigInput struct {
 	FacturacionActiva     bool    `json:"facturacionActiva"`
 }
 
+// CambioRegimen rige desde la fecha (hora de Ecuador) para los comprobantes nuevos.
+type CambioRegimen struct {
+	Desde                 string  `json:"desde"` // AAAA-MM-DD
+	Regimen               string  `json:"regimen"`
+	ObligadoContabilidad  bool    `json:"obligadoContabilidad"`
+	ContribuyenteEspecial *string `json:"contribuyenteEspecial"`
+	AgenteRetencion       *string `json:"agenteRetencion"`
+}
+
 type PuntoInput struct {
 	Establecimiento string `json:"establecimiento"`
 	PuntoEmision    string `json:"puntoEmision"`
@@ -107,10 +118,28 @@ func (s *Service) Obtener(ctx context.Context, p auth.Principal) (Config, error)
 
 func leer(ctx context.Context, tx db.Tx) (Config, error) {
 	c := Config{Cajas: []Punto{}, Pendientes: []string{}, Avisos: []string{}}
+	// Llegada su fecha, el cambio programado pasa a ser la configuración actual.
+	if _, err := tx.Exec(ctx, `UPDATE configuracion_fiscal SET regimen = cambio_regimen, obligado_contabilidad = cambio_obligado_contabilidad,
+			contribuyente_especial = cambio_contribuyente_especial, agente_retencion = cambio_agente_retencion,
+			cambio_desde = NULL, cambio_regimen = NULL, cambio_obligado_contabilidad = NULL, cambio_contribuyente_especial = NULL,
+			cambio_agente_retencion = NULL, updated_at = now(), version = version + 1
+		WHERE cambio_desde <= (now() AT TIME ZONE 'America/Guayaquil')::date`); err != nil {
+		return c, err
+	}
+	var cambio CambioRegimen
+	var desde *time.Time
+	var cRegimen *string
+	var cObligado *bool
 	err := tx.QueryRow(ctx, `SELECT ambiente, ruc, razon_social, nombre_comercial, direccion_matriz, obligado_contabilidad,
-		contribuyente_especial, agente_retencion, regimen, facturacion_activa FROM configuracion_fiscal`).
+		contribuyente_especial, agente_retencion, regimen, facturacion_activa,
+		cambio_desde, cambio_regimen, cambio_obligado_contabilidad, cambio_contribuyente_especial, cambio_agente_retencion FROM configuracion_fiscal`).
 		Scan(&c.Ambiente, &c.RUC, &c.RazonSocial, &c.NombreComercial, &c.DireccionMatriz, &c.ObligadoContabilidad,
-			&c.ContribuyenteEspecial, &c.AgenteRetencion, &c.Regimen, &c.FacturacionActiva)
+			&c.ContribuyenteEspecial, &c.AgenteRetencion, &c.Regimen, &c.FacturacionActiva,
+			&desde, &cRegimen, &cObligado, &cambio.ContribuyenteEspecial, &cambio.AgenteRetencion)
+	if err == nil && desde != nil && cRegimen != nil && cObligado != nil {
+		cambio.Desde, cambio.Regimen, cambio.ObligadoContabilidad = desde.Format(time.DateOnly), *cRegimen, *cObligado
+		c.CambioProgramado = &cambio
+	}
 	switch {
 	case err == nil:
 		c.Guardada = true
@@ -299,6 +328,83 @@ func (s *Service) AsignarPunto(ctx context.Context, p auth.Principal, caja ids.I
 	})
 	return out, err
 }
+
+// ProgramarCambio deja programado un cambio de régimen o de calificaciones tributarias desde
+// una fecha futura (RF-05-05: lo ya emitido no cambia).
+func (s *Service) ProgramarCambio(ctx context.Context, p auth.Principal, in CambioRegimen) (Config, error) {
+	in.ContribuyenteEspecial, in.AgenteRetencion = opcional(in.ContribuyenteEspecial), opcional(in.AgenteRetencion)
+	desde, err := time.Parse(time.DateOnly, in.Desde)
+	var v apperr.Validation
+	hoy := time.Now().In(guayaquil).Format(time.DateOnly)
+	v.Check(err == nil && in.Desde > hoy, "desde", "Elige una fecha a partir de mañana: lo ya emitido no cambia.")
+	v.Check(err != nil || desde.Before(time.Now().AddDate(2, 0, 0)), "desde", "Programa el cambio dentro de los próximos dos años.")
+	v.Check(in.Regimen == General || in.Regimen == RimpeEmprendedor || in.Regimen == RimpeNegocioPopular, "regimen", "Elige el régimen tributario.")
+	v.Check(in.ContribuyenteEspecial == nil || especial.MatchString(*in.ContribuyenteEspecial), "contribuyenteEspecial", "El número de resolución de contribuyente especial tiene de 3 a 13 letras o números.")
+	v.Check(in.AgenteRetencion == nil || agente.MatchString(*in.AgenteRetencion), "agenteRetencion", "La resolución de agente de retención son hasta 8 números.")
+	if err := v.Err(); err != nil {
+		return Config{}, err
+	}
+	var out Config
+	err = s.DB.InTenant(ctx, p.TenantID, func(tx db.Tx) error {
+		antes, err := leer(ctx, tx)
+		if err != nil {
+			return err
+		}
+		if !antes.Guardada {
+			return apperr.New(apperr.Conflict, "SIN_CONFIGURAR", "Primero confirma los datos del emisor.")
+		}
+		if in.Regimen == RimpeNegocioPopular && antes.FacturacionActiva {
+			return apperr.New(apperr.Conflict, "NEGOCIO_POPULAR", "Los negocios populares RIMPE emiten notas de venta; esa modalidad todavía no está disponible.")
+		}
+		if _, err := tx.Exec(ctx, `UPDATE configuracion_fiscal SET cambio_desde = $1, cambio_regimen = $2, cambio_obligado_contabilidad = $3,
+				cambio_contribuyente_especial = $4, cambio_agente_retencion = $5, updated_at = now(), version = version + 1`,
+			in.Desde, in.Regimen, in.ObligadoContabilidad, in.ContribuyenteEspecial, in.AgenteRetencion); err != nil {
+			return err
+		}
+		if out, err = leer(ctx, tx); err != nil {
+			return err
+		}
+		autor := p.UserID
+		return auditoria.Registrar(ctx, tx, p.TenantID, aud.Registro{UsuarioID: &autor, Accion: "REGIMEN_PROGRAMADO", Entidad: "configuracion_fiscal",
+			EntidadID: p.TenantID.String(), Antes: aud.Compactar(resumen(antes)), Despues: aud.Compactar(map[string]any{"desde": in.Desde, "regimen": in.Regimen,
+				"obligadoContabilidad": in.ObligadoContabilidad, "contribuyenteEspecial": in.ContribuyenteEspecial, "agenteRetencion": in.AgenteRetencion})}, time.Now())
+	})
+	return out, err
+}
+
+// CancelarCambio quita el cambio programado (si su fecha aún no llega).
+func (s *Service) CancelarCambio(ctx context.Context, p auth.Principal) (Config, error) {
+	var out Config
+	err := s.DB.InTenant(ctx, p.TenantID, func(tx db.Tx) error {
+		antes, err := leer(ctx, tx)
+		if err != nil {
+			return err
+		}
+		if antes.CambioProgramado == nil {
+			out = antes
+			return nil
+		}
+		if _, err := tx.Exec(ctx, `UPDATE configuracion_fiscal SET cambio_desde = NULL, cambio_regimen = NULL, cambio_obligado_contabilidad = NULL,
+				cambio_contribuyente_especial = NULL, cambio_agente_retencion = NULL, updated_at = now(), version = version + 1`); err != nil {
+			return err
+		}
+		if out, err = leer(ctx, tx); err != nil {
+			return err
+		}
+		autor := p.UserID
+		return auditoria.Registrar(ctx, tx, p.TenantID, aud.Registro{UsuarioID: &autor, Accion: "REGIMEN_PROGRAMADO_CANCELADO", Entidad: "configuracion_fiscal",
+			EntidadID: p.TenantID.String(), Antes: aud.Compactar(map[string]any{"desde": antes.CambioProgramado.Desde, "regimen": antes.CambioProgramado.Regimen})}, time.Now())
+	})
+	return out, err
+}
+
+var guayaquil = func() *time.Location {
+	l, err := time.LoadLocation("America/Guayaquil")
+	if err != nil {
+		return time.FixedZone("ECT", -5*3600)
+	}
+	return l
+}()
 
 func resumen(c Config) map[string]any {
 	return map[string]any{"ambiente": c.Ambiente, "razonSocial": c.RazonSocial, "direccionMatriz": c.DireccionMatriz,

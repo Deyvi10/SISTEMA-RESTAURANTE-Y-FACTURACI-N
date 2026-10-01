@@ -13,7 +13,7 @@ const base: ConfigFiscal = {
   direccionMatriz: "Quito", obligadoContabilidad: false, contribuyenteEspecial: null, agenteRetencion: null, regimen: "GENERAL",
   facturacionActiva: false, pendientes: ["Confirma los datos del emisor y guárdalos.", "Asigna un punto de emisión a «Caja 1»."],
   cajas: [{ cajaId: "c1", caja: "Caja 1", localId: "l1", puntoId: null, establecimiento: null, puntoEmision: null, conNodo: false }],
-  certificado: null, pruebaAprobada: false, avisos: ["Sube tu firma electrónica (.p12) para que las facturas lleguen al SRI."],
+  certificado: null, cambioProgramado: null, pruebaAprobada: false, avisos: ["Sube tu firma electrónica (.p12) para que las facturas lleguen al SRI."],
 };
 
 const cert: Certificado = {
@@ -84,5 +84,20 @@ describe("facturación SRI", () => {
     expect(vigencia({ ...cert, diasRestantes: 200 }).tint).toBe("green");
     expect(vigencia({ ...cert, diasRestantes: 1 }).texto).toContain("quedan 1 día");
     expect(vigencia({ ...cert, diasRestantes: -1 })).toEqual(expect.objectContaining({ tint: "red" }));
+  });
+
+  it("programa un cambio de régimen con fecha", async () => {
+    const fetch = montar({ ...base, guardada: true, pendientes: [], avisos: [] });
+    await userEvent.click(await screen.findByTestId("programar-cambio"));
+    await userEvent.click(screen.getByTestId("guardar-cambio"));
+    const put = fetch.mock.calls.find(([url, init]) => String(url).includes("/cambio-programado") && init?.method === "PUT");
+    expect(JSON.parse(String(put?.[1]?.body))).toEqual(expect.objectContaining({ regimen: "RIMPE_EMPRENDEDOR", obligadoContabilidad: false }));
+  });
+
+  it("muestra el cambio programado con su fecha", async () => {
+    montar({ ...base, guardada: true, pendientes: [], avisos: [],
+      cambioProgramado: { desde: "2027-01-01", regimen: "RIMPE_EMPRENDEDOR", obligadoContabilidad: true, contribuyenteEspecial: null, agenteRetencion: "7" } });
+    expect(await screen.findByTestId("cambio-actual")).toHaveTextContent("1 de enero de 2027: RIMPE Emprendedor");
+    expect(screen.getByTestId("cambio-actual")).toHaveTextContent("agente de retención 7");
   });
 });

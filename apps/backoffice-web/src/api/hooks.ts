@@ -1,7 +1,7 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { del, get, post, put, patch } from "./client";
 import type {
-  Caja, Categoria, CodigoNodo, MetodoPago, MotivoDescuento, ComandoNodo, Estacion, Impresora, ImpresoraInstalada, FotoGaleria, Grupo, IconoCategoria, Imagen, Local, Mesa, NodoLocal, PermisosPersona, Persona, Producto, Resumen, TarifaIVA, Zona, ConfigFiscal, Certificado, DetalleComprobante, FilaComprobante, ListaComprobantes } from "./types";
+  Caja, Categoria, CodigoNodo, MetodoPago, MotivoDescuento, ComandoNodo, Estacion, Impresora, ImpresoraInstalada, FotoGaleria, Grupo, IconoCategoria, Imagen, Local, Mesa, NodoLocal, PermisosPersona, Persona, Producto, Resumen, TarifaIVA, Zona, ConfigFiscal, Certificado, CambioRegimen, DetalleComprobante, FilaComprobante, ListaComprobantes } from "./types";
 
 export const useResumen = () => useQuery({ queryKey: ["resumen"], queryFn: () => get<Resumen>("/v1/resumen") });
 export const useTarifas = () => useQuery({ queryKey: ["tarifas"], queryFn: () => get<TarifaIVA[]>("/v1/tarifas-iva"), staleTime: Infinity });
@@ -55,6 +55,8 @@ export const api = {
   crearCaja: (b: object) => post<Caja>("/v1/cajas", b),
   editarCaja: (id: string, b: object) => put<Caja>(`/v1/cajas/${id}`, b),
   guardarFacturacion: (b: object) => put<ConfigFiscal>("/v1/facturacion", b),
+  programarCambio: (b: CambioRegimen) => put<ConfigFiscal>("/v1/facturacion/cambio-programado", b),
+  cancelarCambio: () => del("/v1/facturacion/cambio-programado"),
   subirCertificado: (archivo: File, clave: string) => {
     const fd = new FormData();
     fd.append("p12", archivo);

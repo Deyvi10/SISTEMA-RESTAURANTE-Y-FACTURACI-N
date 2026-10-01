@@ -11,6 +11,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/edge-node/internal/store"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/money"
@@ -215,4 +216,50 @@ func TestFacturaPorCuentaDividida(t *testing.T) {
 		}
 		validarXSD(t, x.xml)
 	}
+}
+
+// F5-14: un cambio de régimen programado rige desde su fecha; lo emitido antes no cambia.
+func TestCambioDeRegimenProgramado(t *testing.T) {
+	c := nuevaCaja(t, nocheDel25)
+	tel := c.emparejar(t, "Teléfono")
+	tel.entrar(c.carlos, pinCarlos)
+	c.pos.req("POST", "/v1/turnos", map[string]any{"cajaId": c.caja1, "fondoInicial": "20"})
+	c.conFacturacion(t)
+	// Hoy (25 de septiembre) es régimen general sin contabilidad; desde el 26, RIMPE y obligado.
+	if err := c.a.Store.Write(context.Background(), func(tx *store.Tx) error {
+		_, err := tx.Exec(`UPDATE configuracion_fiscal SET regimen = 'GENERAL', obligado_contabilidad = 0, cambio_desde = '2026-09-26',
+			cambio_regimen = 'RIMPE_EMPRENDEDOR', cambio_obligado_contabilidad = 1, cambio_contribuyente_especial = NULL, cambio_agente_retencion = '7'`)
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	orden, _ := c.ordenEnMesa(t, tel, "antes-del-cambio", c.mesa1, plato(c.cerveza, "1"))
+	if st, _, raw := c.cobrar(orden, c.efectivo.String(), "", "cobro-antes-cambio"); st != 200 {
+		t.Fatalf("antes: %d %v", st, raw)
+	}
+	c.reloj.Set(nocheDel25.Add(3 * time.Hour)) // 01:00 del 26 (hora del local)
+	orden2, _ := c.ordenEnMesa(t, tel, "despues-del-cambio", c.mesa2, plato(c.cerveza, "1"))
+	if st, _, raw := c.cobrar(orden2, c.efectivo.String(), "", "cobro-despues-cambio"); st != 200 {
+		t.Fatalf("después: %d %v", st, raw)
+	}
+	cs := c.comprobantes(t)
+	if len(cs) != 2 {
+		t.Fatalf("comprobantes: %d", len(cs))
+	}
+	antes, despues := cs[0].xml, cs[1].xml
+	if strings.Contains(antes, "contribuyenteRimpe") || !strings.Contains(antes, "<obligadoContabilidad>NO</obligadoContabilidad>") || strings.Contains(antes, "agenteRetencion") {
+		t.Fatalf("antes del cambio rige lo actual:\n%s", antes)
+	}
+	for _, quiero := range []string{"<contribuyenteRimpe>CONTRIBUYENTE RÉGIMEN RIMPE</contribuyenteRimpe>", "<obligadoContabilidad>SI</obligadoContabilidad>", "<agenteRetencion>7</agenteRetencion>"} {
+		if !strings.Contains(despues, quiero) {
+			t.Errorf("desde el cambio, el XML lleva %s", quiero)
+		}
+	}
+	validarXSD(t, despues)
+	// El ticket del segundo cobro también lleva la leyenda RIMPE.
+	esperar(t, func() bool {
+		return slices.ContainsFunc(c.cocina.Textos(), func(s string) bool {
+			return strings.Contains(s, "No. 001-002-000000002") && strings.Contains(s, "CONTRIBUYENTE RÉGIMEN RIMPE") && strings.Contains(s, "CONTABILIDAD: SI")
+		})
+	})
 }
