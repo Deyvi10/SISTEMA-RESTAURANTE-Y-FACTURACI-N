@@ -69,6 +69,8 @@ type comprobante struct {
 	zona               string
 	certID             *ids.ID
 	numeroAutorizacion *string
+	sustento           *ids.ID // factura que modifica una nota de crédito
+	revierteTodo       bool
 }
 
 // Procesar hace una pasada por la cola y devuelve cuántos comprobantes avanzó.
@@ -111,12 +113,12 @@ func (w *Worker) reclamar(ctx context.Context, p pendiente) (*comprobante, error
 		var x comprobante
 		var amb int16
 		err := tx.QueryRow(ctx, `SELECT c.id, c.estado, c.ambiente, c.clave_acceso, c.xml, c.xml_firmado, c.intentos, l.zona_horaria,
-				(SELECT f.id FROM certificados_firma f WHERE f.activo), c.numero_autorizacion
+				(SELECT f.id FROM certificados_firma f WHERE f.activo), c.numero_autorizacion, c.sustento_id, c.revierte_todo
 			FROM comprobantes c JOIN locales l ON l.id = c.local_id
 			WHERE c.id = $1 AND c.estado IN ('EN_NUBE', 'FIRMADO', 'RECIBIDO')
 			  AND (c.proximo_intento_at IS NULL OR c.proximo_intento_at <= $2)
 			FOR UPDATE OF c SKIP LOCKED`, p.id, w.Now()).
-			Scan(&x.id, &x.estado, &amb, &x.clave, &x.xml, &x.xmlFirmado, &x.intentos, &x.zona, &x.certID, &x.numeroAutorizacion)
+			Scan(&x.id, &x.estado, &amb, &x.clave, &x.xml, &x.xmlFirmado, &x.intentos, &x.zona, &x.certID, &x.numeroAutorizacion, &x.sustento, &x.revierteTodo)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil
 		}
@@ -253,8 +255,22 @@ func (w *Worker) guardar(ctx context.Context, tenant ids.ID, c *comprobante, ch 
 			return nil
 		}
 		detalle, _ := json.Marshal(map[string]any{"mensajes": nonil(ch.mensajes), "error": ch.error, "numeroAutorizacion": ch.numero})
-		_, err := tx.Exec(ctx, `INSERT INTO comprobante_eventos (id, tenant_id, comprobante_id, estado, detalle, created_at)
-			VALUES ($1, app_tenant(), $2, $3, $4, $5)`, ids.New(), c.id, ch.estado, detalle, w.Now())
+		if _, err := tx.Exec(ctx, `INSERT INTO comprobante_eventos (id, tenant_id, comprobante_id, estado, detalle, created_at)
+			VALUES ($1, app_tenant(), $2, $3, $4, $5)`, ids.New(), c.id, ch.estado, detalle, w.Now()); err != nil {
+			return err
+		}
+		// Autorizada la nota de crédito que revierte todo lo que quedaba: la factura queda
+		// anulada por NC (F5-13).
+		if ch.estado != Autorizado || c.sustento == nil || !c.revierteTodo {
+			return nil
+		}
+		tag, err := tx.Exec(ctx, `UPDATE comprobantes SET estado = 'ANULADO', updated_at = $2 WHERE id = $1 AND estado = 'AUTORIZADO'`, *c.sustento, w.Now())
+		if err != nil || tag.RowsAffected() == 0 {
+			return err
+		}
+		anulada, _ := json.Marshal(map[string]any{"notaCredito": c.id, "claveNotaCredito": c.clave})
+		_, err = tx.Exec(ctx, `INSERT INTO comprobante_eventos (id, tenant_id, comprobante_id, estado, detalle, created_at)
+			VALUES ($1, app_tenant(), $2, 'ANULADO', $3, $4)`, ids.New(), *c.sustento, anulada, w.Now())
 		return err
 	})
 }

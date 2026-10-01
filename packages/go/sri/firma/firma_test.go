@@ -257,3 +257,62 @@ func TestNoFirmaDosVecesNiComprobantesRaros(t *testing.T) {
 		}
 	}
 }
+
+// F5-13: la nota de crédito se firma igual (raíz <notaCredito id="comprobante">), la verifica
+// signxml y valida contra el XSD oficial de la NC 1.1.0.
+func TestFirmaDeNotaDeCredito(t *testing.T) {
+	f, c := firmante(t)
+	factura, err := sri.LeerFactura(facturaSinFirmar(t, "Ceviche"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	nc, err := sri.CalcularNC(factura, nil, nil, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	clave, err := sri.NuevaClaveAcceso(sri.ClaveAccesoInput{FechaEmision: ahoraPrueba, TipoComprobante: sri.TipoNotaCredito, RUC: "1710034065001",
+		Ambiente: sri.AmbientePruebas, Establecimiento: "001", PuntoEmision: "002", Secuencial: 1, CodigoNumerico: "12345678"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	doc, err := sri.NotaCreditoXML(sri.DatosNC{Ambiente: sri.AmbientePruebas, ClaveAcceso: clave, Secuencial: 1, Fecha: ahoraPrueba,
+		Emisor:    sri.Emisor{RUC: "1710034065001", RazonSocial: "PÉREZ JOSÉ", DirMatriz: "Guayaquil", Establecimiento: "001", PuntoEmision: "002"},
+		Comprador: sri.Comprador{TipoIdentificacion: "05", Identificacion: "1710034065", RazonSocial: "María Pérez"},
+		Sustento:  factura, Motivo: "Plato devuelto"}, nc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	firmado, err := f.Firmar(doc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(firmado, []byte(`<notaCredito id="comprobante" version="1.1.0">`)) {
+		t.Fatalf("raíz: %s", firmado[:120])
+	}
+	if err := verificarConSignxml(t, firmado, c); err != nil {
+		t.Fatalf("signxml rechaza la firma de la NC: %v", err)
+	}
+	dir := t.TempDir()
+	for _, n := range []string{"NotaCredito_V1.1.0.xsd", "xmldsig-core-schema.xsd"} {
+		b, _ := sri.XSD.ReadFile("xsd/" + n)
+		_ = os.WriteFile(filepath.Join(dir, n), b, 0o600)
+	}
+	archivo := filepath.Join(dir, "nc.xml")
+	_ = os.WriteFile(archivo, firmado, 0o600)
+	esquema := filepath.Join(dir, "NotaCredito_V1.1.0.xsd")
+	var cmd *exec.Cmd
+	if x, err := exec.LookPath("xmllint"); err == nil {
+		cmd = exec.Command(x, "--noout", "--nonet", "--schema", esquema, archivo)
+	} else if py, err := exec.LookPath("python3"); err == nil && exec.Command(py, "-c", "import lxml").Run() == nil {
+		cmd = exec.Command(py, "-c", `import sys
+from lxml import etree
+p = etree.XMLParser(no_network=True, load_dtd=False)
+s = etree.XMLSchema(etree.parse(sys.argv[1], p))
+sys.exit(0 if s.validate(etree.parse(sys.argv[2], p)) else print(s.error_log) or 1)`, esquema, archivo)
+	} else {
+		t.Skip("sin validador XSD")
+	}
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("el XSD rechaza la NC firmada: %s", out)
+	}
+}

@@ -45,6 +45,11 @@ type Ride struct {
 	Vuelto                money.Money
 	Adicionales           []ValorTexto // información adicional (correo, RUC del proveedor…)
 	AbrirCajon            bool
+	// Nota de crédito (F5-13): la factura que modifica, su fecha y la razón (Anexo 2).
+	NotaCredito   bool
+	Sustento      string // 001-002-000000067
+	FechaSustento string // dd/mm/aaaa
+	Motivo        string
 }
 
 // LineaRide es un detalle de la factura: valores sin IVA, como en el XML.
@@ -98,7 +103,11 @@ func ImprimirRide(p Paper, r Ride) []byte {
 		b.Line("CONTRIBUYENTE RÉGIMEN RIMPE")
 	}
 	b.Separator('-')
-	b.Align(Center).Bold(true).Size(1, 2).Line("FACTURA").Size(1, 1).Line("No. " + r.Numero).Bold(false)
+	titulo := "FACTURA"
+	if r.NotaCredito {
+		titulo = "NOTA DE CRÉDITO"
+	}
+	b.Align(Center).Bold(true).Size(1, 2).Wrapped(titulo, "").Size(1, 1).Line("No. " + r.Numero).Bold(false)
 	b.Align(Left)
 	b.Columns("Emitida", r.Emision.Format("02/01/2006 15:04"))
 	b.Line("Ambiente: " + map[bool]string{true: "PRUEBAS", false: "PRODUCCIÓN"}[r.Pruebas])
@@ -117,6 +126,12 @@ func ImprimirRide(p Paper, r Ride) []byte {
 	}
 	if r.CompradorDireccion != "" {
 		colgante(b, "Dirección: "+r.CompradorDireccion)
+	}
+	if r.NotaCredito {
+		b.Separator('-')
+		colgante(b, "Comprobante que se modifica: FACTURA "+r.Sustento)
+		b.Line("Fecha emisión del comprobante: " + r.FechaSustento)
+		colgante(b, "Razón de modificación: "+r.Motivo)
 	}
 	b.Columns(r.Mesa, "Caja: "+r.Cajero)
 	b.Separator('-')
@@ -143,8 +158,9 @@ func ImprimirRide(p Paper, r Ride) []byte {
 		b.Columns("PROPINA", r.Propina.String())
 	}
 	b.Bold(true).Size(1, 2).Columns("VALOR TOTAL", "$"+r.Total.String()).Size(1, 1).Bold(false)
-	b.Separator('-')
-	b.Line("Forma de pago")
+	if len(r.Pagos) > 0 {
+		b.Separator('-').Line("Forma de pago")
+	}
 	for _, p := range r.Pagos {
 		desc := p.Codigo + " - " + sri.FormasPago[p.Codigo]
 		colgante(b, desc)

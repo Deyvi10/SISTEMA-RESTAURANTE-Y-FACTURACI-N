@@ -4,6 +4,7 @@ import { useSesion } from "./api/sesion";
 import { useAtajo } from "./components/atajos";
 import { Avatar } from "./components/Avatar";
 import { Indicador } from "./components/Indicador";
+import { Comprobantes } from "./pages/Comprobantes";
 import { Emparejar } from "./pages/Emparejar";
 import { Mesas } from "./pages/Mesas";
 import { type ACobrar, Cobro } from "./pages/Cobro";
@@ -31,7 +32,7 @@ function Caja() {
   const tomaPedidos = puede("TOMAR_PEDIDO");
   const [cobrando, setCobrando] = useState<ACobrar | null>(null);
   const [venta, setVenta] = useState<{ existente?: OrdenExistente; mesa?: MesaParaPedir } | null>(null);
-  const [seccion, setSeccion] = useState<"mesas" | "turno" | "cobro" | "venta">("mesas");
+  const [seccion, setSeccion] = useState<"mesas" | "turno" | "cobro" | "venta" | "comprobantes">("mesas");
   const [aviso, setAviso] = useState<string | null>(null);
   const caja = useCaja();
   const turno = caja.estado?.turno ?? null;
@@ -50,6 +51,7 @@ function Caja() {
     setSeccion("cobro");
   };
   useAtajo("F10", "Ver el turno de caja", () => setSeccion("turno"), "General");
+  useAtajo("F11", "Ver los comprobantes", () => setSeccion("comprobantes"), "General");
 
   return (
     <div className="caja">
@@ -60,9 +62,10 @@ function Caja() {
             [
               ["mesas", "Mesas", "F9"],
               ["turno", "Turno", "F10"],
+              ["comprobantes", "Comprobantes", "F11"],
             ] as const
           ).map(([id, nombre, tecla]) => (
-            <button key={id} className="barra__tab" aria-current={seccion === id || (seccion !== "turno" && id === "mesas") ? "page" : undefined} onClick={() => setSeccion(id)} title={`${nombre} (${tecla})`} data-testid={`tab-${id}`}>
+            <button key={id} className="barra__tab" aria-current={seccion === id || (seccion !== "turno" && seccion !== "comprobantes" && id === "mesas") ? "page" : undefined} onClick={() => setSeccion(id)} title={`${nombre} (${tecla})`} data-testid={`tab-${id}`}>
               {nombre}
             </button>
           ))}
@@ -103,6 +106,8 @@ function Caja() {
           <Venta existente={venta.existente} mesa={venta.mesa} volver={alSalon} cobrar={(ordenId, nombre) => aCobrar({ ordenId, nombre })} />
         ) : seccion === "turno" ? (
           <Turno caja={caja} />
+        ) : seccion === "comprobantes" ? (
+          <Comprobantes caja={caja} usuarioId={usuario?.id} />
         ) : (
           <>
             <Mesas

@@ -451,6 +451,69 @@ export interface CierreOut {
 
 // ---------- Llamadas ----------
 
+/** Factura o nota de crédito del nodo (F5-13, F5-18). */
+export interface ComprobanteCaja {
+  id: string;
+  tipo: "01" | "04";
+  numero: string;
+  claveAcceso: string;
+  emitido: string;
+  total: string;
+  comprador: string;
+  identificacion: string;
+  ambiente: 1 | 2;
+  estado: "EMITIDO" | "ENVIADO" | "AUTORIZADO" | "NO_AUTORIZADO" | "REQUIERE_ATENCION" | "ANULADO";
+  mensaje?: string;
+  fechaAutorizacion?: string;
+  sustento?: string;
+  saldo?: string;
+}
+
+export interface LineaRevertible {
+  indice: number;
+  descripcion: string;
+  cantidad: string;
+  disponible: string;
+  total: string;
+}
+
+export interface DetalleComprobanteCaja extends ComprobanteCaja {
+  consumidorFinal: boolean;
+  lineas: LineaRevertible[];
+  notasCredito: ComprobanteCaja[];
+}
+
+export interface NotaCreditoEnvio {
+  cajaId: string;
+  lineas: { indice: number; cantidad: string }[];
+  todo: boolean;
+  motivo: string;
+  comprador?: CompradorEnvioNC;
+  devolucion?: { metodoId: string };
+  autorizacion: string;
+  idempotencyKey: string;
+}
+
+export interface CompradorEnvioNC {
+  tipoIdentificacion: string;
+  identificacion: string;
+  razonSocial: string;
+  email: string;
+  direccion: string;
+  telefono: string;
+  consentimiento: boolean;
+}
+
+export interface NotaCreditoOut extends ComprobanteCaja {
+  valor: string;
+  revierteTodo: boolean;
+  devuelto?: string;
+  metodo?: string;
+  impresoras: string[];
+  autorizadoPor?: string;
+  aviso?: string;
+}
+
 export const nodo = {
   salud: () => api<{ estado: string; version: string }>("GET", "/health"),
   conectividad: () => api<Conectividad>("GET", "/v1/conectividad"),
@@ -497,6 +560,9 @@ export const nodo = {
     },
   ) =>
     api<CobroOut>("POST", `/v1/ordenes/${ordenId}/cobrar`, b),
+  comprobantes: (q = "") => api<ComprobanteCaja[]>("GET", `/v1/caja/comprobantes${q ? `?q=${encodeURIComponent(q)}` : ""}`),
+  comprobante: (id: string) => api<DetalleComprobanteCaja>("GET", `/v1/caja/comprobantes/${id}`),
+  notaCredito: (facturaId: string, b: NotaCreditoEnvio) => api<NotaCreditoOut>("POST", `/v1/caja/comprobantes/${facturaId}/nota-credito`, b),
   autorizar: (b: { usuarioId: string; pin: string; accion: string; referencia: string }) =>
     api<{ token: string; expiraAt: string; autorizadoPor: string }>("POST", "/v1/autorizaciones", b),
   abrirCajon: (b: { cajaId: string; motivo: string; autorizacion: string }) =>

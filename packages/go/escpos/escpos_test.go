@@ -346,3 +346,21 @@ func TestGoldenRide(t *testing.T) {
 		t.Fatal("producción no lleva la leyenda de pruebas")
 	}
 }
+
+// F5-13: el ticket de la nota de crédito dice qué factura modifica, de qué fecha y por qué, y
+// no lleva forma de pago ni vuelto.
+func TestGoldenRideNotaCredito(t *testing.T) {
+	r := rideDePrueba()
+	r.NotaCredito, r.Sustento, r.FechaSustento, r.Motivo = true, "001-002-000000067", "29/09/2026", "El cliente devolvió el ceviche"
+	r.Numero, r.Pagos, r.Recibido, r.Vuelto, r.Propina, r.AbrirCajon = "001-002-000000004", nil, money.Money{}, money.Money{}, money.Money{}, false
+	txt := Decode(ImprimirRide(Paper80, r)).Text()
+	golden(t, "ride-nc-80", txt)
+	for _, quiero := range []string{"NOTA DE CRÉDITO", "No. 001-002-000000004", "Comprobante que se modifica: FACTURA", "001-002-000000067", "29/09/2026", "El cliente devolvió el"} {
+		if !strings.Contains(txt, quiero) {
+			t.Errorf("falta %q", quiero)
+		}
+	}
+	if strings.Contains(txt, "Forma de pago") || strings.Contains(txt, "Vuelto") {
+		t.Fatal("la nota de crédito no lleva forma de pago ni vuelto")
+	}
+}

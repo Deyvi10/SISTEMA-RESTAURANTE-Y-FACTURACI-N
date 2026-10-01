@@ -130,3 +130,43 @@ func TestRIDEPendienteEnPruebasYLargo(t *testing.T) {
 		t.Fatal("solo facturas")
 	}
 }
+
+// F5-13: el RIDE de la nota de crédito sigue el Anexo 2 (pág. 61).
+func TestRIDENotaDeCredito(t *testing.T) {
+	factura, err := sri.LeerFactura(factura(t, 2, sri.AmbientePruebas))
+	if err != nil {
+		t.Fatal(err)
+	}
+	nc, err := sri.CalcularNC(factura, []sri.Devolucion{{Indice: 0, Cantidad: decimal.NewFromInt(1)}}, nil, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fecha := time.Date(2026, 10, 1, 9, 0, 0, 0, clock.Guayaquil)
+	clave, _ := sri.NuevaClaveAcceso(sri.ClaveAccesoInput{FechaEmision: fecha, TipoComprobante: "04", RUC: "1790011674001", Ambiente: sri.AmbientePruebas,
+		Establecimiento: "001", PuntoEmision: "002", Secuencial: 3, CodigoNumerico: "12345678"})
+	doc, err := sri.NotaCreditoXML(sri.DatosNC{Ambiente: sri.AmbientePruebas, ClaveAcceso: clave, Secuencial: 3, Fecha: fecha,
+		Emisor:    sri.Emisor{RUC: "1790011674001", RazonSocial: "DISTRIBUIDORA DEL PACIFICO S.A.", DirMatriz: "Guayaquil", Establecimiento: "001", PuntoEmision: "002"},
+		Comprador: sri.Comprador{TipoIdentificacion: "05", Identificacion: "1710034065", RazonSocial: "María Pérez"},
+		Sustento:  factura, Motivo: "El plato llegó frío"}, nc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := PDF(doc, Autorizacion{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if os.Getenv("RIDE_NC") != "" {
+		_ = os.WriteFile(os.Getenv("RIDE_NC"), b, 0o600)
+	}
+	if txt := pdfprueba.Texto(t, b); txt != "" {
+		for _, quiero := range []string{"NOTA DE CRÉDITO", "001-002-000000003", "Comprobante que se modifica:", "FACTURA 001-002-000000067",
+			"Fecha Emisión (Comprobante a modificar):", "29/09/2026", "Razón de Modificación:", "El plato llegó frío", "VALOR TOTAL", nc.ValorModificacion.String()} {
+			if !strings.Contains(txt, quiero) {
+				t.Errorf("el RIDE de la NC no trae %q", quiero)
+			}
+		}
+		if strings.Contains(txt, "Forma de pago") {
+			t.Error("la NC no lleva forma de pago")
+		}
+	}
+}

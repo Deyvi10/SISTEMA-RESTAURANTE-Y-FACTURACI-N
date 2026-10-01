@@ -32,6 +32,10 @@ type ComprobanteEmitido struct {
 	ImporteTotal   string `json:"importeTotal"`
 	XML            string `json:"xml"`
 	Hash           string `json:"hash"`
+	// Nota de crédito (F5-13): la factura que modifica y si revierte todo lo que quedaba.
+	SustentoID    *ids.ID `json:"sustentoId,omitempty"`
+	SustentoClave string  `json:"sustentoClave,omitempty"`
+	Total         bool    `json:"total,omitempty"`
 }
 
 // RegistrarComprobante guarda en la nube un comprobante del nodo (idempotente por clave de
@@ -52,15 +56,29 @@ func RegistrarComprobante(ctx context.Context, tx pgx.Tx, tenant, local, nodo id
 	if err != nil {
 		return nil
 	}
+	// Una nota de crédito llega con su factura, que el nodo subió antes (mismo outbox, en orden).
+	if (c.Tipo == sri.TipoNotaCredito) != (c.SustentoID != nil) {
+		return nil
+	}
+	if c.SustentoID != nil {
+		var clave string
+		if err := tx.QueryRow(ctx, `SELECT clave_acceso FROM comprobantes WHERE id = $1 AND tenant_id = $2`, *c.SustentoID, tenant).Scan(&clave); err != nil || clave != c.SustentoClave {
+			return nil // sin su factura no se puede enviar: queda en la bitácora de sync_eventos
+		}
+	}
 	suma := sha256.Sum256([]byte(c.XML))
 	valido := hex.EncodeToString(suma[:]) == c.Hash
 	estado := "EN_NUBE"
 	if !valido {
 		estado = "REQUIERE_ATENCION"
 	}
+	var documento *ids.ID
+	if c.Tipo == sri.TipoFactura {
+		documento = &c.DocumentoID
+	}
 	// El comprador, para la bóveda y el correo (el nodo pone el correo en «Email», F5-05).
 	var idComprador, nombre, correo *string
-	if f, err := sri.LeerFactura([]byte(c.XML)); err == nil && valido {
+	if f, err := sri.LeerComprobante([]byte(c.XML)); err == nil && valido {
 		idComprador, nombre = &f.IdComprador, &f.RazonSocialComprador
 		if e := f.Adicional("Email"); e != "" {
 			correo = &e
@@ -68,11 +86,11 @@ func RegistrarComprobante(ctx context.Context, tx pgx.Tx, tenant, local, nodo id
 	}
 	tag, err := tx.Exec(ctx, `INSERT INTO comprobantes (id, tenant_id, local_id, nodo_id, punto_emision_id, documento_id, tipo, ambiente, serie,
 			secuencial, clave_acceso, fecha_emision, importe_total, xml, hash, hash_valido, estado, proximo_intento_at,
-			comprador_identificacion, comprador_nombre, correo_comprador)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, now(), $18, $19, $20)
+			comprador_identificacion, comprador_nombre, correo_comprador, sustento_id, revierte_todo)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, now(), $18, $19, $20, $21, $22)
 		ON CONFLICT DO NOTHING`,
-		c.ID, tenant, local, nodo, c.PuntoEmisionID, c.DocumentoID, c.Tipo, c.Ambiente, c.Serie, c.Secuencial, c.ClaveAcceso,
-		c.FechaEmision, total.Decimal(), c.XML, c.Hash, valido, estado, idComprador, nombre, correo)
+		c.ID, tenant, local, nodo, c.PuntoEmisionID, documento, c.Tipo, c.Ambiente, c.Serie, c.Secuencial, c.ClaveAcceso,
+		c.FechaEmision, total.Decimal(), c.XML, c.Hash, valido, estado, idComprador, nombre, correo, c.SustentoID, c.Total)
 	// Repetido (el nodo reintenta) o una serie+secuencial que ya existe con otra clave: no se
 	// duplica ni se detiene la sincronización; el evento crudo queda en sync_eventos.
 	if err != nil || tag.RowsAffected() == 0 {

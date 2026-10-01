@@ -82,6 +82,8 @@ type FilaComprobante struct {
 	CorreoEnviado   bool         `json:"correoEnviado"`
 	Explicacion     *Explicacion `json:"explicacion,omitempty"`
 	FechaAutorizado *time.Time   `json:"fechaAutorizacion"`
+	// Sustento: el número de la factura que modifica una nota de crédito.
+	Sustento *string `json:"sustento,omitempty"`
 }
 
 // Explicacion del último mensaje del SRI o del motivo por el que espera.
@@ -108,7 +110,9 @@ type Filtro struct {
 const columnasFila = `c.id, c.tipo, c.serie, c.secuencial, c.clave_acceso, c.fecha_emision, c.comprador_nombre, c.comprador_identificacion,
 	c.importe_total::text, c.ambiente, c.estado, c.correo_comprador IS NOT NULL,
 	EXISTS (SELECT 1 FROM comprobante_correos k WHERE k.comprobante_id = c.id AND k.ok),
-	c.mensajes_sri, c.ultimo_error, c.hash_valido, c.fecha_autorizacion, c.recibido_at`
+	c.mensajes_sri, c.ultimo_error, c.hash_valido, c.fecha_autorizacion, c.recibido_at,
+	(SELECT substr(s.serie, 1, 3) || '-' || substr(s.serie, 4, 3) || '-' || lpad(s.secuencial::text, 9, '0') FROM comprobantes s WHERE s.id = c.sustento_id),
+	(SELECT s.estado FROM comprobantes s WHERE s.id = c.sustento_id)`
 
 func escanearFila(r pgx.Row) (FilaComprobante, time.Time, error) {
 	var f FilaComprobante
@@ -119,8 +123,9 @@ func escanearFila(r pgx.Row) (FilaComprobante, time.Time, error) {
 	var ultimoError *string
 	var hashValido bool
 	var recibido time.Time
+	var estadoSustento *string
 	err := r.Scan(&f.ID, &f.Tipo, &f.Serie, &sec, &f.ClaveAcceso, &fecha, &f.Comprador, &f.Identificacion, &f.ImporteTotal, &amb,
-		&f.Estado, &f.TieneCorreo, &f.CorreoEnviado, &mensajes, &ultimoError, &hashValido, &f.FechaAutorizado, &recibido)
+		&f.Estado, &f.TieneCorreo, &f.CorreoEnviado, &mensajes, &ultimoError, &hashValido, &f.FechaAutorizado, &recibido, &f.Sustento, &estadoSustento)
 	if err != nil {
 		return f, recibido, err
 	}
@@ -129,6 +134,11 @@ func escanearFila(r pgx.Row) (FilaComprobante, time.Time, error) {
 	f.Ambiente = int(amb)
 	f.Grupo = grupoDe(f.Estado)
 	f.Explicacion = explicacionDe(f.Estado, mensajes, ultimoError, hashValido)
+	// Una nota de crédito espera a que su factura esté autorizada antes de ir al SRI.
+	if f.Sustento != nil && f.Estado == "EN_NUBE" && estadoSustento != nil && *estadoSustento != "AUTORIZADO" && *estadoSustento != "ANULADO" {
+		f.Explicacion = &Explicacion{Que: "Espera a que el SRI autorice la factura " + *f.Sustento + " que modifica.",
+			Accion: "Sale sola en cuanto la factura se autorice; si la factura tiene un problema, resuélvelo primero."}
+	}
 	return f, recibido, nil
 }
 
@@ -351,7 +361,7 @@ func (b *Boveda) XML(ctx context.Context, p auth.Principal, id ids.ID) (string, 
 		}
 		return "comprobante.xml", doc, err
 	}
-	return "FACTURA-" + d.Numero + ".xml", d.XML, nil
+	return d.Archivo + ".xml", d.XML, nil
 }
 
 // PDF devuelve el RIDE: el autorizado o, si aún no se autoriza, con «Pendiente de autorización».
@@ -359,12 +369,12 @@ func (b *Boveda) PDF(ctx context.Context, p auth.Principal, id ids.ID) (string, 
 	var doc string
 	var fecha *time.Time
 	var hashValido bool
-	var numero string
+	var numero, tipo string
 	err := b.DB.InTenant(ctx, p.TenantID, func(tx db.Tx) error {
 		var serie string
 		var sec int64
-		err := tx.QueryRow(ctx, `SELECT coalesce(xml_firmado, xml), fecha_autorizacion, hash_valido, serie, secuencial FROM comprobantes WHERE id = $1`, id).
-			Scan(&doc, &fecha, &hashValido, &serie, &sec)
+		err := tx.QueryRow(ctx, `SELECT coalesce(xml_firmado, xml), fecha_autorizacion, hash_valido, serie, secuencial, tipo FROM comprobantes WHERE id = $1`, id).
+			Scan(&doc, &fecha, &hashValido, &serie, &sec, &tipo)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return apperr.ErrNotFound
 		}
@@ -378,7 +388,7 @@ func (b *Boveda) PDF(ctx context.Context, p auth.Principal, id ids.ID) (string, 
 		return "", nil, apperr.New(apperr.Conflict, "COMPROBANTE_ALTERADO", "Este comprobante llegó alterado del Nodo Local: no se genera su RIDE.")
 	}
 	pdf, err := ride.PDF([]byte(doc), ride.Autorizacion{Fecha: fecha})
-	return "FACTURA-" + numero + ".pdf", pdf, err
+	return NombreArchivo(tipo, numero) + ".pdf", pdf, err
 }
 
 // ReenvioInput: vacío reenvía al correo del comprador.

@@ -417,3 +417,36 @@ button { font: inherit; }
   .pagos__agregar, .pagos__total { margin-left: 12px; margin-right: 12px; }
   .ayuda-atajos { width: 100vw; }
 }
+
+/* Comprobantes de la caja y nota de crédito (F5-13) */
+.comprobantes { display: flex; flex-direction: column; gap: 12px; max-width: 900px; width: 100%; margin: 0 auto; }
+.comprobantes__lista { list-style: none; margin: 0; padding: 0; }
+.comprobantes__fila { width: 100%; border: 0; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; gap: 12px; }
+.comprobantes__fila .rp-cell__subtitle { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.comprobantes__total { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
+.comprobantes__vacio { text-align: center; padding: 32px 0; }
+.comprobante-caja { display: flex; flex-direction: column; gap: 8px; }
+.comprobante-caja p { margin: 0; }
+.comprobante-caja__total { font-size: 32px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.comprobante-caja__clave { font-size: 12px; word-break: break-all; color: var(--rp-color-label-secondary); }
+.comprobante-caja__lineas { list-style: none; margin: 8px 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.comprobante-caja__lineas li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; }
+.comprobante-caja__lineas small { width: 100%; color: var(--rp-color-label-secondary); }
+.nc { display: flex; flex-direction: column; gap: 14px; }
+.nc__alcance { border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.nc__alcance legend { font-weight: 600; margin-bottom: 4px; }
+.nc__opcion { display: flex; align-items: center; gap: 8px; min-height: 36px; }
+.nc__lineas { list-style: none; margin: 0; padding: 0 0 0 26px; display: flex; flex-direction: column; gap: 8px; }
+.nc__lineas li { display: grid; grid-template-columns: 1fr 84px auto; align-items: center; gap: 8px; }
+.nc__lineas input { min-height: 36px; border: 0; border-radius: 10px; padding: 0 8px; background: var(--rp-color-fill); font: inherit; color: inherit; text-align: right; }
+.nc__cliente { display: flex; flex-direction: column; gap: 8px; }
+.nc-hecha { display: flex; flex-direction: column; gap: 10px; }
+.nc-hecha p { margin: 0; }
+.nc-hecha__numero { font-size: 18px; }
+.nc-hecha__devuelto { font-size: 20px; font-weight: 700; color: var(--rp-color-warning-text); }
+[data-dispositivo="celular"] .comprobantes__fila { flex-wrap: wrap; }
+[data-dispositivo="celular"] .comprobantes__fila .rp-status { order: 3; }
+.hoja-comprobante { width: min(520px, 94vw); }
+.hoja-comprobante .rp-sheet__body { padding: 4px 18px 18px; }
+.nc select { min-height: 42px; border-radius: 12px; border: 1px solid var(--rp-color-separator); background: var(--rp-color-surface); color: var(--rp-color-label); font: inherit; padding: 0 10px; }
+.nc .rp-field { display: flex; flex-direction: column; gap: 6px; }

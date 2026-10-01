@@ -84,6 +84,14 @@ valores de las respuestas pueden traer saltos de línea (la clave consultada, po
 - **XML autorizado.** Es el elemento `<autorizacion>` del WSDL oficial de autorización: `estado`, `numeroAutorizacion`, `fechaAutorizacion`, `ambiente` y el `comprobante` firmado en CDATA, sin mensajes. Es lo que recibe el comprador y lo que se archiva.
 - 🔎 **Valor de `<ambiente>`.** Se escribe «PRUEBAS» o «PRODUCCIÓN» como en las respuestas del WS. Falta confirmarlo con una respuesta real del SRI de pruebas (DP-04).
 
+## Nota de crédito (F5-13)
+
+- **Esquema.** Es la NC 1.1.0 (`NotaCredito_V1.1.0.xsd`). Lleva `codDocModificado` 01, `numDocModificado` (001-002-000000067), `fechaEmisionDocSustento`, `valorModificacion` y `motivo`. A diferencia de la factura, el total por impuesto no lleva tarifa. Se validan 300 NC al azar contra el XSD, y la firma de una NC la verifica signxml.
+- **No admite consumidor final.** Así lo dice la ficha en la nota de la Tabla 6: «en el caso de emisión de notas de crédito… se debe obligatoriamente identificar al receptor». Si la factura fue a consumidor final, la caja pide los datos del cliente para la NC.
+- **Sin propina.** El XSD de la NC no tiene propina, así que la NC revierte base + IVA. La devolución de dinero es por el valor de la NC. 🔎 Pendiente con el tributarista (DP-07): cómo tratar la propina de una venta revertida.
+- **Cálculo por línea.** Una NC nunca se pasa de lo que queda de cada línea de la factura. La que devuelve el resto de una línea toma exactamente ese resto, así la suma de las NC de una línea es igual a la línea; una devolución parcial se calcula en proporción. Hay una prueba de propiedades con 400 facturas al azar revertidas en pasos hasta cero.
+- **Orden de envío.** La NC espera en la nube a que su factura esté AUTORIZADA. Cuando se autoriza la NC que revierte todo, la factura queda ANULADO («Anulado por NC»). 🔎 La anulación en el portal del SRI es otro procedimiento (DP-07).
+
 ## Firma (F5-09)
 
 Implementada según §6 y el Anexo 4 con un certificado de prueba y verificada con `signxml`

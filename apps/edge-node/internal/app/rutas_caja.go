@@ -129,6 +129,27 @@ func (a *App) rutasCaja() {
 		}
 		return a.Cobrar(ctx, u, id, in)
 	}))
+	m.Handle("GET /v1/caja/comprobantes", a.enCaja(func(ctx context.Context, _ Dispositivo, u Usuario, r *http.Request) (any, error) {
+		return a.ComprobantesCaja(ctx, u, r.URL.Query().Get("q"))
+	}))
+	m.Handle("GET /v1/caja/comprobantes/{id}", a.enCaja(func(ctx context.Context, _ Dispositivo, u Usuario, r *http.Request) (any, error) {
+		id, err := idRuta(r)
+		if err != nil {
+			return nil, err
+		}
+		return a.DetalleComprobanteCajaDe(ctx, u, id)
+	}))
+	m.Handle("POST /v1/caja/comprobantes/{id}/nota-credito", a.enCaja(func(ctx context.Context, d Dispositivo, u Usuario, r *http.Request) (any, error) {
+		id, err := idRuta(r)
+		if err != nil {
+			return nil, err
+		}
+		in, err := leer[NotaCreditoIn](nil, r)
+		if err != nil {
+			return nil, err
+		}
+		return a.EmitirNotaCredito(ctx, d, u, id, in)
+	}))
 	m.Handle("POST /v1/caja/cajon", a.enCaja(func(ctx context.Context, d Dispositivo, u Usuario, r *http.Request) (any, error) {
 		in, err := leer[AbrirCajonIn](nil, r)
 		if err != nil {

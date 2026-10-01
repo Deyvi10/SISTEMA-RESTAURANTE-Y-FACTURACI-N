@@ -249,7 +249,28 @@ func sumarPorMetodo(ctx context.Context, q queryer, turno ids.ID) (map[ids.ID]mo
 		}
 		out[mid] = out[mid].Add(m)
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	// Lo devuelto por notas de crédito sale de lo cobrado por ese método (F5-13).
+	dev, err := q.QueryContext(ctx, `SELECT metodo_pago_id, monto FROM devoluciones_nc WHERE turno_id = ?`, turno.String())
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = dev.Close() }()
+	for dev.Next() {
+		var id, monto string
+		if err := dev.Scan(&id, &monto); err != nil {
+			return nil, err
+		}
+		mid, err1 := ids.Parse(id)
+		m, err2 := money.Parse(monto)
+		if err := errors.Join(err1, err2); err != nil {
+			return nil, err
+		}
+		out[mid] = out[mid].Sub(m)
+	}
+	return out, dev.Err()
 }
 
 func sumarMovimientos(ctx context.Context, q queryer, turno ids.ID, mov *cierrez.Movimientos) error {

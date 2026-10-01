@@ -108,7 +108,7 @@ func (a *Archivador) ArchivarDia(ctx context.Context, tenant ids.ID, fecha time.
 	err := a.DB.InTenant(ctx, tenant, func(tx db.Tx) error {
 		rows, err := tx.Query(ctx, `SELECT c.id, c.clave_acceso, c.xml_firmado, c.numero_autorizacion, c.fecha_autorizacion, c.ambiente
 			FROM comprobantes c
-			WHERE c.estado = 'AUTORIZADO' AND (c.fecha_autorizacion AT TIME ZONE 'America/Guayaquil')::date = $1::date
+			WHERE c.estado IN ('AUTORIZADO', 'ANULADO') AND (c.fecha_autorizacion AT TIME ZONE 'America/Guayaquil')::date = $1::date
 			  AND NOT EXISTS (SELECT 1 FROM archivo_comprobantes x WHERE x.comprobante_id = c.id)
 			ORDER BY c.fecha_autorizacion, c.id`, fecha.Format(time.DateOnly))
 		if err != nil {

@@ -46,7 +46,7 @@ var columnas = []struct {
 
 // PDF devuelve el RIDE de la factura.
 func PDF(doc []byte, a Autorizacion) ([]byte, error) {
-	f, err := sri.LeerFactura(doc)
+	f, err := sri.LeerComprobante(doc)
 	if err != nil {
 		return nil, err
 	}
@@ -104,7 +104,7 @@ func cabecera(l *pdf.Lienzo, f sri.FacturaLeida, a Autorizacion) pdf.Pt {
 	l.Rect(x, 30, w, 230)
 	l.Texto(x+10, 50, bold, 11, "R.U.C.:")
 	l.Texto(x+60, 50, sans, 11, f.RUC)
-	l.Texto(x+10, 70, bold, 13, "FACTURA")
+	l.Texto(x+10, 70, bold, 13, titulo(f))
 	l.Texto(x+10, 86, sans, 9, "No.")
 	l.Texto(x+40, 86, bold, 9, f.Numero())
 	l.Texto(x+10, 104, bold, 8, "NÚMERO DE AUTORIZACIÓN")
@@ -137,6 +137,13 @@ func cabecera(l *pdf.Lienzo, f sri.FacturaLeida, a Autorizacion) pdf.Pt {
 	return 266
 }
 
+func titulo(f sri.FacturaLeida) string {
+	if f.EsNotaCredito() {
+		return "NOTA DE CRÉDITO"
+	}
+	return "FACTURA"
+}
+
 func suma(xs []int) int {
 	s := 0
 	for _, x := range xs {
@@ -154,12 +161,19 @@ func comprador(l *pdf.Lienzo, f sri.FacturaLeida, y pdf.Pt) pdf.Pt {
 	if f.DireccionComprador != "" {
 		lineas = append(lineas, struct{ et, valor string }{"Dirección:", f.DireccionComprador})
 	}
+	if f.EsNotaCredito() {
+		// Anexo 2, nota de crédito: el comprobante que se modifica, su fecha y la razón.
+		lineas = append(lineas,
+			struct{ et, valor string }{"Comprobante que se modifica:", "FACTURA " + f.NumDocModificado},
+			struct{ et, valor string }{"Fecha Emisión (Comprobante a modificar):", f.FechaEmisionDocSustento},
+			struct{ et, valor string }{"Razón de Modificación:", f.Motivo})
+	}
 	alto := pdf.Pt(len(lineas))*13 + 10
 	l.Rect(margen, y, ancho, alto)
 	for i, ln := range lineas {
 		yy := y + 15 + pdf.Pt(i)*13
 		l.Texto(margen+8, yy, bold, 8, ln.et)
-		l.Texto(margen+160, yy, sans, 8, ln.valor)
+		l.Texto(margen+200, yy, sans, 8, ln.valor)
 	}
 	return y + alto
 }
@@ -167,7 +181,7 @@ func comprador(l *pdf.Lienzo, f sri.FacturaLeida, y pdf.Pt) pdf.Pt {
 // continuacion abre otra hoja que dice de qué factura es y devuelve dónde seguir.
 func continuacion(l *pdf.Lienzo, f sri.FacturaLeida) pdf.Pt {
 	l.NuevaPagina()
-	l.Texto(margen, 40, bold, 9, "FACTURA No. "+f.Numero())
+	l.Texto(margen, 40, bold, 9, titulo(f)+" No. "+f.Numero())
 	l.TextoDerecha(margen+ancho, 40, sans, 8, "R.U.C. "+f.RUC+" · continuación")
 	return 52
 }

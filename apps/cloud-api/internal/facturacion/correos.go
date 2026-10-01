@@ -37,6 +37,7 @@ const (
 // Documentos es lo que se entrega de una factura autorizada.
 type Documentos struct {
 	Numero, Nombre, Correo string
+	Archivo                string // FACTURA-001-002-000000067 o NOTA-CREDITO-001-002-000000004
 	Ambiente               sri.Ambiente
 	PDF, XML               []byte
 	Leida                  sri.FacturaLeida
@@ -57,17 +58,18 @@ func LeerDocumentos(ctx context.Context, tx db.Tx, comprobante ids.ID) (Document
 	if err != nil {
 		return d, err
 	}
-	if *estado != "AUTORIZADO" || firmado == nil || numero == nil || fecha == nil {
+	if (*estado != "AUTORIZADO" && *estado != "ANULADO") || firmado == nil || numero == nil || fecha == nil {
 		return d, apperr.New(apperr.Conflict, "NO_AUTORIZADO", "La factura todavía no está autorizada por el SRI.")
 	}
 	d.Ambiente = sri.Ambiente(amb)
 	if correo != nil {
 		d.Correo = *correo
 	}
-	if d.Leida, err = sri.LeerFactura([]byte(*firmado)); err != nil {
+	if d.Leida, err = sri.LeerComprobante([]byte(*firmado)); err != nil {
 		return d, err
 	}
 	d.Numero = d.Leida.Numero()
+	d.Archivo = NombreArchivo(d.Leida.CodDoc, d.Numero)
 	if d.PDF, err = ride.PDF([]byte(*firmado), ride.Autorizacion{Fecha: fecha}); err != nil {
 		return d, err
 	}
@@ -78,22 +80,29 @@ func LeerDocumentos(ctx context.Context, tx db.Tx, comprobante ids.ID) (Document
 // Mensaje es el correo con los dos adjuntos.
 func (d Documentos) Mensaje() (mail.Message, error) {
 	f := d.Leida
-	asunto := fmt.Sprintf("Tu factura %s de %s", d.Numero, d.Nombre)
-	parrafos := []string{
-		fmt.Sprintf("Hola, %s. Te enviamos tu factura electrónica autorizada por el SRI.", f.RazonSocialComprador),
-		fmt.Sprintf("Factura %s del %s por $%s.", d.Numero, f.FechaEmision, f.ImporteTotal),
-		"Número de autorización: " + f.ClaveAcceso,
-		"Adjuntamos el RIDE (PDF) y el comprobante en XML; con la clave de acceso también puedes consultarla en el portal del SRI.",
+	que, titulo := "factura", "Factura"
+	if f.EsNotaCredito() {
+		que, titulo = "nota de crédito", "Nota de crédito"
 	}
+	asunto := fmt.Sprintf("Tu %s %s de %s", que, d.Numero, d.Nombre)
+	parrafos := []string{
+		fmt.Sprintf("Hola, %s. Te enviamos tu %s electrónica autorizada por el SRI.", f.RazonSocialComprador, que),
+		fmt.Sprintf("%s %s del %s por $%s.", titulo, d.Numero, f.FechaEmision, f.ImporteTotal),
+	}
+	if f.EsNotaCredito() {
+		parrafos = append(parrafos, fmt.Sprintf("Modifica la factura %s del %s. Motivo: %s.", f.NumDocModificado, f.FechaEmisionDocSustento, f.Motivo))
+	}
+	parrafos = append(parrafos, "Número de autorización: "+f.ClaveAcceso,
+		"Adjuntamos el RIDE (PDF) y el comprobante en XML; con la clave de acceso también puedes consultarlo en el portal del SRI.")
 	if d.Ambiente == sri.AmbientePruebas {
 		asunto = "[PRUEBAS] " + asunto
 		parrafos = append(parrafos, "Este comprobante es del ambiente de pruebas del SRI y no tiene validez tributaria.")
 	}
-	text, html, err := mail.Render(mail.Contenido{Titulo: "Factura " + d.Numero, Parrafos: parrafos, Pie: d.Nombre})
+	text, html, err := mail.Render(mail.Contenido{Titulo: titulo + " " + d.Numero, Parrafos: parrafos, Pie: d.Nombre})
 	if err != nil {
 		return mail.Message{}, err
 	}
-	base := "FACTURA-" + d.Numero
+	base := d.Archivo
 	return mail.Message{Subject: asunto, Text: text, HTML: html, Attachments: []mail.Attachment{
 		{Name: base + ".pdf", ContentType: "application/pdf", Data: d.PDF},
 		{Name: base + ".xml", ContentType: "application/xml", Data: d.XML},
@@ -185,4 +194,12 @@ func (c *Correos) Correr(ctx context.Context, pool *pgxpool.Pool) {
 		case <-despertar:
 		}
 	}
+}
+
+// NombreArchivo del comprobante descargado o adjunto.
+func NombreArchivo(tipo, numero string) string {
+	if tipo == sri.TipoNotaCredito {
+		return "NOTA-CREDITO-" + numero
+	}
+	return "FACTURA-" + numero
 }

@@ -38,13 +38,23 @@ type configFiscal struct {
 
 // leerConfigFiscal devuelve la configuración si la facturación electrónica está activa.
 func leerConfigFiscal(ctx context.Context, q queryer) (*configFiscal, error) {
+	return leerConfig(ctx, q, true)
+}
+
+// leerConfigFiscalSiempre la devuelve aunque la facturación esté apagada: una factura ya
+// emitida se puede revertir con una nota de crédito después de apagarla (F5-13).
+func leerConfigFiscalSiempre(ctx context.Context, q queryer) (*configFiscal, error) {
+	return leerConfig(ctx, q, false)
+}
+
+func leerConfig(ctx context.Context, q queryer, soloActiva bool) (*configFiscal, error) {
 	var c configFiscal
 	var nombre, especial, agente sql.NullString
 	var obligado, activa int
 	err := q.QueryRowContext(ctx, `SELECT ambiente, ruc, razon_social, nombre_comercial, direccion_matriz, obligado_contabilidad,
 		contribuyente_especial, agente_retencion, regimen, facturacion_activa FROM configuracion_fiscal LIMIT 1`).
 		Scan(&c.Ambiente, &c.RUC, &c.RazonSocial, &nombre, &c.DirMatriz, &obligado, &especial, &agente, &c.Regimen, &activa)
-	if errors.Is(err, sql.ErrNoRows) || (err == nil && activa == 0) {
+	if errors.Is(err, sql.ErrNoRows) || (err == nil && activa == 0 && soloActiva) {
 		return nil, nil //nolint:nilnil // sin facturación: el cobro emite el documento interno
 	}
 	if err != nil {
