@@ -22,6 +22,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/archivo"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/auth"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/caja"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/catalogo"
@@ -74,6 +75,8 @@ type App struct {
 	Salon    *salon.Service
 	Personal *personal.Service
 	Signer   *auth.Signer
+	// Comprobantes es el almacenamiento inmutable de los XML autorizados.
+	Comprobantes imagenes.Store
 }
 
 func build(ctx context.Context, migrate bool) (*App, error) {
@@ -92,12 +95,17 @@ func build(ctx context.Context, migrate bool) (*App, error) {
 	if err != nil {
 		return nil, err
 	}
-	var store imagenes.Store
-	if cfg.StorageDriver == "azure" {
-		store, err = imagenes.NewAzureBlob(ctx, cfg.AzureStorageConn, cfg.S3Bucket)
-	} else {
-		store, err = imagenes.NewS3(cfg.S3Endpoint, cfg.S3AccessKey, cfg.S3SecretKey, cfg.S3Bucket, cfg.S3UseSSL)
+	abrir := func(bucket string) (imagenes.Store, error) {
+		if cfg.StorageDriver == "azure" {
+			return imagenes.NewAzureBlob(ctx, cfg.AzureStorageConn, bucket)
+		}
+		return imagenes.NewS3(cfg.S3Endpoint, cfg.S3AccessKey, cfg.S3SecretKey, bucket, cfg.S3UseSSL)
 	}
+	store, err := abrir(cfg.S3Bucket)
+	if err != nil {
+		return nil, err
+	}
+	comprobantes, err := abrir(cfg.BucketComprobantes)
 	if err != nil {
 		return nil, err
 	}
@@ -106,11 +114,12 @@ func build(ctx context.Context, migrate bool) (*App, error) {
 	img := &imagenes.Service{Store: store, PublicURL: cfg.PublicURL}
 	return &App{
 		Cfg: cfg, DB: d, Mail: m, Clock: clk, Imagenes: img,
-		Tenants:  &tenants.Service{DB: d, Mail: m, BackofficeURL: cfg.BackofficeURL},
-		Catalogo: &catalogo.Service{DB: d, ImagenURL: img.URL, Clock: clk},
-		Salon:    &salon.Service{DB: d},
-		Personal: &personal.Service{DB: d, Mail: m, Pepper: cfg.PINPepper, BackofficeURL: cfg.BackofficeURL, ImagenURL: img.URL},
-		Signer:   auth.NewSigner(cfg.JWTKey, clk.Now),
+		Tenants:      &tenants.Service{DB: d, Mail: m, BackofficeURL: cfg.BackofficeURL},
+		Catalogo:     &catalogo.Service{DB: d, ImagenURL: img.URL, Clock: clk},
+		Salon:        &salon.Service{DB: d},
+		Personal:     &personal.Service{DB: d, Mail: m, Pepper: cfg.PINPepper, BackofficeURL: cfg.BackofficeURL, ImagenURL: img.URL},
+		Signer:       auth.NewSigner(cfg.JWTKey, clk.Now),
+		Comprobantes: comprobantes,
 	}, nil
 }
 
@@ -185,6 +194,8 @@ func serve(ctx context.Context) error {
 	}
 	go deps.Nodos.Avisos.Escuchar(ctx, app.DB.Pool, slog.Default())
 	go (&caja.Notificador{DB: app.DB, Mail: app.Mail, Log: slog.Default()}).Correr(ctx, app.DB.Pool)
+	go (&facturacion.Correos{DB: app.DB, Mail: app.Mail, Log: slog.Default()}).Correr(ctx, app.DB.Pool)
+	go (&archivo.Archivador{DB: app.DB, Store: app.Comprobantes, Log: slog.Default(), Now: app.Clock.Now}).Correr(ctx)
 	srv := &http.Server{
 		Addr: cfg.HTTPAddr, Handler: server.Handler(deps, server.Routes(deps)),
 		ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 30 * time.Second, WriteTimeout: 60 * time.Second, IdleTimeout: 120 * time.Second,

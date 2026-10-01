@@ -72,6 +72,18 @@ valores de las respuestas pueden traer saltos de línea (la clave consultada, po
   Se toma de `parametros_globales.ruc_proveedor_sistema` (vacío hasta que el proveedor de este
   software lo defina: **pendiente**).
 
+## RIDE A4 y XML autorizado (F5-11)
+
+- **RIDE A4** (`apps/cloud-api/internal/ride`):
+  - Sigue la imagen del Anexo 2, página 60 de la ficha. Arriba a la izquierda va el emisor y a la derecha el RUC, el número, la autorización, el ambiente, la emisión y la clave.
+  - Después vienen el comprador y el detalle, con Cód. Principal, Cantidad, Descripción, Precio Unitario, Descuento y Precio Total.
+  - Al pie, la información adicional y la forma de pago con su código de la Tabla 24, y el cuadro de totales con solo los subtotales llenos.
+  - La fecha y hora de autorización se imprimen cuando ya se conocen; antes dice «Pendiente de autorización del SRI».
+  - El código de barras de la clave va en Code 128. Es opcional según §9.20 y se verifica con zxing-cpp.
+  - El PDF se genera al vuelo desde el XML y es determinista; no se guarda.
+- **XML autorizado.** Es el elemento `<autorizacion>` del WSDL oficial de autorización: `estado`, `numeroAutorizacion`, `fechaAutorizacion`, `ambiente` y el `comprobante` firmado en CDATA, sin mensajes. Es lo que recibe el comprador y lo que se archiva.
+- 🔎 **Valor de `<ambiente>`.** Se escribe «PRUEBAS» o «PRODUCCIÓN» como en las respuestas del WS. Falta confirmarlo con una respuesta real del SRI de pruebas (DP-04).
+
 ## Firma (F5-09)
 
 Implementada según §6 y el Anexo 4 con un certificado de prueba y verificada con `signxml`

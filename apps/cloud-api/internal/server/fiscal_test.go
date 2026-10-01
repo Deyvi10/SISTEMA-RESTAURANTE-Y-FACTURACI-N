@@ -2,6 +2,7 @@ package server_test
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
 	"net/http/httptest"
 	"strings"
@@ -137,6 +138,44 @@ func TestWorkerFiscalHastaAutorizado(t *testing.T) {
 	if accesos != 4 || firmados != 4 {
 		t.Fatalf("accesos %d, firmados %d", accesos, firmados)
 	}
+	// F5-11: cada estado vuelve al nodo por la réplica, sin el XML; el volcado trae el último.
+	estados := map[string][]string{}
+	var autorizado map[string]any
+	for _, cam := range n.pull(1, 0).Cambios {
+		if cam.Tabla != "estados_comprobante" {
+			continue
+		}
+		var d map[string]any
+		_ = json.Unmarshal(cam.Datos, &d)
+		if _, hay := d["xml"]; hay {
+			t.Fatal("el estado no lleva el XML")
+		}
+		estados[d["clave_acceso"].(string)] = append(estados[d["clave_acceso"].(string)], d["estado"].(string))
+		if d["estado"] == "AUTORIZADO" {
+			autorizado = d
+		}
+	}
+	if got := strings.Join(estados[ok.ClaveAcceso], " → "); got != "EN_NUBE → FIRMADO → RECIBIDO → AUTORIZADO" {
+		t.Fatalf("estados al nodo: %s", got)
+	}
+	if autorizado["numero_autorizacion"] != ok.ClaveAcceso || autorizado["fecha_autorizacion"] == nil {
+		t.Fatalf("autorizado al nodo: %v", autorizado)
+	}
+	if got := estados[devuelto.ClaveAcceso]; got[len(got)-1] != "DEVUELTO" {
+		t.Fatalf("devuelto al nodo: %v", got)
+	}
+	ultimo := map[string]string{}
+	for _, cam := range n.pull(0, 0).Cambios {
+		if cam.Tabla == "estados_comprobante" {
+			var d map[string]any
+			_ = json.Unmarshal(cam.Datos, &d)
+			ultimo[d["clave_acceso"].(string)] = d["estado"].(string)
+		}
+	}
+	if len(ultimo) != 5 || ultimo[ok.ClaveAcceso] != "AUTORIZADO" || ultimo[alterado.ClaveAcceso] != "REQUIERE_ATENCION" {
+		t.Fatalf("volcado de estados: %v", ultimo)
+	}
+
 	// Lo firmado y autorizado ya no cambia.
 	if _, err := e.tdb.Admin.Exec(ctx, `UPDATE comprobantes SET xml_firmado = 'x' WHERE id = $1`, ok.ID); err == nil {
 		t.Fatal("el XML firmado no se reescribe")

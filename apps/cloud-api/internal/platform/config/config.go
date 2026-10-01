@@ -32,6 +32,8 @@ type Config struct {
 	S3SecretKey string
 	S3UseSSL    bool
 	S3Bucket    string // imágenes
+	// BucketComprobantes guarda los XML autorizados (inmutable, F5-11).
+	BucketComprobantes string
 
 	// StorageDriver elige el almacenamiento de objetos: "s3" (VersityGW en local) o "azure" (ADR-0013).
 	StorageDriver    string
@@ -59,25 +61,26 @@ func Load() (Config, error) {
 		return ""
 	}
 	c := Config{
-		Env:              env,
-		HTTPAddr:         get("HTTP_ADDR", ":8080"),
-		DatabaseURL:      get("DATABASE_URL", def("postgres://restpos_app:restpos_app_dev@localhost:5442/restpos")),
-		AdminDBURL:       get("DATABASE_ADMIN_URL", def("postgres://restpos_owner:restpos_dev@localhost:5442/restpos")),
-		PublicURL:        get("PUBLIC_URL", def("http://localhost:8080")),
-		BackofficeURL:    get("BACKOFFICE_URL", def("http://localhost:5173")),
-		CookieSecure:     get("COOKIE_SECURE", map[bool]string{true: "false", false: "true"}[local]) == "true",
-		SMTPAddr:         get("SMTP_ADDR", def("localhost:1025")),
-		MailFrom:         get("MAIL_FROM", "RestPOS <no-responder@restpos.local>"),
-		S3Endpoint:       get("S3_ENDPOINT", def("localhost:7171")),
-		S3AccessKey:      get("S3_ACCESS_KEY", def("restpos")),
-		S3SecretKey:      get("S3_SECRET_KEY", def("restpos_s3_dev")),
-		S3UseSSL:         get("S3_USE_SSL", map[bool]string{true: "false", false: "true"}[local]) == "true",
-		S3Bucket:         get("S3_BUCKET_IMAGENES", "imagenes"),
-		StorageDriver:    get("STORAGE_DRIVER", "s3"),
-		AzureStorageConn: os.Getenv("AZURE_STORAGE_CONNECTION_STRING"),
-		KEKPublicaFile:   get("KEK_PUBLICA_FILE", def(".secrets/kek-publica.pem")),
-		KEKPrivadaFile:   get("KEK_PRIVADA_FILE", def(".secrets/kek-privada.pem")),
-		SRIHost:          get("SRI_HOST", def("http://localhost:8091")),
+		Env:                env,
+		HTTPAddr:           get("HTTP_ADDR", ":8080"),
+		DatabaseURL:        get("DATABASE_URL", def("postgres://restpos_app:restpos_app_dev@localhost:5442/restpos")),
+		AdminDBURL:         get("DATABASE_ADMIN_URL", def("postgres://restpos_owner:restpos_dev@localhost:5442/restpos")),
+		PublicURL:          get("PUBLIC_URL", def("http://localhost:8080")),
+		BackofficeURL:      get("BACKOFFICE_URL", def("http://localhost:5173")),
+		CookieSecure:       get("COOKIE_SECURE", map[bool]string{true: "false", false: "true"}[local]) == "true",
+		SMTPAddr:           get("SMTP_ADDR", def("localhost:1025")),
+		MailFrom:           get("MAIL_FROM", "RestPOS <no-responder@restpos.local>"),
+		S3Endpoint:         get("S3_ENDPOINT", def("localhost:7171")),
+		S3AccessKey:        get("S3_ACCESS_KEY", def("restpos")),
+		S3SecretKey:        get("S3_SECRET_KEY", def("restpos_s3_dev")),
+		S3UseSSL:           get("S3_USE_SSL", map[bool]string{true: "false", false: "true"}[local]) == "true",
+		S3Bucket:           get("S3_BUCKET_IMAGENES", "imagenes"),
+		BucketComprobantes: get("BUCKET_COMPROBANTES", "comprobantes"),
+		StorageDriver:      get("STORAGE_DRIVER", "s3"),
+		AzureStorageConn:   os.Getenv("AZURE_STORAGE_CONNECTION_STRING"),
+		KEKPublicaFile:     get("KEK_PUBLICA_FILE", def(".secrets/kek-publica.pem")),
+		KEKPrivadaFile:     get("KEK_PRIVADA_FILE", def(".secrets/kek-privada.pem")),
+		SRIHost:            get("SRI_HOST", def("http://localhost:8091")),
 	}
 
 	var missing []string

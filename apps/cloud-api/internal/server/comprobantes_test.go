@@ -22,6 +22,12 @@ import (
 // comprobante envía a la nube una factura como la emite el nodo al cobrar (F5-05).
 func (n *nodoSim) comprobante(ruc string, punto ids.ID, sec int64, alterarHash bool) facturacion.ComprobanteEmitido {
 	n.e.t.Helper()
+	return n.comprobanteCon(ruc, punto, sec, alterarHash, nil)
+}
+
+// comprobanteCon permite ajustar los datos de la factura (comprador, campos adicionales).
+func (n *nodoSim) comprobanteCon(ruc string, punto ids.ID, sec int64, alterarHash bool, ajustar func(*sri.DatosFactura)) facturacion.ComprobanteEmitido {
+	n.e.t.Helper()
 	iva := sri.Tarifa{Porcentaje: "15", Codigo: "4"}
 	f, err := sri.Desglosar(sri.Venta{
 		Lineas:     []sri.LineaVenta{{Codigo: "CEV", Descripcion: "Ceviche", Cantidad: decimal.NewFromInt(1), Bruto: money.MustParse("15.00"), Final: money.MustParse("15.00"), Tarifa: iva}},
@@ -37,9 +43,13 @@ func (n *nodoSim) comprobante(ruc string, punto ids.ID, sec int64, alterarHash b
 	if err != nil {
 		n.e.t.Fatal(err)
 	}
-	doc, err := sri.FacturaXML(sri.DatosFactura{Ambiente: 1, ClaveAcceso: clave, Secuencial: sec, Fecha: fecha,
+	datos := sri.DatosFactura{Ambiente: 1, ClaveAcceso: clave, Secuencial: sec, Fecha: fecha,
 		Emisor:    sri.Emisor{RUC: ruc, RazonSocial: "Emisor", DirMatriz: "Quito", Establecimiento: "001", PuntoEmision: "001"},
-		Comprador: sri.Comprador{TipoIdentificacion: "07", Identificacion: "9999999999999", RazonSocial: "CONSUMIDOR FINAL"}}, f)
+		Comprador: sri.Comprador{TipoIdentificacion: "07", Identificacion: "9999999999999", RazonSocial: "CONSUMIDOR FINAL"}}
+	if ajustar != nil {
+		ajustar(&datos)
+	}
+	doc, err := sri.FacturaXML(datos, f)
 	if err != nil {
 		n.e.t.Fatal(err)
 	}

@@ -17,6 +17,7 @@ const (
 	Unauthorized                 // 401
 	Forbidden                    // 403
 	TooMany                      // 429: demasiados intentos
+	Unavailable                  // 503: un servicio externo no respondió (correo, SRI)
 )
 
 // FieldError señala el campo exacto que hay que corregir.

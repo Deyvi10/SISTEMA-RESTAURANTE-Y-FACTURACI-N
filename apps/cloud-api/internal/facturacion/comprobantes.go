@@ -58,12 +58,21 @@ func RegistrarComprobante(ctx context.Context, tx pgx.Tx, tenant, local, nodo id
 	if !valido {
 		estado = "REQUIERE_ATENCION"
 	}
+	// El comprador, para la bóveda y el correo (el nodo pone el correo en «Email», F5-05).
+	var idComprador, nombre, correo *string
+	if f, err := sri.LeerFactura([]byte(c.XML)); err == nil && valido {
+		idComprador, nombre = &f.IdComprador, &f.RazonSocialComprador
+		if e := f.Adicional("Email"); e != "" {
+			correo = &e
+		}
+	}
 	tag, err := tx.Exec(ctx, `INSERT INTO comprobantes (id, tenant_id, local_id, nodo_id, punto_emision_id, documento_id, tipo, ambiente, serie,
-			secuencial, clave_acceso, fecha_emision, importe_total, xml, hash, hash_valido, estado, proximo_intento_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, now())
+			secuencial, clave_acceso, fecha_emision, importe_total, xml, hash, hash_valido, estado, proximo_intento_at,
+			comprador_identificacion, comprador_nombre, correo_comprador)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, now(), $18, $19, $20)
 		ON CONFLICT DO NOTHING`,
 		c.ID, tenant, local, nodo, c.PuntoEmisionID, c.DocumentoID, c.Tipo, c.Ambiente, c.Serie, c.Secuencial, c.ClaveAcceso,
-		c.FechaEmision, total.Decimal(), c.XML, c.Hash, valido, estado)
+		c.FechaEmision, total.Decimal(), c.XML, c.Hash, valido, estado, idComprador, nombre, correo)
 	// Repetido (el nodo reintenta) o una serie+secuencial que ya existe con otra clave: no se
 	// duplica ni se detiene la sincronización; el evento crudo queda en sync_eventos.
 	if err != nil || tag.RowsAffected() == 0 {

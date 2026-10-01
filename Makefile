@@ -53,7 +53,8 @@ lint: check-float ## Revisión estática (go vet + golangci-lint si está instal
 	@if command -v golangci-lint >/dev/null; then golangci-lint run; else echo "golangci-lint no instalado: se ejecuta en el CI"; fi
 
 check-float: ## Falla si aparece float en código de dominio (regla: dinero siempre decimal)
-	@if grep -rnE '\bfloat(32|64)\b' --include='*.go' packages apps | grep -v '_test.go'; then \
+	@# Única excepción: la geometría de los PDF (puntos tipográficos, pdf.Pt), que no es dinero.
+	@if grep -rnE '\bfloat(32|64)\b' --include='*.go' packages apps | grep -v '_test.go' | grep -vE '^apps/cloud-api/internal/platform/pdf/lienzo.go:[0-9]+:(type Pt float64|.*float64\(v\))'; then \
 		echo "✗ Se encontró float en código de dominio. Usa money.Money o decimal."; exit 1; \
 	else echo "✓ Sin float en código de dominio"; fi
 

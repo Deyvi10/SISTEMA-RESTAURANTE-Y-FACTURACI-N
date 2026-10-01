@@ -401,7 +401,27 @@ func TestTiempoRealYConectividad(t *testing.T) {
 	if !slices.Contains(tipos, eventos.TipoUserDeactivated) {
 		t.Fatalf("eventos: %v", tipos)
 	}
-	_ = a
+
+	// F5-11: el SRI autorizó una factura; la caja se entera y el nodo lo guarda.
+	clave := strings.Repeat("1", 49)
+	f.mu.Lock()
+	f.feed = append(f.feed, edgesync.Cambio{Seq: 2, Tabla: "estados_comprobante", Op: "U", Datos: []byte(`{"id":"01a0da6b-e870-74e7-984b-266e0803f193","tenant_id":"t",
+		"clave_acceso":"` + clave + `","estado":"DEVUELTO","mensaje":"35 ARCHIVO NO CUMPLE ESTRUCTURA XML","numero_autorizacion":null}`)})
+	f.mu.Unlock()
+	var fiscal eventos.FiscalStatusChanged
+	for fiscal.Status == "" {
+		if s := leer(); s.Type == eventos.TipoFiscalStatusChanged {
+			_ = json.Unmarshal(s.Data, &fiscal)
+		}
+	}
+	if fiscal.Status != "REQUIERE_ATENCION" || fiscal.AccessKey == nil || *fiscal.AccessKey != clave || fiscal.Message == nil || !strings.Contains(*fiscal.Message, "35") {
+		t.Fatalf("estado fiscal: %+v", fiscal)
+	}
+	var estado string
+	_ = a.Store.Read().QueryRow(`SELECT estado FROM estados_comprobante WHERE clave_acceso = ?`, clave).Scan(&estado)
+	if estado != "DEVUELTO" {
+		t.Fatalf("estado guardado: %q", estado)
+	}
 }
 
 // Una actualización del nodo que agrega tablas replicadas pide un volcado: las filas de esas

@@ -55,6 +55,10 @@ func (a *App) difundirCambios(c CambiosAplicados) {
 		return
 	}
 	for _, cam := range c.Cambios {
+		if cam.Tabla == "estados_comprobante" {
+			a.difundirEstadoFiscal(cam.Datos)
+			continue
+		}
 		if cam.Tabla != "usuarios" {
 			continue
 		}
@@ -116,4 +120,34 @@ func (a *App) anunciarMDNS(ctx context.Context, port int) {
 	a.Log.Info("nodo anunciado en la red", "servicio", ServicioMDNS, "puerto", strconv.Itoa(port))
 	<-ctx.Done()
 	srv.Shutdown()
+}
+
+// difundirEstadoFiscal avisa a las cajas que la nube o el SRI movieron un comprobante
+// (fiscal.status_changed): enviado, autorizado o con algo que atender.
+func (a *App) difundirEstadoFiscal(datos json.RawMessage) {
+	var e struct {
+		ID      ids.ID  `json:"id"`
+		Clave   string  `json:"clave_acceso"`
+		Estado  string  `json:"estado"`
+		Mensaje *string `json:"mensaje"`
+	}
+	if json.Unmarshal(datos, &e) != nil {
+		return
+	}
+	ev := eventos.FiscalStatusChanged{InvoiceID: e.ID, AccessKey: &e.Clave, Status: EstadoFiscal(e.Estado), Message: e.Mensaje}
+	if err := a.hub.Difundir(ev); err != nil {
+		a.Log.Error("hub: difundir estado fiscal", "err", err)
+	}
+}
+
+// EstadoFiscal traduce el estado de la nube al del contrato fiscal.status_changed.
+func EstadoFiscal(nube string) string {
+	switch nube {
+	case "AUTORIZADO", "NO_AUTORIZADO", "REQUIERE_ATENCION":
+		return nube
+	case "DEVUELTO":
+		return "REQUIERE_ATENCION"
+	default: // EN_NUBE, FIRMADO, RECIBIDO
+		return "ENVIADO"
+	}
 }

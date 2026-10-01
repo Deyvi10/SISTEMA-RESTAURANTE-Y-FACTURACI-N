@@ -70,8 +70,11 @@ func (d *Doc) paginas() [][]byte {
 }
 
 // Bytes devuelve el PDF completo.
-func (d *Doc) Bytes() []byte {
-	pags := d.paginas()
+func (d *Doc) Bytes() []byte { return escribir(d.paginas()) }
+
+// escribir arma el archivo con las páginas ya dibujadas. No lleva fecha de creación ni
+// identificadores al azar: el mismo contenido da siempre los mismos bytes.
+func escribir(pags [][]byte) []byte {
 	var out bytes.Buffer
 	var offs []int
 	obj := func(cuerpo string) {
@@ -79,17 +82,18 @@ func (d *Doc) Bytes() []byte {
 		fmt.Fprintf(&out, "%d 0 obj\n%s\nendobj\n", len(offs), cuerpo)
 	}
 	out.WriteString("%PDF-1.4\n%\xe2\xe3\xcf\xd3\n")
-	// 1 catálogo, 2 páginas, 3 y 4 fuentes; luego cada página (hoja + contenido).
+	// 1 catálogo, 2 páginas, 3 a 6 fuentes; luego cada página (hoja + contenido).
 	obj("<< /Type /Catalog /Pages 2 0 R >>")
 	kids := make([]string, len(pags))
 	for i := range pags {
-		kids[i] = fmt.Sprintf("%d 0 R", 5+2*i)
+		kids[i] = fmt.Sprintf("%d 0 R", 7+2*i)
 	}
 	obj(fmt.Sprintf("<< /Type /Pages /Kids [%s] /Count %d >>", strings.Join(kids, " "), len(pags)))
-	obj("<< /Type /Font /Subtype /Type1 /BaseFont /Courier /Encoding /WinAnsiEncoding >>")
-	obj("<< /Type /Font /Subtype /Type1 /BaseFont /Courier-Bold /Encoding /WinAnsiEncoding >>")
+	for _, f := range []string{"Courier", "Courier-Bold", "Helvetica", "Helvetica-Bold"} {
+		obj("<< /Type /Font /Subtype /Type1 /BaseFont /" + f + " /Encoding /WinAnsiEncoding >>")
+	}
 	for i, p := range pags {
-		obj(fmt.Sprintf("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 %d %d] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents %d 0 R >>", anchoA4, altoA4, 6+2*i))
+		obj(fmt.Sprintf("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 %d %d] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R /F4 6 0 R >> >> /Contents %d 0 R >>", anchoA4, altoA4, 8+2*i))
 		obj(fmt.Sprintf("<< /Length %d >>\nstream\n%sendstream", len(p), p))
 	}
 	xref := out.Len()

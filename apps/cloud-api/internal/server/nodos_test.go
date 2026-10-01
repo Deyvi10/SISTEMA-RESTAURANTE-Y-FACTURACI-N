@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"strings"
 	"testing"
@@ -15,11 +16,14 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/archivo"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/caja"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/facturacion"
+	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/imagenes"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/impresoras"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/nodos"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/salon"
+	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/clock"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/edgesync"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/ids"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/nodoauth"
@@ -112,9 +116,26 @@ func (c *cliente) nodoOperativo() *nodoSim {
 	var fcfg facturacion.Config
 	c.do("GET", "/v1/facturacion", nil, 200, &fcfg)
 	n.comprobante(fcfg.RUC, *fcfg.Cajas[0].PuntoID, 1, false)
+	n.comprobante(fcfg.RUC, *fcfg.Cajas[0].PuntoID, 2, false)
 	// Con su firma electrónica, el worker fiscal lo firma (F5-07): deja el acceso registrado.
 	c.subirP12(p12De(c.e.t, fcfg.RUC, time.Now().Add(-time.Hour), time.Now().AddDate(1, 0, 0)), claveP12, 201)
 	drenar(c.e.t, c.e.worker("fiscal@qa"))
+	// Su correo y su archivo (F5-11).
+	var tid ids.ID
+	_ = c.e.tdb.Admin.QueryRow(context.Background(), `SELECT tenant_id FROM nodos WHERE id = $1`, n.id).Scan(&tid)
+	var compID ids.ID
+	_ = c.e.tdb.Admin.QueryRow(context.Background(), `SELECT id FROM comprobantes WHERE tenant_id = $1 AND estado = 'AUTORIZADO' LIMIT 1`, tid).Scan(&compID)
+	if err := (&facturacion.Correos{DB: c.e.tdb.App, Mail: c.e.mail, Log: slog.Default()}).Enviar(context.Background(), tid, compID, "qa@example.com", facturacion.CorreoReenvio, nil); err != nil {
+		c.e.t.Fatal(err)
+	}
+	manana := time.Now().Add(24 * time.Hour)
+	arch := &archivo.Archivador{DB: c.e.tdb.App, Store: &imagenes.Memory{}, Log: slog.Default(), Now: func() time.Time { return manana }, Muestras: 2}
+	if n, err := arch.ArchivarDia(context.Background(), tid, time.Now().In(clock.Guayaquil)); err != nil || n != 2 {
+		c.e.t.Fatalf("archivar: %d %v", n, err)
+	}
+	if err := arch.EntrenarSiHaceFalta(context.Background(), tid); err != nil {
+		c.e.t.Fatal(err)
+	}
 	n.cierreZ(cajas[0].ID, 1, "", "-0.50")
 	c.e.notificarCierres()
 	n.cliente(caja.Cliente{ID: ids.New(), TipoIdentificacion: "05", Identificacion: "1710034065", RazonSocial: "María Pérez", Email: "maria@example.com",

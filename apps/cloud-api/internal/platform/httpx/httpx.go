@@ -77,7 +77,7 @@ func decode(w http.ResponseWriter, r *http.Request, v any, limit int64, strict b
 var status = map[apperr.Kind]int{
 	apperr.Invalid: http.StatusUnprocessableEntity, apperr.NotFound: http.StatusNotFound,
 	apperr.Conflict: http.StatusConflict, apperr.Unauthorized: http.StatusUnauthorized,
-	apperr.Forbidden: http.StatusForbidden, apperr.TooMany: http.StatusTooManyRequests,
+	apperr.Forbidden: http.StatusForbidden, apperr.TooMany: http.StatusTooManyRequests, apperr.Unavailable: http.StatusServiceUnavailable,
 }
 
 // Error traduce cualquier error a un Problem. Los errores inesperados se registran con

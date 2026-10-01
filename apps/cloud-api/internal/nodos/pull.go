@@ -113,6 +113,9 @@ func consultasVolcado(tabla string) (string, bool) {
 		return `SELECT to_jsonb(t) - 'llave_publica' FROM dispositivos t WHERE t.local_id = $1`, true
 	case "estaciones", "zonas", "mesas", "impresoras", "cajas", "puntos_emision":
 		return fmt.Sprintf(`SELECT to_jsonb(t) FROM %s t WHERE t.local_id = $1 AND t.deleted_at IS NULL`, tabla), true
+	case "estados_comprobante":
+		// Los últimos 90 días: lo que la caja puede necesitar consultar o reimprimir (F5-18).
+		return `SELECT estado_comprobante_json(c) FROM comprobantes c WHERE c.local_id = $1 AND c.recibido_at > now() - interval '90 days'`, true
 	case "usuario_locales", "estacion_impresoras":
 		return fmt.Sprintf(`SELECT to_jsonb(t) FROM %s t WHERE t.local_id = $1`, tabla), true
 	case "comandos_nodo":

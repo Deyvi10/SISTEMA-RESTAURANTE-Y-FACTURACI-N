@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/money"
+	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/sri"
 )
 
 // Ride es la representación impresa de la factura electrónica (RIDE, F5-05) en formato
@@ -68,13 +69,6 @@ type PagoRide struct {
 	Metodo   string
 	Monto    money.Money
 	Ultimos4 string
-}
-
-// formasPagoSRI son las descripciones de la Tabla 24 de la ficha técnica offline v2.34.
-var formasPagoSRI = map[string]string{
-	"01": "SIN UTILIZACION DEL SISTEMA FINANCIERO", "15": "COMPENSACION DE DEUDAS", "16": "TARJETA DE DEBITO",
-	"17": "DINERO ELECTRONICO", "18": "TARJETA PREPAGO", "19": "TARJETA DE CREDITO",
-	"20": "OTROS CON UTILIZACION DEL SISTEMA FINANCIERO", "21": "ENDOSO DE TITULOS",
 }
 
 func ImprimirRide(p Paper, r Ride) []byte {
@@ -152,7 +146,7 @@ func ImprimirRide(p Paper, r Ride) []byte {
 	b.Separator('-')
 	b.Line("Forma de pago")
 	for _, p := range r.Pagos {
-		desc := p.Codigo + " - " + formasPagoSRI[p.Codigo]
+		desc := p.Codigo + " - " + sri.FormasPago[p.Codigo]
 		colgante(b, desc)
 		nombre := "  " + p.Metodo
 		if p.Ultimos4 != "" {

@@ -39,6 +39,12 @@ func probarStore(t *testing.T, s Store) {
 	if string(got) != string(datos) {
 		t.Fatalf("Get devolvió %q; quiero %q", got, datos)
 	}
+	if parte, err := s.GetRange(ctx, key, 8, 4); err != nil || string(parte) != "WEBP" {
+		t.Fatalf("GetRange = %q, %v; quiero WEBP", parte, err)
+	}
+	if _, err := s.GetRange(ctx, key, int64(len(datos))-2, 10); err == nil {
+		t.Fatal("un rango fuera del objeto debe fallar")
+	}
 }
 
 func TestMemoryStore(t *testing.T) { probarStore(t, &Memory{}) }
@@ -51,6 +57,20 @@ func TestAzureBlobStore(t *testing.T) {
 	s, err := NewAzureBlob(context.Background(), conn, "pruebas")
 	if err != nil {
 		t.Skipf("Azurite no disponible: %v", err)
+	}
+	probarStore(t, s)
+}
+
+func TestS3Store(t *testing.T) {
+	if os.Getenv("TEST_DATABASE_URL") == "" {
+		t.Skip("sin `make dev`")
+	}
+	s, err := NewS3("localhost:7171", "restpos", "restpos_s3_dev", "imagenes", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Exists(context.Background(), "x"); err != nil {
+		t.Skipf("S3 local no disponible: %v", err)
 	}
 	probarStore(t, s)
 }

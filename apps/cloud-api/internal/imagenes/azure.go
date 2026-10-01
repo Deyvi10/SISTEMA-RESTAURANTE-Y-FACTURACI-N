@@ -54,3 +54,19 @@ func (a *AzureBlob) Exists(ctx context.Context, key string) (bool, error) {
 	}
 	return err == nil, err
 }
+
+func (a *AzureBlob) GetRange(ctx context.Context, key string, off, n int64) ([]byte, error) {
+	r, err := a.c.DownloadStream(ctx, a.container, key, &azblob.DownloadStreamOptions{Range: blob.HTTPRange{Offset: off, Count: n}})
+	if bloberror.HasCode(err, bloberror.BlobNotFound) {
+		return nil, ErrNoExiste
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = r.Body.Close() }()
+	b, err := io.ReadAll(r.Body)
+	if err == nil && int64(len(b)) != n {
+		return nil, io.ErrUnexpectedEOF
+	}
+	return b, err
+}

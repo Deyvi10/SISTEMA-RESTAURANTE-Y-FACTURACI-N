@@ -18,6 +18,8 @@ type Store interface {
 	Put(ctx context.Context, key string, data []byte, contentType string) error
 	Get(ctx context.Context, key string) (io.ReadCloser, error)
 	Exists(ctx context.Context, key string) (bool, error)
+	// GetRange lee n bytes desde off (una factura dentro del archivo del día, F5-11).
+	GetRange(ctx context.Context, key string, off, n int64) ([]byte, error)
 }
 
 type S3 struct {
@@ -61,6 +63,26 @@ func (s *S3) Exists(ctx context.Context, key string) (bool, error) {
 	return err == nil, err
 }
 
+func (s *S3) GetRange(ctx context.Context, key string, off, n int64) ([]byte, error) {
+	var o minio.GetObjectOptions
+	if err := o.SetRange(off, off+n-1); err != nil {
+		return nil, err
+	}
+	obj, err := s.c.GetObject(ctx, s.bucket, key, o)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = obj.Close() }()
+	b, err := io.ReadAll(obj)
+	if minio.ToErrorResponse(err).Code == "NoSuchKey" {
+		return nil, ErrNoExiste
+	}
+	if err == nil && int64(len(b)) != n {
+		return nil, io.ErrUnexpectedEOF
+	}
+	return b, err
+}
+
 // Memory es un Store en memoria para pruebas.
 type Memory struct {
 	mu   sync.Mutex
@@ -92,4 +114,17 @@ func (m *Memory) Exists(_ context.Context, key string) (bool, error) {
 	defer m.mu.Unlock()
 	_, ok := m.objs[key]
 	return ok, nil
+}
+
+func (m *Memory) GetRange(_ context.Context, key string, off, n int64) ([]byte, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	b, ok := m.objs[key]
+	if !ok {
+		return nil, ErrNoExiste
+	}
+	if off < 0 || n < 0 || off+n > int64(len(b)) {
+		return nil, io.ErrUnexpectedEOF
+	}
+	return bytes.Clone(b[off : off+n]), nil
 }

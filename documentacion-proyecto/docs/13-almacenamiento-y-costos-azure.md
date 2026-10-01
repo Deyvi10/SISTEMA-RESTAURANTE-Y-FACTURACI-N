@@ -21,6 +21,13 @@ Generamos 300 facturas realistas con el formato real del SRI: `<autorizacion>` c
 
 La compresión **no pierde datos**. Al descomprimir se obtiene el XML byte por byte idéntico, así que la firma sigue siendo válida. Antes de archivar, el worker comprueba el SHA-256 del resultado contra el original.
 
+**Implementado (F5-11, `apps/cloud-api/internal/archivo`).** Primeras cifras del archivador real:
+
+- La primera factura de la demo (sin diccionario todavía, 1 producto): 7 239 → 3 019 bytes (2,4×).
+- Prueba con 300 facturas sintéticas de restaurante (`TestDiccionarioDelEmisor`): 2,7× con zstd solo y 14,7× con el diccionario del emisor, entrenado con 1 000 facturas. Ese 14,7× es más optimista que el 10,5× de arriba, porque las facturas sintéticas se parecen más entre sí que las reales. Hay que volver a medir con datos del piloto.
+- El diccionario sale del historial de las facturas más antiguas (hasta 64 KB) más las tablas de entropía de todas. Se guarda versionado e inmutable en `diccionarios_zstd` y también en el blob.
+- Cada factura del blob del día es un frame zstd independiente con CRC. Antes de indexar, el archivador relee cada factura **desde el almacenamiento**, la descomprime y compara su SHA-256 con el original.
+
 ## 2. Qué se guarda y dónde
 
 | Dato | Dónde | Cómo | Retención |

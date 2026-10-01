@@ -2,6 +2,7 @@ package sriws
 
 import (
 	"context"
+	"encoding/xml"
 	"errors"
 	"io"
 	"log/slog"
@@ -223,5 +224,33 @@ func TestAlertaTrasVeinticuatroHoras(t *testing.T) {
 	e := Envio{Fase: Recibido, RecibidoAt: recibido}
 	if e.Retrasado(recibido.Add(23*time.Hour), PoliticaPorDefecto) || !e.Retrasado(recibido.Add(25*time.Hour), PoliticaPorDefecto) {
 		t.Fatal("la alerta fiscal salta pasadas 24 h sin respuesta")
+	}
+}
+
+func TestXMLAutorizado(t *testing.T) {
+	firmado := []byte(`<?xml version="1.0" encoding="UTF-8"?><factura id="comprobante">&amp;</factura>`)
+	fecha := time.Date(2026, 9, 29, 18, 31, 2, 0, time.UTC)
+	doc, err := XMLAutorizado(firmado, "123", fecha, sri.AmbientePruebas)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var a struct {
+		Estado, NumeroAutorizacion, FechaAutorizacion, Ambiente, Comprobante string
+	}
+	if err := xml.Unmarshal(doc, &struct {
+		XMLName xml.Name `xml:"autorizacion"`
+		E       *string  `xml:"estado"`
+		N       *string  `xml:"numeroAutorizacion"`
+		F       *string  `xml:"fechaAutorizacion"`
+		A       *string  `xml:"ambiente"`
+		C       *string  `xml:"comprobante"`
+	}{E: &a.Estado, N: &a.NumeroAutorizacion, F: &a.FechaAutorizacion, A: &a.Ambiente, C: &a.Comprobante}); err != nil {
+		t.Fatal(err)
+	}
+	if a.Estado != "AUTORIZADO" || a.NumeroAutorizacion != "123" || a.FechaAutorizacion != "2026-09-29T13:31:02-05:00" || a.Ambiente != "PRUEBAS" || a.Comprobante != string(firmado) {
+		t.Fatalf("%+v", a)
+	}
+	if _, err := XMLAutorizado([]byte("a]]>b"), "1", fecha, sri.AmbientePruebas); err == nil {
+		t.Fatal("]]> no cabe en CDATA")
 	}
 }
