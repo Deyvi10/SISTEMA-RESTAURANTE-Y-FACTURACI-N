@@ -200,6 +200,18 @@ func TestWorkerFiscalHastaAutorizado(t *testing.T) {
 	if cfg.Ambiente != 2 || !cfg.PruebaAprobada || cfg.Certificado == nil || len(cfg.Pendientes) != 0 || len(cfg.Avisos) != 0 {
 		t.Fatalf("producción: %+v", cfg)
 	}
+	// F5-15: no se vuelve a pruebas; el paso queda auditado.
+	datos["ambiente"] = 1
+	var p map[string]any
+	c.do("PUT", "/v1/facturacion", datos, 409, &p)
+	if p["code"] != "YA_EN_PRODUCCION" {
+		t.Fatalf("volver a pruebas: %v", p)
+	}
+	var auditado int
+	_ = e.tdb.Admin.QueryRow(ctx, `SELECT count(*) FROM auditoria WHERE tenant_id = $1 AND accion = 'AMBIENTE_CAMBIADO'`, r.TenantID).Scan(&auditado)
+	if auditado != 1 {
+		t.Fatalf("auditoría del ambiente: %d", auditado)
+	}
 }
 
 // Sin la prueba autorizada, producción sigue cerrada aunque haya firma.

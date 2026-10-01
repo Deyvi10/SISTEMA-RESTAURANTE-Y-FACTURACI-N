@@ -100,4 +100,21 @@ describe("facturación SRI", () => {
     expect(await screen.findByTestId("cambio-actual")).toHaveTextContent("1 de enero de 2027: RIMPE Emprendedor");
     expect(screen.getByTestId("cambio-actual")).toHaveTextContent("agente de retención 7");
   });
+
+  it("pasar a producción pide confirmación dentro de la página", async () => {
+    const fetch = montar({ ...base, guardada: true, pendientes: [], avisos: [], certificado: cert, pruebaAprobada: true });
+    await userEvent.click(await screen.findByRole("radio", { name: "Producción" }));
+    await userEvent.click(screen.getByTestId("guardar-emisor"));
+    expect(screen.getByTestId("confirmar-produccion")).toHaveTextContent("No se puede volver al ambiente de pruebas");
+    expect(fetch.mock.calls.filter(([, init]) => init?.method === "PUT")).toHaveLength(0);
+    await userEvent.click(screen.getByTestId("si-produccion"));
+    const put = fetch.mock.calls.find(([url, init]) => String(url).endsWith("/v1/facturacion") && init?.method === "PUT");
+    expect(JSON.parse(String(put?.[1]?.body))).toEqual(expect.objectContaining({ ambiente: 2 }));
+  });
+
+  it("en producción no se ofrece volver a pruebas", async () => {
+    montar({ ...base, guardada: true, ambiente: 2, pendientes: [], avisos: [], certificado: cert, pruebaAprobada: true });
+    expect(await screen.findByRole("radio", { name: "Producción" })).toBeChecked();
+    expect(screen.queryByRole("radio", { name: "Pruebas" })).toBeNull();
+  });
 });

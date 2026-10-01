@@ -377,3 +377,5 @@ h1, h2, h3 { text-wrap: balance; margin: 0; }
   .pildora-escritorio { display: none; }
   .pildora-movil { display: inline-flex; height: 22px; margin-right: 6px; padding: 0 8px; font-size: 12px; vertical-align: middle; }
 }
+.confirmar-produccion { padding: 14px 16px; border-radius: 14px; background: var(--rp-color-warning-soft); color: var(--rp-color-warning-text); }
+.confirmar-produccion p { margin: 0 0 8px; }

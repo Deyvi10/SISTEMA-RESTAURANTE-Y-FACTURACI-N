@@ -237,6 +237,11 @@ func (s *Service) Guardar(ctx context.Context, p auth.Principal, in ConfigInput)
 		if err != nil {
 			return err
 		}
+		// Una vez en producción no se vuelve a pruebas: los clientes recibirían comprobantes sin
+		// validez tributaria (F5-15). Si de verdad hace falta, lo hace el soporte.
+		if antes.Ambiente == 2 && in.Ambiente == 1 {
+			return apperr.New(apperr.Conflict, "YA_EN_PRODUCCION", "Ya facturas en producción: no se vuelve al ambiente de pruebas desde el panel. Escríbenos si de verdad lo necesitas.")
+		}
 		// Producción solo con la firma vigente y una factura de prueba autorizada (F5-06 paso 6).
 		if in.Ambiente == 2 && antes.Ambiente != 2 &&
 			(antes.Certificado == nil || antes.Certificado.DiasRestantes < 0 || !antes.PruebaAprobada) {
@@ -269,6 +274,12 @@ func (s *Service) Guardar(ctx context.Context, p auth.Principal, in ConfigInput)
 			return err
 		}
 		autor := p.UserID
+		if antes.Ambiente != out.Ambiente {
+			if err := auditoria.Registrar(ctx, tx, p.TenantID, aud.Registro{UsuarioID: &autor, Accion: "AMBIENTE_CAMBIADO", Entidad: "configuracion_fiscal",
+				EntidadID: p.TenantID.String(), Antes: aud.Compactar(map[string]any{"ambiente": antes.Ambiente}), Despues: aud.Compactar(map[string]any{"ambiente": out.Ambiente})}, time.Now()); err != nil {
+				return err
+			}
+		}
 		return auditoria.Registrar(ctx, tx, p.TenantID, aud.Registro{UsuarioID: &autor, Accion: "FACTURACION_CONFIGURADA",
 			Entidad: "configuracion_fiscal", EntidadID: p.TenantID.String(), Antes: aud.Compactar(resumen(antes)), Despues: aud.Compactar(resumen(out))}, time.Now())
 	})

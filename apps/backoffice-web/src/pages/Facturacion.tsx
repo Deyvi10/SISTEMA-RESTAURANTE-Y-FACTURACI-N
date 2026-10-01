@@ -55,6 +55,7 @@ function FacturacionForm({ cfg }: { cfg: ConfigFiscal }) {
     setErrores({});
     try {
       await guardar.mutateAsync(activa);
+      setConfirmar(false);
       toast(mensaje);
     } catch (e) {
       if (e instanceof ApiError) {
@@ -65,6 +66,8 @@ function FacturacionForm({ cfg }: { cfg: ConfigFiscal }) {
   }
   const puedeActivar = cfg.guardada && cfg.pendientes.length === 0;
   const produccion = cfg.ambiente === 2;
+  // Paso a producción con confirmación dentro de la página (F5-15).
+  const [confirmar, setConfirmar] = useState(false);
   const puedeProduccion = produccion || (!!cfg.certificado && cfg.certificado.diasRestantes >= 0 && cfg.pruebaAprobada);
 
   return (
@@ -151,20 +154,49 @@ function FacturacionForm({ cfg }: { cfg: ConfigFiscal }) {
           <Segmented
             label="Ambiente"
             value={f.ambiente}
-            options={puedeProduccion ? [{ value: "1", label: "Pruebas" }, { value: "2", label: "Producción" }] : [{ value: "1", label: "Pruebas" }]}
+            options={
+              produccion
+                ? [{ value: "2", label: "Producción" }]
+                : puedeProduccion
+                  ? [{ value: "1", label: "Pruebas" }, { value: "2", label: "Producción" }]
+                  : [{ value: "1", label: "Pruebas" }]
+            }
             onChange={(v) => set("ambiente", v)}
           />
           <p className="rp-secondary">
-            {puedeProduccion
-              ? "Producción: las facturas tienen validez tributaria. Pruebas: el SRI las revisa pero no valen."
-              : "Producción se habilita con tu firma electrónica vigente y una factura de prueba autorizada por el SRI."}
+            {produccion
+              ? "Facturas en producción: cada comprobante tiene validez tributaria."
+              : puedeProduccion
+                ? "Producción: las facturas tienen validez tributaria. Pruebas: el SRI las revisa pero no valen."
+                : "Producción se habilita con tu firma electrónica vigente y una factura de prueba autorizada por el SRI."}
           </p>
+          {confirmar && (
+            <div className="confirmar-produccion" role="alertdialog" aria-label="Pasar a producción" data-testid="confirmar-produccion">
+              <p>
+                <strong>¿Pasar a producción?</strong>
+              </p>
+              <p>Desde ahora, cada cobro emitirá una factura con validez tributaria ante el SRI, con una numeración nueva. No se puede volver al ambiente de pruebas desde el panel.</p>
+              <div className="acciones">
+                <button className="rp-btn rp-btn--primary" disabled={guardar.isPending} onClick={() => void onGuardar(cfg.facturacionActiva, "Ya facturas en producción")} data-testid="si-produccion">
+                  Sí, pasar a producción
+                </button>
+                <button className="rp-btn rp-btn--plain" onClick={() => (setConfirmar(false), set("ambiente", "1"))}>
+                  Seguir en pruebas
+                </button>
+              </div>
+            </div>
+          )}
           {errores.general && (
             <p className="rp-field__error" role="alert">
               {errores.general}
             </p>
           )}
-          <button className="rp-btn rp-btn--primary" disabled={guardar.isPending} onClick={() => void onGuardar(cfg.facturacionActiva, "Datos del emisor guardados")} data-testid="guardar-emisor">
+          <button
+            className="rp-btn rp-btn--primary"
+            disabled={guardar.isPending || confirmar}
+            onClick={() => (f.ambiente === "2" && !produccion ? setConfirmar(true) : void onGuardar(cfg.facturacionActiva, "Datos del emisor guardados"))}
+            data-testid="guardar-emisor"
+          >
             {cfg.guardada ? "Guardar cambios" : "Confirmar datos del emisor"}
           </button>
         </div>
