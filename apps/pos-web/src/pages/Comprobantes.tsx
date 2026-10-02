@@ -3,7 +3,7 @@
 // nota de crédito total o parcial: qué platos se devuelven, el motivo, el cliente (la NC no
 // admite consumidor final), cómo se devuelve el dinero y, si hace falta, el PIN de un supervisor.
 import { formatMoney } from "@restpos/ui";
-import { ArrowLeft, FileMinus, Search } from "lucide-react";
+import { ArrowLeft, FileMinus, Printer, Search } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { uuidv7 } from "../api/identidad";
 import { ApiError, type ComprobanteCaja, type DetalleComprobanteCaja, nodo, type NotaCreditoOut } from "../api/nodo";
@@ -35,14 +35,15 @@ const cant = (s: string) => String(Number(s));
 
 export function Comprobantes({ caja, usuarioId }: { caja: Caja; usuarioId?: string }) {
   const [texto, setTexto] = useState("");
+  const [fecha, setFecha] = useState("");
   const [lista, setLista] = useState<ComprobanteCaja[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [abierto, setAbierto] = useState<string | null>(null);
   const buscar = useRef<HTMLInputElement>(null);
 
-  const cargar = useCallback((q: string) => {
+  const cargar = useCallback((q: string, dia = "") => {
     nodo
-      .comprobantes(q)
+      .comprobantes(q, dia)
       .then((l) => {
         setLista(l);
         setError(null);
@@ -59,11 +60,22 @@ export function Comprobantes({ caja, usuarioId }: { caja: Caja; usuarioId?: stri
         role="search"
         onSubmit={(e) => {
           e.preventDefault();
-          cargar(texto.trim());
+          cargar(texto.trim(), fecha);
         }}
       >
         <Search aria-hidden="true" />
         <input ref={buscar} aria-label="Buscar comprobantes" placeholder="Número, cliente o clave de acceso" value={texto} onChange={(e) => setTexto(e.target.value)} data-testid="buscar-comprobante" />
+        <input
+          type="date"
+          aria-label="Fecha de emisión"
+          className="comprobantes__fecha"
+          value={fecha}
+          onChange={(e) => {
+            setFecha(e.target.value);
+            cargar(texto.trim(), e.target.value);
+          }}
+          data-testid="fecha-comprobante"
+        />
       </form>
       {error && (
         <p className="rp-field__error" role="alert">
@@ -104,7 +116,7 @@ export function Comprobantes({ caja, usuarioId }: { caja: Caja; usuarioId?: stri
           caja={caja}
           usuarioId={usuarioId}
           cerrar={() => setAbierto(null)}
-          alEmitir={() => cargar(texto.trim())}
+          alEmitir={() => cargar(texto.trim(), fecha)}
         />
       )}
     </section>
@@ -125,6 +137,7 @@ function HojaComprobante({ id, caja, usuarioId, cerrar, alEmitir }: { id: string
   const [error, setError] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
   const [hecha, setHecha] = useState<NotaCreditoOut | null>(null);
+  const [aviso, setAviso] = useState<string | null>(null);
   const clave = useRef(uuidv7());
 
   useEffect(() => {
@@ -173,6 +186,19 @@ function HojaComprobante({ id, caja, usuarioId, cerrar, alEmitir }: { id: string
       const m = e instanceof ApiError ? e.message : "No se pudo emitir la nota de crédito.";
       setError(m);
       return m;
+    } finally {
+      setOcupado(false);
+    }
+  };
+
+  const reimprimir = async () => {
+    if (!d || !caja.cajaId) return;
+    setOcupado(true);
+    try {
+      const r = await nodo.reimprimirComprobante(d.id, caja.cajaId);
+      setAviso(`Se reimprimió en ${r.impresoras.join(", ")}.`);
+    } catch (e) {
+      setAviso(e instanceof ApiError ? e.message : "No se pudo reimprimir.");
     } finally {
       setOcupado(false);
     }
@@ -300,6 +326,19 @@ function HojaComprobante({ id, caja, usuarioId, cerrar, alEmitir }: { id: string
                 {d.ambiente === 1 ? " · ambiente de pruebas" : ""}
               </p>
               <code className="comprobante-caja__clave">{d.claveAcceso}</code>
+              {d.fechaAutorizacion && (
+                <p className="rp-secondary" data-testid="autorizado-el">
+                  Autorizado el {new Date(d.fechaAutorizacion).toLocaleString("es-EC", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                </p>
+              )}
+              <button className="rp-btn rp-btn--gray rp-btn--block" disabled={ocupado} onClick={() => void reimprimir()} data-testid="reimprimir">
+                <Printer aria-hidden="true" /> Reimprimir el RIDE
+              </button>
+              {aviso && (
+                <p className="rp-secondary" role="status">
+                  {aviso}
+                </p>
+              )}
               {d.tipo === "01" && (
                 <>
                   <ul className="comprobante-caja__lineas">

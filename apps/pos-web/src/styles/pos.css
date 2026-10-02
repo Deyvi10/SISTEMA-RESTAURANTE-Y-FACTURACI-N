@@ -450,3 +450,4 @@ button { font: inherit; }
 .hoja-comprobante .rp-sheet__body { padding: 4px 18px 18px; }
 .nc select { min-height: 42px; border-radius: 12px; border: 1px solid var(--rp-color-separator); background: var(--rp-color-surface); color: var(--rp-color-label); font: inherit; padding: 0 10px; }
 .nc .rp-field { display: flex; flex-direction: column; gap: 6px; }
+.comprobantes__fecha { flex: none; border: 0; background: none; color: var(--rp-color-label-secondary); font: inherit; }

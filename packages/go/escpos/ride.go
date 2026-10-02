@@ -50,6 +50,9 @@ type Ride struct {
 	Sustento      string // 001-002-000000067
 	FechaSustento string // dd/mm/aaaa
 	Motivo        string
+	// Reimpresión (F5-18): marca y, si ya está autorizado, la fecha de autorización.
+	Reimpresion       bool
+	FechaAutorizacion *time.Time
 }
 
 // LineaRide es un detalle de la factura: valores sin IVA, como en el XML.
@@ -108,6 +111,9 @@ func ImprimirRide(p Paper, r Ride) []byte {
 		titulo = "NOTA DE CRÉDITO"
 	}
 	b.Align(Center).Bold(true).Size(1, 2).Wrapped(titulo, "").Size(1, 1).Line("No. " + r.Numero).Bold(false)
+	if r.Reimpresion {
+		b.Bold(true).Invert(true).Line(" REIMPRESIÓN ").Invert(false).Bold(false)
+	}
 	b.Align(Left)
 	b.Columns("Emitida", r.Emision.Format("02/01/2006 15:04"))
 	b.Line("Ambiente: " + map[bool]string{true: "PRUEBAS", false: "PRODUCCIÓN"}[r.Pruebas])
@@ -115,7 +121,11 @@ func ImprimirRide(p Paper, r Ride) []byte {
 	b.Wrapped("NÚMERO DE AUTORIZACIÓN / CLAVE DE ACCESO:", "")
 	b.Align(Center).Wrapped(partirClave(r.ClaveAcceso, b.Width()), "")
 	b.QR(r.ClaveAcceso, 5)
-	b.Wrapped("Comprobante pendiente de autorización del SRI", "")
+	if r.FechaAutorizacion != nil {
+		b.Wrapped("AUTORIZADO por el SRI el "+r.FechaAutorizacion.Format("02/01/2006 15:04"), "")
+	} else {
+		b.Wrapped("Comprobante pendiente de autorización del SRI", "")
+	}
 	if r.Pruebas {
 		b.Bold(true).Invert(true).Wrapped(" AMBIENTE DE PRUEBAS - SIN VALIDEZ TRIBUTARIA ", "").Invert(false).Bold(false)
 	}

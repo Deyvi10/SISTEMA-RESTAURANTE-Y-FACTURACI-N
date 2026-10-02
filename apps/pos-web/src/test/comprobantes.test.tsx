@@ -91,3 +91,19 @@ describe("comprobantes de la caja", () => {
     expect(await screen.findByText(/supervisor/i)).toBeInTheDocument();
   });
 });
+
+describe("reimpresión y fecha (F5-18)", () => {
+  it("filtra por fecha y reimprime el RIDE", async () => {
+    const lista = vi.spyOn(nodo, "comprobantes").mockResolvedValue([factura]);
+    vi.spyOn(nodo, "comprobante").mockResolvedValue({ ...detalle, fechaAutorizacion: "2026-09-30T22:57:41-05:00" });
+    const reimp = vi.spyOn(nodo, "reimprimirComprobante").mockResolvedValue({ impresoras: ["Caja"] });
+    montar();
+    fireEvent.change(await screen.findByTestId("fecha-comprobante"), { target: { value: "2026-09-30" } });
+    await waitFor(() => expect(lista).toHaveBeenLastCalledWith("", "2026-09-30"));
+    fireEvent.click(await screen.findByTestId("factura-001-001-000000002"));
+    expect(await screen.findByTestId("autorizado-el")).toHaveTextContent("Autorizado el");
+    fireEvent.click(screen.getByTestId("reimprimir"));
+    await waitFor(() => expect(reimp).toHaveBeenCalledWith("f1", "c1"));
+    expect(await screen.findByText("Se reimprimió en Caja.")).toBeInTheDocument();
+  });
+});

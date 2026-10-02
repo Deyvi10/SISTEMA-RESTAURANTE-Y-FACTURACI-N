@@ -176,6 +176,13 @@ func TestWorkerFiscalHastaAutorizado(t *testing.T) {
 		t.Fatalf("volcado de estados: %v", ultimo)
 	}
 
+	// F5-18: el nodo pide sus XML autorizados para la copia local; lo no autorizado se omite.
+	var copias []facturacion.AutorizadoNodo
+	n.req("POST", "/v1/nodos/comprobantes/autorizados", map[string]any{"ids": []ids.ID{ok.ID, devuelto.ID, ids.New()}}, true, 200, &copias)
+	if len(copias) != 1 || copias[0].ID != ok.ID || copias[0].NumeroAutorizacion != ok.ClaveAcceso || !strings.Contains(copias[0].XML, "<estado>AUTORIZADO</estado>") {
+		t.Fatalf("copias para el nodo: %+v", copias)
+	}
+
 	// Lo firmado y autorizado ya no cambia.
 	if _, err := e.tdb.Admin.Exec(ctx, `UPDATE comprobantes SET xml_firmado = 'x' WHERE id = $1`, ok.ID); err == nil {
 		t.Fatal("el XML firmado no se reescribe")

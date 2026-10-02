@@ -12,11 +12,13 @@ import (
 
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/auth"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/caja"
+	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/facturacion"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/nodos"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/platform/apperr"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/platform/db"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/platform/httpx"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/edgesync"
+	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/ids"
 )
 
 func ipDe(r *http.Request) string {
@@ -137,5 +139,32 @@ func buscarClienteNodo(c *caja.Clientes) http.HandlerFunc {
 		}
 		w.Header().Set("Cache-Control", "no-store")
 		httpx.JSON(w, http.StatusOK, cli)
+	}
+}
+
+// autorizadosNodo entrega al nodo los XML autorizados de su local que todavía no tiene, para
+// su copia local de 90 días (F5-18). Solo de su propio local; lo que no está autorizado o es
+// de otro local se omite sin error.
+func autorizadosNodo(b *facturacion.Boveda) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		n := auth.MustNodo(r.Context())
+		var in struct {
+			IDs []ids.ID `json:"ids"`
+		}
+		if err := httpx.Decode(w, r, &in); err != nil {
+			httpx.Error(w, r, err)
+			return
+		}
+		if len(in.IDs) > 50 {
+			httpx.Error(w, r, apperr.New(apperr.Invalid, "DEMASIADOS", "Pide hasta 50 comprobantes por vez."))
+			return
+		}
+		out, err := b.AutorizadosDeLocal(r.Context(), n.TenantID, n.LocalID, in.IDs)
+		if err != nil {
+			httpx.Error(w, r, err)
+			return
+		}
+		w.Header().Set("Cache-Control", "no-store")
+		httpx.JSON(w, http.StatusOK, out)
 	}
 }

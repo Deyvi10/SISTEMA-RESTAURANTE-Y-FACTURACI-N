@@ -77,18 +77,30 @@ func escanearComprobanteCaja(r interface{ Scan(...any) error }) (ComprobanteCaja
 	return c, doc, nil
 }
 
-// ComprobantesCaja busca facturas y notas de crédito del nodo por número, cliente o clave.
-func (a *App) ComprobantesCaja(ctx context.Context, u Usuario, q string) ([]ComprobanteCaja, error) {
+// ComprobantesCaja busca facturas y notas de crédito del nodo por número, cliente o clave, y
+// opcionalmente por fecha de emisión (AAAA-MM-DD).
+func (a *App) ComprobantesCaja(ctx context.Context, u Usuario, q, fecha string) ([]ComprobanteCaja, error) {
 	if !u.Puede(rbac.Cobrar) && !u.Puede(rbac.EmitirNC) {
 		return nil, problema(http.StatusForbidden, "SIN_PERMISO", "No tienes permiso para ver los comprobantes.")
 	}
 	q = strings.TrimSpace(q)
 	limpio := strings.ReplaceAll(q, "-", "")
-	where, args := "", []any{}
+	conds, args := []string{}, []any{}
 	if q != "" {
 		// El comprador está dentro del XML: se busca por número, clave o texto del XML.
-		where = `WHERE c.clave_acceso = ? OR (c.serie || printf('%09d', c.secuencial)) LIKE ? OR c.xml LIKE ?`
+		conds = append(conds, `(c.clave_acceso = ? OR (c.serie || printf('%09d', c.secuencial)) LIKE ? OR c.xml LIKE ?)`)
 		args = append(args, limpio, "%"+limpio, "%"+q+"%")
+	}
+	if fecha != "" {
+		if _, err := time.Parse(time.DateOnly, fecha); err != nil {
+			return nil, invalido("La fecha no es válida.")
+		}
+		conds = append(conds, `c.fecha_emision = ?`)
+		args = append(args, fecha)
+	}
+	where := ""
+	if len(conds) > 0 {
+		where = "WHERE " + strings.Join(conds, " AND ")
 	}
 	rows, err := a.Store.Read().QueryContext(ctx, `SELECT `+columnasComprobanteCaja+` FROM comprobantes c
 		LEFT JOIN estados_comprobante e ON e.id = c.id `+where+` ORDER BY c.created_at DESC LIMIT 50`, args...)

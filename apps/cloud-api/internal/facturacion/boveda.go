@@ -3,6 +3,7 @@ package facturacion
 import (
 	"context"
 	"encoding/json"
+	"encoding/xml"
 	"errors"
 	"fmt"
 	"net/http"
@@ -498,4 +499,85 @@ func (b *Boveda) HandleDescargar(formato string) http.HandlerFunc {
 		w.Header().Set("Cache-Control", "private, no-store")
 		_, _ = w.Write(datos)
 	}
+}
+
+// AutorizadoNodo es un XML autorizado para la copia local del nodo (F5-18).
+type AutorizadoNodo struct {
+	ID                 ids.ID    `json:"id"`
+	NumeroAutorizacion string    `json:"numeroAutorizacion"`
+	FechaAutorizacion  time.Time `json:"fechaAutorizacion"`
+	XML                string    `json:"xml"`
+}
+
+// AutorizadosDeLocal devuelve los XML autorizados pedidos que sean de ese local.
+func (b *Boveda) AutorizadosDeLocal(ctx context.Context, tenant, local ids.ID, pedidos []ids.ID) ([]AutorizadoNodo, error) {
+	out := []AutorizadoNodo{}
+	if len(pedidos) == 0 {
+		return out, nil
+	}
+	var archivados []ids.ID
+	err := b.DB.InTenant(ctx, tenant, func(tx db.Tx) error {
+		rows, err := tx.Query(ctx, `SELECT id, xml_firmado IS NOT NULL FROM comprobantes
+			WHERE id = ANY($1) AND local_id = $2 AND estado IN ('AUTORIZADO', 'ANULADO')`, pedidos, local)
+		if err != nil {
+			return err
+		}
+		type par struct {
+			ID       ids.ID
+			EnLaBase bool
+		}
+		ps, err := pgx.CollectRows(rows, pgx.RowToStructByPos[par])
+		if err != nil {
+			return err
+		}
+		for _, p := range ps {
+			if !p.EnLaBase {
+				archivados = append(archivados, p.ID)
+				continue
+			}
+			d, err := LeerDocumentos(ctx, tx, p.ID)
+			if err != nil {
+				return err
+			}
+			a, err := autorizadoDe(d.XML)
+			if err != nil {
+				return err
+			}
+			a.ID = p.ID
+			out = append(out, a)
+		}
+		return nil
+	})
+	if err != nil || b.Archivo == nil {
+		return out, err
+	}
+	for _, id := range archivados {
+		doc, err := b.Archivo.Leer(ctx, tenant, id)
+		if err != nil {
+			continue // se reintenta en la próxima vuelta del nodo
+		}
+		a, err := autorizadoDe(doc)
+		if err != nil {
+			continue
+		}
+		a.ID = id
+		out = append(out, a)
+	}
+	return out, nil
+}
+
+// autorizadoDe lee número y fecha del <autorizacion> que se entrega y archiva.
+func autorizadoDe(doc []byte) (AutorizadoNodo, error) {
+	var x struct {
+		Numero string `xml:"numeroAutorizacion"`
+		Fecha  string `xml:"fechaAutorizacion"`
+	}
+	if err := xml.Unmarshal(doc, &x); err != nil {
+		return AutorizadoNodo{}, err
+	}
+	f, err := time.Parse(time.RFC3339, strings.TrimSpace(x.Fecha))
+	if err != nil {
+		return AutorizadoNodo{}, err
+	}
+	return AutorizadoNodo{NumeroAutorizacion: strings.TrimSpace(x.Numero), FechaAutorizacion: f, XML: string(doc)}, nil
 }

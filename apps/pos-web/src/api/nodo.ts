@@ -560,7 +560,11 @@ export const nodo = {
     },
   ) =>
     api<CobroOut>("POST", `/v1/ordenes/${ordenId}/cobrar`, b),
-  comprobantes: (q = "") => api<ComprobanteCaja[]>("GET", `/v1/caja/comprobantes${q ? `?q=${encodeURIComponent(q)}` : ""}`),
+  comprobantes: (q = "", fecha = "") => {
+    const p = new URLSearchParams(Object.entries({ q, fecha }).filter(([, v]) => v !== ""));
+    return api<ComprobanteCaja[]>("GET", `/v1/caja/comprobantes${p.size ? `?${p}` : ""}`);
+  },
+  reimprimirComprobante: (id: string, cajaId: string) => api<{ impresoras: string[] }>("POST", `/v1/caja/comprobantes/${id}/reimprimir`, { cajaId }),
   comprobante: (id: string) => api<DetalleComprobanteCaja>("GET", `/v1/caja/comprobantes/${id}`),
   notaCredito: (facturaId: string, b: NotaCreditoEnvio) => api<NotaCreditoOut>("POST", `/v1/caja/comprobantes/${facturaId}/nota-credito`, b),
   autorizar: (b: { usuarioId: string; pin: string; accion: string; referencia: string }) =>

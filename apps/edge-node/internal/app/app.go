@@ -29,11 +29,13 @@ import (
 
 // App es el nodo en ejecución.
 type App struct {
-	Cfg    Config
-	Store  *store.Store
-	Clock  clock.Clock
-	Log    *slog.Logger
-	Inicio time.Time
+	// ultimaPurga de la copia local de autorizados (F5-18), una vez al día.
+	ultimaPurga time.Time
+	Cfg         Config
+	Store       *store.Store
+	Clock       clock.Clock
+	Log         *slog.Logger
+	Inicio      time.Time
 
 	mux *http.ServeMux
 
