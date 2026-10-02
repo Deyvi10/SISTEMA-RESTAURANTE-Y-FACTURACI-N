@@ -3,6 +3,7 @@
 // fiscal) y el interruptor para facturar. Producción se abre con la firma vigente y una
 // factura de prueba autorizada por el SRI.
 import { useEffect, useRef, useState } from "react";
+import { Asistente } from "./AsistenteFiscal";
 import { ApiError } from "../api/client";
 import { api, useFacturacion, useGuardar } from "../api/hooks";
 import type { CambioRegimen, Certificado, ConfigFiscal, PuntoCaja, Regimen } from "../api/types";
@@ -39,11 +40,14 @@ export function cuerpo(f: Form, activa: boolean) {
 
 export function Facturacion() {
   const cfg = useFacturacion();
+  // La primera vez, el asistente de 6 pasos (F5-06); después, todo en una página.
+  const [asistente, setAsistente] = useState<boolean | null>(null);
   if (cfg.isLoading || !cfg.data) return <Spinner />;
-  return <FacturacionForm cfg={cfg.data} />;
+  if (asistente ?? !cfg.data.guardada) return <Asistente cfg={cfg.data} salir={() => setAsistente(false)} />;
+  return <FacturacionForm cfg={cfg.data} abrirAsistente={() => setAsistente(true)} />;
 }
 
-function FacturacionForm({ cfg }: { cfg: ConfigFiscal }) {
+function FacturacionForm({ cfg, abrirAsistente }: { cfg: ConfigFiscal; abrirAsistente: () => void }) {
   const { toast } = useFeedback();
   const [f, setF] = useState<Form>(() => formDe(cfg));
   const [errores, setErrores] = useState<Record<string, string>>({});
@@ -77,6 +81,9 @@ function FacturacionForm({ cfg }: { cfg: ConfigFiscal }) {
           <h1 className="rp-t-large-title">Facturación SRI</h1>
           <p>Con la facturación activa, cada cobro emite su comprobante electrónico con clave de acceso, aunque no haya internet.</p>
         </div>
+        <button className="rp-btn rp-btn--gray" onClick={abrirAsistente} data-testid="abrir-asistente">
+          Asistente paso a paso
+        </button>
       </header>
 
       <section className="seccion">
@@ -219,7 +226,7 @@ function FacturacionForm({ cfg }: { cfg: ConfigFiscal }) {
   );
 }
 
-function PuntoFila({ p }: { p: PuntoCaja }) {
+export function PuntoFila({ p }: { p: PuntoCaja }) {
   const { toast } = useFeedback();
   const [est, setEst] = useState(p.establecimiento ?? "001");
   const [pto, setPto] = useState(p.puntoEmision ?? "");
@@ -264,7 +271,7 @@ export function vigencia(c: Certificado): { texto: string; tint: string } {
 
 // Paso 1 y 2 de F5-06: subir el .p12 con su contraseña. La nube lo valida (vigencia, llave,
 // RUC del restaurante) y lo guarda cifrado; nunca se vuelve a mostrar ni descargar.
-function FirmaSeccion({ cert, ruc }: { cert: Certificado | null; ruc: string }) {
+export function FirmaSeccion({ cert, ruc }: { cert: Certificado | null; ruc: string }) {
   const { toast } = useFeedback();
   const [abierto, setAbierto] = useState(!cert);
   const [archivo, setArchivo] = useState<File | null>(null);

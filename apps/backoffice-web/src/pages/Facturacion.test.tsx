@@ -21,6 +21,11 @@ const cert: Certificado = {
   validoHasta: "2026-10-20T12:00:00Z", subidoAt: "2026-09-01T00:00:00Z", diasRestantes: 21,
 };
 
+/** La primera vez se abre el asistente: estas pruebas usan la página completa. */
+async function verTodo() {
+  await userEvent.click(await screen.findByTestId("ver-todo"));
+}
+
 function montar(cfg: ConfigFiscal) {
   const fetch = vi.spyOn(globalThis, "fetch").mockImplementation(async () =>
     new Response(JSON.stringify(cfg), { status: 200, headers: { "Content-Type": "application/json" } }),
@@ -43,6 +48,7 @@ describe("facturación SRI", () => {
 
   it("muestra lo pendiente y no deja activar hasta completarlo", async () => {
     const fetch = montar(base);
+    await verTodo();
     expect(await screen.findByTestId("pendientes")).toHaveTextContent("Asigna un punto de emisión a «Caja 1»");
     await userEvent.click(screen.getByRole("switch", { name: /Facturar electrónicamente/ }));
     expect(fetch.mock.calls.filter(([, init]) => init?.method === "PUT")).toHaveLength(0);
@@ -50,6 +56,7 @@ describe("facturación SRI", () => {
 
   it("asigna la serie de una caja con tres dígitos", async () => {
     const fetch = montar(base);
+    await verTodo();
     const punto = await screen.findByLabelText("Punto de emisión de Caja 1");
     await userEvent.type(punto, "0a02");
     expect(punto).toHaveValue("002");
@@ -60,6 +67,7 @@ describe("facturación SRI", () => {
 
   it("sube la firma como formulario con el archivo y la contraseña", async () => {
     const fetch = montar(base);
+    await verTodo();
     expect(await screen.findByTestId("avisos")).toHaveTextContent("Sube tu firma electrónica");
     const boton = screen.getByTestId("subir-firma");
     expect(boton).toBeDisabled();
@@ -116,5 +124,29 @@ describe("facturación SRI", () => {
     montar({ ...base, guardada: true, ambiente: 2, pendientes: [], avisos: [], certificado: cert, pruebaAprobada: true });
     expect(await screen.findByRole("radio", { name: "Producción" })).toBeChecked();
     expect(screen.queryByRole("radio", { name: "Pruebas" })).toBeNull();
+  });
+
+  it("asistente: sin firma se puede seguir, guarda negocio y régimen, y pide las series", async () => {
+    const fetch = montar(base);
+    expect(await screen.findByTestId("asistente")).toHaveTextContent("Paso 1 de 6");
+    expect(screen.getByTestId("continuar")).toBeDisabled(); // sin firma
+    await userEvent.click(screen.getByTestId("firma-despues"));
+    expect(screen.getByTestId("asistente")).toHaveTextContent("Datos de tu negocio");
+    await userEvent.click(screen.getByTestId("continuar"));
+    expect(screen.getByTestId("asistente")).toHaveTextContent("Tu régimen tributario");
+    await userEvent.click(screen.getByRole("radio", { name: "RIMPE Emprendedor" }));
+    await userEvent.click(screen.getByTestId("continuar"));
+    const put = fetch.mock.calls.find(([url, init]) => String(url).endsWith("/v1/facturacion") && init?.method === "PUT");
+    expect(JSON.parse(String(put?.[1]?.body))).toEqual(expect.objectContaining({ regimen: "RIMPE_EMPRENDEDOR", razonSocial: "Distribuidora del Pacífico S.A.", ambiente: 1 }));
+    expect(await screen.findByText("Falta la serie de Caja 1")).toBeInTheDocument();
+  });
+
+  it("asistente: retoma en la prueba y celebra cuando el SRI la autoriza", async () => {
+    const lista = { ...base, guardada: true, pendientes: [], avisos: [], certificado: cert, facturacionActiva: true, pruebaAprobada: true,
+      cajas: [{ ...base.cajas[0]!, puntoId: "p1", establecimiento: "001", puntoEmision: "001" }] };
+    montar(lista);
+    await userEvent.click(await screen.findByTestId("abrir-asistente"));
+    expect(await screen.findByTestId("asistente-listo")).toHaveTextContent("El SRI autorizó tu factura de prueba");
+    expect(screen.getByTestId("asistente")).toHaveTextContent("Paso 6 de 6");
   });
 });

@@ -398,3 +398,25 @@ h1, h2, h3 { text-wrap: balance; margin: 0; }
 .tabla-reporte th:first-child, .tabla-reporte td:first-child { text-align: left; }
 .tabla-reporte th { color: var(--rp-color-label-secondary); font-weight: 600; font-size: 13px; }
 @media (max-width: 640px) { .tabla-reporte th:nth-child(3), .tabla-reporte td:nth-child(3), .tabla-reporte th:nth-child(4), .tabla-reporte td:nth-child(4) { display: none; } }
+
+/* Asistente de facturación (F5-06) */
+.asistente { max-width: 640px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+.asistente__progreso { height: 4px; border-radius: 2px; background: var(--rp-color-fill); overflow: hidden; }
+.asistente__progreso span { display: block; height: 100%; background: var(--rp-color-accent); transition: width 0.3s ease; }
+.asistente__cabeza { display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; }
+.asistente__cabeza small { color: var(--rp-color-label-secondary); }
+.asistente__cabeza h1 { margin: 0; font-size: 28px; }
+.asistente__texto { color: var(--rp-color-label-secondary); margin: 0 0 12px; }
+.asistente__checks, .asistente__instrucciones { display: flex; flex-direction: column; gap: 10px; padding-left: 0; list-style: none; margin: 0; }
+.asistente__instrucciones { list-style: decimal; padding-left: 22px; }
+.asistente__checks li { display: flex; gap: 8px; align-items: center; padding: 12px 14px; border-radius: 12px; background: var(--rp-color-surface); }
+.asistente__checks li[data-ok="true"] svg, .asistente__instrucciones li[data-ok="true"]::marker { color: var(--rp-color-success-text); }
+.asistente__checks li[data-ok="false"] { color: var(--rp-color-danger-text); }
+.asistente__checks li[data-ok="aviso"] { color: var(--rp-color-warning-text); background: var(--rp-color-warning-soft); }
+.asistente__pie { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+.asistente__salir { margin-right: auto; }
+.asistente__hecho { display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; }
+.asistente__check { display: grid; place-items: center; width: 72px; height: 72px; border-radius: 50%; background: var(--rp-color-success-soft);
+  color: var(--rp-color-success-text); font-size: 40px; font-weight: 700; animation: asistente-check 0.5s cubic-bezier(.2, 1.4, .4, 1) both; }
+@keyframes asistente-check { from { transform: scale(0.3); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .asistente__check { animation: none; } .asistente__progreso span { transition: none; } }
