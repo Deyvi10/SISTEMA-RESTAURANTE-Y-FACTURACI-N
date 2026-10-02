@@ -1,9 +1,11 @@
 package server_test
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"log/slog"
+	"strings"
 	"testing"
 	"time"
 
@@ -12,6 +14,7 @@ import (
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/facturacion"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/imagenes"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/platform/db"
+	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/clock"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/ids"
 )
 
@@ -140,5 +143,53 @@ func TestArchivoDeAutorizados(t *testing.T) {
 	}
 	if _, err := a.Leer(ctx, r.TenantID, ids.New()); err == nil || errors.Is(err, archivo.ErrIntegridad) {
 		t.Fatalf("lo que no está archivado: %v", err)
+	}
+}
+
+// F5-11: a los 90 días el XML firmado sale de PostgreSQL, pero solo si está archivado; la
+// bóveda y el reenvío de correo siguen funcionando desde el archivo.
+func TestPurgaDelXMLALos90Dias(t *testing.T) {
+	e := newEnv(t)
+	c, r := e.restaurante("1790011674001", "purga@w.ec")
+	comp, _ := e.autorizados(c, 2)
+	c.do("PUT", "/v1/facturacion", map[string]any{"ambiente": 1, "razonSocial": "Distribuidora", "direccionMatriz": "Quito", "regimen": "GENERAL"}, 201, nil)
+	ctx := context.Background()
+	// Hace 91 días que se autorizaron (solo cambia la fecha de autorización, un dato del SRI).
+	if _, err := e.tdb.Admin.Exec(ctx, `ALTER TABLE comprobantes DISABLE TRIGGER comprobantes_contenido`); err != nil {
+		t.Fatal(err)
+	}
+	_, _ = e.tdb.Admin.Exec(ctx, `UPDATE comprobantes SET fecha_autorizacion = now() - interval '91 days' WHERE tenant_id = $1`, r.TenantID)
+	_, _ = e.tdb.Admin.Exec(ctx, `ALTER TABLE comprobantes ENABLE TRIGGER comprobantes_contenido`)
+	// Sin archivar no se purga nada (y el trigger tampoco lo permitiría).
+	if n, err := e.arch.PurgarBase(ctx); err != nil || n != 0 {
+		t.Fatalf("sin archivar: %d %v", n, err)
+	}
+	if _, err := e.tdb.Admin.Exec(ctx, `UPDATE comprobantes SET xml_firmado = NULL WHERE id = $1`, comp[0]); err == nil {
+		t.Fatal("el XML firmado no se borra si no está archivado")
+	}
+	for _, id := range comp {
+		var dia time.Time
+		_ = e.tdb.Admin.QueryRow(ctx, `SELECT fecha_autorizacion FROM comprobantes WHERE id = $1`, id).Scan(&dia)
+		if _, err := e.arch.ArchivarDia(ctx, r.TenantID, dia.In(clock.Guayaquil)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if n, err := e.arch.PurgarBase(ctx); err != nil || n != 2 {
+		t.Fatalf("purga: %d %v", n, err)
+	}
+	var quedan int
+	_ = e.tdb.Admin.QueryRow(ctx, `SELECT count(*) FROM comprobantes WHERE tenant_id = $1 AND xml_firmado IS NOT NULL`, r.TenantID).Scan(&quedan)
+	if quedan != 0 {
+		t.Fatalf("quedan %d XML firmados en la base", quedan)
+	}
+	// La bóveda descarga el XML desde el archivo y el correo se reenvía igual.
+	xmlB, disp := c.descargar("/v1/comprobantes/"+comp[0].String()+"/xml", 200)
+	if !bytes.Contains(xmlB, []byte("<estado>AUTORIZADO</estado>")) || !strings.Contains(disp, "FACTURA-001-001-000000100.xml") {
+		t.Fatalf("xml desde el archivo: %s", disp)
+	}
+	c.do("POST", "/v1/comprobantes/"+comp[0].String()+"/reenviar", map[string]string{"correo": "contador@example.com"}, 204, nil)
+	msg, _ := e.mail.Last()
+	if msg.To != "contador@example.com" || len(msg.Attachments) != 2 || !bytes.HasPrefix(msg.Attachments[0].Data, []byte("%PDF")) {
+		t.Fatalf("reenvío desde el archivo: %+v", msg.Subject)
 	}
 }

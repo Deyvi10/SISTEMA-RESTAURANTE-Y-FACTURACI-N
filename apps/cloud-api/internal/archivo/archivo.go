@@ -101,6 +101,39 @@ func (a *Archivador) ArchivarPendientes(ctx context.Context) (int, error) {
 	return total, nil
 }
 
+// RetencionBase: cuánto se queda el XML firmado en PostgreSQL; después solo en el archivo.
+const RetencionBase = 90 * 24 * time.Hour
+
+// PurgarBase saca de PostgreSQL el XML firmado de lo autorizado hace más de 90 días que ya
+// está archivado y verificado (el trigger no deja borrar lo que no está en el archivo).
+func (a *Archivador) PurgarBase(ctx context.Context) (int64, error) {
+	var tenants []ids.ID
+	if err := a.DB.Global(ctx, func(tx db.Tx) error {
+		rows, err := tx.Query(ctx, `SELECT tenant_id FROM tenants_con_facturacion()`)
+		if err != nil {
+			return err
+		}
+		tenants, err = pgx.CollectRows(rows, pgx.RowTo[ids.ID])
+		return err
+	}); err != nil {
+		return 0, err
+	}
+	var total int64
+	for _, t := range tenants {
+		err := a.DB.InTenant(ctx, t, func(tx db.Tx) error {
+			tag, err := tx.Exec(ctx, `UPDATE comprobantes c SET xml_firmado = NULL, updated_at = now()
+				WHERE c.xml_firmado IS NOT NULL AND c.estado IN ('AUTORIZADO', 'ANULADO') AND c.fecha_autorizacion < $1
+				  AND EXISTS (SELECT 1 FROM archivo_comprobantes x WHERE x.comprobante_id = c.id)`, a.Now().Add(-RetencionBase))
+			total += tag.RowsAffected()
+			return err
+		})
+		if err != nil {
+			return total, err
+		}
+	}
+	return total, nil
+}
+
 // ArchivarDia guarda en un blob los autorizados de ese día (hora de Ecuador) que falten.
 func (a *Archivador) ArchivarDia(ctx context.Context, tenant ids.ID, fecha time.Time) (int, error) {
 	var ps []pendiente
@@ -359,6 +392,11 @@ func (a *Archivador) Correr(ctx context.Context) {
 	for {
 		if _, err := a.ArchivarPendientes(ctx); err != nil && ctx.Err() == nil {
 			a.Log.Warn("archivo: no se pudieron leer los días pendientes", "err", err)
+		}
+		if n, err := a.PurgarBase(ctx); err != nil && ctx.Err() == nil {
+			a.Log.Warn("archivo: no se pudo purgar la base", "err", err)
+		} else if n > 0 {
+			a.Log.Info("archivo: XML firmados de más de 90 días quedan solo en el archivo", "comprobantes", n)
 		}
 		select {
 		case <-ctx.Done():

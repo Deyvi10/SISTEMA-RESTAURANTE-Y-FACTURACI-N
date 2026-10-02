@@ -193,7 +193,7 @@ func serve(ctx context.Context) error {
 		Nodos: nodos.New(app.DB, app.Clock, cfg.PINPepper), Impresoras: &impresoras.Service{DB: app.DB, Clock: app.Clock},
 		Caja: &caja.Service{DB: app.DB}, Clientes: &caja.Clientes{DB: app.DB}, Facturacion: &facturacion.Service{DB: app.DB},
 		Certificados: &certificados.Service{DB: app.DB, KEK: kek, Now: app.Clock.Now},
-		Boveda: &facturacion.Boveda{DB: app.DB, Correos: &facturacion.Correos{DB: app.DB, Mail: app.Mail, Log: slog.Default()},
+		Boveda: &facturacion.Boveda{DB: app.DB, Correos: &facturacion.Correos{DB: app.DB, Mail: app.Mail, Log: slog.Default(), Archivo: archivador},
 			Archivo: archivador},
 		Reportes: &reportes.Service{DB: app.DB},
 	}

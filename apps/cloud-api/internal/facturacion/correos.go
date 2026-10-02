@@ -2,6 +2,7 @@ package facturacion
 
 import (
 	"context"
+	"encoding/xml"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -26,6 +27,40 @@ type Correos struct {
 	DB   *db.DB
 	Mail mail.Sender
 	Log  *slog.Logger
+	// Archivo: de donde se lee el XML autorizado cuando ya salió de PostgreSQL (90 días).
+	Archivo LectorArchivo
+}
+
+// ErrSoloEnArchivo: el comprobante está autorizado pero su XML ya solo está en el archivo.
+var ErrSoloEnArchivo = errors.New("facturacion: el XML autorizado solo está en el archivo")
+
+// DocumentosDesdeArchivo arma el RIDE y el XML desde el <autorizacion> archivado.
+func DocumentosDesdeArchivo(autorizado []byte, nombre, correo string) (Documentos, error) {
+	var x struct {
+		Numero      string `xml:"numeroAutorizacion"`
+		Fecha       string `xml:"fechaAutorizacion"`
+		Ambiente    string `xml:"ambiente"`
+		Comprobante string `xml:"comprobante"`
+	}
+	if err := xml.Unmarshal(autorizado, &x); err != nil {
+		return Documentos{}, err
+	}
+	fecha, err := time.Parse(time.RFC3339, strings.TrimSpace(x.Fecha))
+	if err != nil {
+		return Documentos{}, err
+	}
+	d := Documentos{Nombre: nombre, Correo: correo, XML: autorizado}
+	if d.Leida, err = sri.LeerComprobante([]byte(x.Comprobante)); err != nil {
+		return d, err
+	}
+	d.Ambiente = sri.AmbienteProduccion
+	if d.Leida.Ambiente == "1" {
+		d.Ambiente = sri.AmbientePruebas
+	}
+	d.Numero = d.Leida.Numero()
+	d.Archivo = NombreArchivo(d.Leida.CodDoc, d.Numero)
+	d.PDF, err = ride.PDF([]byte(x.Comprobante), ride.Autorizacion{Fecha: &fecha})
+	return d, err
 }
 
 // Motivos de envío.
@@ -57,6 +92,12 @@ func LeerDocumentos(ctx context.Context, tx db.Tx, comprobante ids.ID) (Document
 	}
 	if err != nil {
 		return d, err
+	}
+	if (*estado == "AUTORIZADO" || *estado == "ANULADO") && firmado == nil && numero != nil {
+		if correo != nil {
+			d.Correo = *correo
+		}
+		return d, ErrSoloEnArchivo
 	}
 	if (*estado != "AUTORIZADO" && *estado != "ANULADO") || firmado == nil || numero == nil || fecha == nil {
 		return d, apperr.New(apperr.Conflict, "NO_AUTORIZADO", "La factura todavía no está autorizada por el SRI.")
@@ -112,11 +153,19 @@ func (d Documentos) Mensaje() (mail.Message, error) {
 // Enviar manda el correo y deja el intento registrado (salga bien o mal).
 func (c *Correos) Enviar(ctx context.Context, tenant, comprobante ids.ID, destino, motivo string, por *ids.ID) error {
 	var d Documentos
-	if err := c.DB.InTenant(ctx, tenant, func(tx db.Tx) error {
+	err := c.DB.InTenant(ctx, tenant, func(tx db.Tx) error {
 		var err error
 		d, err = LeerDocumentos(ctx, tx, comprobante)
 		return err
-	}); err != nil {
+	})
+	if errors.Is(err, ErrSoloEnArchivo) && c.Archivo != nil {
+		doc, errA := c.Archivo.Leer(ctx, tenant, comprobante)
+		if errA != nil {
+			return errA
+		}
+		d, err = DocumentosDesdeArchivo(doc, d.Nombre, d.Correo)
+	}
+	if err != nil {
 		return err
 	}
 	if destino == "" {

@@ -17,6 +17,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/archivo"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/auth"
@@ -46,6 +47,8 @@ type env struct {
 	// kek es la llave privada que en producción solo tiene el worker fiscal.
 	kek *certificados.KEKPrivada
 	sri *httptest.Server // stub del SRI para el worker fiscal
+	// arch es el archivo inmutable que usan la bóveda y el correo (su reloj va un día adelante).
+	arch *archivo.Archivador
 }
 
 var (
@@ -81,6 +84,7 @@ func newEnv(t *testing.T) *env {
 	signer := auth.NewSigner(key, clk.Now)
 	img := &imagenes.Service{Store: &imagenes.Memory{}}
 	pub, priv := kekPrueba(t)
+	arch := &archivo.Archivador{DB: tdb.App, Store: &imagenes.Memory{}, Log: slog.Default(), Now: func() time.Time { return time.Now().Add(24 * time.Hour) }}
 	deps := server.Deps{
 		DB: tdb.App, Signer: signer, Now: clk.Now, BackofficeURL: "http://bo.test",
 		Auth:       &auth.Handlers{Svc: &auth.Service{DB: tdb.App, Signer: signer, Mail: m, Clock: clk, BackofficeURL: "http://bo.test"}},
@@ -92,8 +96,8 @@ func newEnv(t *testing.T) *env {
 		Impresoras: &impresoras.Service{DB: tdb.App, Clock: clk},
 		Caja:       &caja.Service{DB: tdb.App}, Clientes: &caja.Clientes{DB: tdb.App}, Facturacion: &facturacion.Service{DB: tdb.App},
 		Certificados: &certificados.Service{DB: tdb.App, KEK: pub, Now: clk.Now},
-		Boveda: &facturacion.Boveda{DB: tdb.App, Correos: &facturacion.Correos{DB: tdb.App, Mail: m, Log: slog.Default()},
-			Archivo: &archivo.Archivador{DB: tdb.App, Store: &imagenes.Memory{}, Log: slog.Default(), Now: clk.Now}},
+		Boveda: &facturacion.Boveda{DB: tdb.App, Correos: &facturacion.Correos{DB: tdb.App, Mail: m, Log: slog.Default(), Archivo: arch},
+			Archivo: arch},
 		Reportes: &reportes.Service{DB: tdb.App},
 	}
 	ctx, cancel := context.WithCancel(context.Background())
@@ -102,7 +106,7 @@ func newEnv(t *testing.T) *env {
 	srv := httptest.NewServer(server.Handler(deps, server.Routes(deps)))
 	img.PublicURL = srv.URL
 	t.Cleanup(srv.Close)
-	return &env{t: t, tdb: tdb, srv: srv, mail: m, ten: &tenants.Service{DB: tdb.App, Mail: m, BackofficeURL: "http://bo.test"}, kek: priv}
+	return &env{t: t, tdb: tdb, srv: srv, mail: m, ten: &tenants.Service{DB: tdb.App, Mail: m, BackofficeURL: "http://bo.test"}, kek: priv, arch: arch}
 }
 
 // cliente simula el backoffice de un usuario con su cookie de refresh.

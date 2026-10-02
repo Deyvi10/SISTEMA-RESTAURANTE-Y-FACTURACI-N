@@ -349,7 +349,7 @@ func (b *Boveda) XML(ctx context.Context, p auth.Principal, id ids.ID) (string, 
 		d, err = LeerDocumentos(ctx, tx, id)
 		return err
 	})
-	if err != nil {
+	if err != nil && !errors.Is(err, ErrSoloEnArchivo) {
 		return "", nil, err
 	}
 	if !firmado {
@@ -360,7 +360,14 @@ func (b *Boveda) XML(ctx context.Context, p auth.Principal, id ids.ID) (string, 
 		if errors.Is(err, apperr.ErrNotFound) {
 			return "", nil, apperr.New(apperr.Conflict, "NO_AUTORIZADO", "La factura todavía no está autorizada por el SRI.")
 		}
-		return "comprobante.xml", doc, err
+		if err != nil {
+			return "", nil, err
+		}
+		nombre := "comprobante.xml"
+		if dd, err := DocumentosDesdeArchivo(doc, "", ""); err == nil {
+			nombre = dd.Archivo + ".xml"
+		}
+		return nombre, doc, nil
 	}
 	return d.Archivo + ".xml", d.XML, nil
 }
