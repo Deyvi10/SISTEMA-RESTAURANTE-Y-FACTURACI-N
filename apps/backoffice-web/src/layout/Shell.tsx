@@ -11,6 +11,7 @@ export const SECCIONES = [
   { to: "/nodo", label: "Nodo Local", icono: "servidor", tint: "orange", permiso: "CONFIGURAR_SALON", soloEscritorio: true },
   { to: "/caja", label: "Caja", icono: "caja", tint: "green", permiso: "CONFIGURAR_CAJA" },
   { to: "/impresoras", label: "Impresoras", icono: "printer", tint: "gray", permiso: "CONFIGURAR_SALON", soloEscritorio: true },
+  { to: "/reportes", label: "Reportes", icono: "tendencia", tint: "purple", permiso: "VER_REPORTES" },
   { to: "/comprobantes", label: "Comprobantes", icono: "factura", tint: "teal", permiso: "VER_REPORTES" },
   { to: "/facturacion", label: "Facturación SRI", icono: "receipt", tint: "pink", permiso: "CONFIGURAR_SRI" },
   { to: "/ajustes", label: "Ajustes", icono: "ajustes", tint: "gray", permiso: "CONFIGURAR_SALON" },

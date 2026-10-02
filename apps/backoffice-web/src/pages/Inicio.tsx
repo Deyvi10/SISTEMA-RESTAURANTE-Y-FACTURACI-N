@@ -1,6 +1,7 @@
 import { Link } from "react-router";
 import { useResumen } from "../api/hooks";
 import { useSession } from "../api/session";
+import { AlertasFiscales } from "../components/AlertasFiscales";
 import { AppIcon, Spinner } from "../components/ui";
 import { Icon } from "../lib/icons";
 
@@ -15,6 +16,7 @@ export function Inicio() {
   const listo = data.progreso === 100;
   return (
     <>
+      <AlertasFiscales />
       <section className="welcome">
         <div>
           <h1>{listo ? `¡Todo listo, ${nombre}!` : `Hola, ${nombre}. Preparemos ${data.nombreComercial}.`}</h1>

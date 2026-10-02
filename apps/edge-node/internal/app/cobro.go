@@ -99,6 +99,8 @@ type DocumentoVenta struct {
 	Cajero                  string    `json:"cajero"`
 	TurnoID                 ids.ID    `json:"turnoId"`
 	EmitidoAt               time.Time `json:"emitidoAt"`
+	// FechaNegocio de la jornada de la orden (AAAA-MM-DD): los reportes van por jornada (F5-16).
+	FechaNegocio string `json:"fechaNegocio,omitempty"`
 }
 
 type CobroOut struct {
@@ -294,6 +296,7 @@ func (a *App) Cobrar(ctx context.Context, u Usuario, orden ids.ID, in CobrarIn) 
 			Comprador: comprador.RazonSocial, CompradorTipo: comprador.TipoIdentificacion, CompradorIdentificacion: comprador.Identificacion,
 			CompradorEmail: comprador.Email, CompradorDireccion: comprador.Direccion, CompradorTelefono: comprador.Telefono, Totales: tot, Metodo: metodo, Pagos: docPagos, Recibido: recibido.String(), Vuelto: vuelto.String(),
 			AbreCajon: abreCajon, Cajero: u.Nombre, TurnoID: t.ID, EmitidoAt: now}
+		_ = tx.QueryRowContext(ctx, `SELECT fecha_negocio FROM ordenes WHERE id = ?`, o.ID.String()).Scan(&doc.FechaNegocio)
 		// Con consentimiento, el comprador queda guardado para la próxima compra (LOPDP).
 		if !esCF && comprador.Consentimiento {
 			if _, err := a.guardarClienteEnTx(ctx, tx, comprador, now); err != nil {

@@ -36,6 +36,7 @@ import (
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/platform/config"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/platform/db"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/platform/mail"
+	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/reportes"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/salon"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/server"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/tenants"
@@ -194,11 +195,13 @@ func serve(ctx context.Context) error {
 		Certificados: &certificados.Service{DB: app.DB, KEK: kek, Now: app.Clock.Now},
 		Boveda: &facturacion.Boveda{DB: app.DB, Correos: &facturacion.Correos{DB: app.DB, Mail: app.Mail, Log: slog.Default()},
 			Archivo: archivador},
+		Reportes: &reportes.Service{DB: app.DB},
 	}
 	go deps.Nodos.Avisos.Escuchar(ctx, app.DB.Pool, slog.Default())
 	go (&caja.Notificador{DB: app.DB, Mail: app.Mail, Log: slog.Default()}).Correr(ctx, app.DB.Pool)
 	go deps.Boveda.Correos.Correr(ctx, app.DB.Pool)
 	go archivador.Correr(ctx)
+	go (&facturacion.NotificadorAlertas{DB: app.DB, Mail: app.Mail, Log: slog.Default(), Now: app.Clock.Now}).Correr(ctx)
 	srv := &http.Server{
 		Addr: cfg.HTTPAddr, Handler: server.Handler(deps, server.Routes(deps)),
 		ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 30 * time.Second, WriteTimeout: 60 * time.Second, IdleTimeout: 120 * time.Second,

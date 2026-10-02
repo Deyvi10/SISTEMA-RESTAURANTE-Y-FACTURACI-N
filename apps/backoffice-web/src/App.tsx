@@ -5,6 +5,7 @@ import { Shell } from "./layout/Shell";
 import { CambiarClave, Login, Olvide, Restablecer } from "./pages/Acceso";
 import { Caja } from "./pages/Caja";
 import { Comprobantes } from "./pages/Comprobantes";
+import { Reportes } from "./pages/Reportes";
 import { Facturacion } from "./pages/Facturacion";
 import { Inicio } from "./pages/Inicio";
 import { Impresoras } from "./pages/Impresoras";
@@ -46,6 +47,7 @@ export function App() {
         <Route path="caja" element={<Caja />} />
         <Route path="facturacion" element={<Facturacion />} />
         <Route path="comprobantes" element={<Comprobantes />} />
+        <Route path="reportes" element={<Reportes />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

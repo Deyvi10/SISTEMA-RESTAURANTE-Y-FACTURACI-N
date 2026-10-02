@@ -30,6 +30,7 @@ import (
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/personal"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/platform/mail"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/platform/testdb"
+	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/reportes"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/salon"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/server"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/tenants"
@@ -93,6 +94,7 @@ func newEnv(t *testing.T) *env {
 		Certificados: &certificados.Service{DB: tdb.App, KEK: pub, Now: clk.Now},
 		Boveda: &facturacion.Boveda{DB: tdb.App, Correos: &facturacion.Correos{DB: tdb.App, Mail: m, Log: slog.Default()},
 			Archivo: &archivo.Archivador{DB: tdb.App, Store: &imagenes.Memory{}, Log: slog.Default(), Now: clk.Now}},
+		Reportes: &reportes.Service{DB: tdb.App},
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)

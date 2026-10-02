@@ -1,7 +1,7 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { del, get, post, put, patch } from "./client";
 import type {
-  Caja, Categoria, CodigoNodo, MetodoPago, MotivoDescuento, ComandoNodo, Estacion, Impresora, ImpresoraInstalada, FotoGaleria, Grupo, IconoCategoria, Imagen, Local, Mesa, NodoLocal, PermisosPersona, Persona, Producto, Resumen, TarifaIVA, Zona, ConfigFiscal, Certificado, CambioRegimen, DetalleComprobante, FilaComprobante, ListaComprobantes } from "./types";
+  Caja, Categoria, CodigoNodo, MetodoPago, MotivoDescuento, ComandoNodo, Estacion, Impresora, ImpresoraInstalada, FotoGaleria, Grupo, IconoCategoria, Imagen, Local, Mesa, NodoLocal, PermisosPersona, Persona, Producto, Resumen, TarifaIVA, Zona, ConfigFiscal, Certificado, CambioRegimen, AlertaFiscal, CierreZFila, ResumenVentas, DetalleComprobante, FilaComprobante, ListaComprobantes } from "./types";
 
 export const useResumen = () => useQuery({ queryKey: ["resumen"], queryFn: () => get<Resumen>("/v1/resumen") });
 export const useTarifas = () => useQuery({ queryKey: ["tarifas"], queryFn: () => get<TarifaIVA[]>("/v1/tarifas-iva"), staleTime: Infinity });
@@ -32,6 +32,12 @@ export const useComprobantes = (filtro: Record<string, string>) =>
   });
 export const useComprobante = (id: string | null) =>
   useQuery({ queryKey: ["comprobante", id], queryFn: () => get<DetalleComprobante>(`/v1/comprobantes/${id}`), enabled: !!id });
+export const useAlertasFiscales = (activo = true) =>
+  useQuery({ queryKey: ["alertas-fiscales"], queryFn: () => get<AlertaFiscal[]>("/v1/alertas/fiscales"), refetchInterval: 60_000, enabled: activo });
+export const useVentas = (desde: string, hasta: string) =>
+  useQuery({ queryKey: ["ventas", desde, hasta], queryFn: () => get<ResumenVentas>(`/v1/reportes/ventas?desde=${desde}&hasta=${hasta}`) });
+export const useCierresZ = (desde: string, hasta: string) =>
+  useQuery({ queryKey: ["cierres", desde, hasta], queryFn: () => get<CierreZFila[]>(`/v1/reportes/cierres?desde=${desde}&hasta=${hasta}`) });
 export const useCajas = () => useQuery({ queryKey: ["cajas"], queryFn: () => get<Caja[]>("/v1/cajas") });
 export const useFacturacion = () => useQuery({ queryKey: ["facturacion"], queryFn: () => get<ConfigFiscal>("/v1/facturacion") });
 export const useMetodosPago = () => useQuery({ queryKey: ["metodos-pago"], queryFn: () => get<MetodoPago[]>("/v1/metodos-pago") });

@@ -18,6 +18,7 @@ import (
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/personal"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/platform/db"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/platform/httpx"
+	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/reportes"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/apps/cloud-api/internal/salon"
 	"github.com/Deyvi10/SISTEMA-RESTAURANTE-Y-FACTURACI-N/packages/go/rbac"
 )
@@ -54,6 +55,7 @@ type Deps struct {
 	Facturacion   *facturacion.Service
 	Certificados  *certificados.Service
 	Boveda        *facturacion.Boveda
+	Reportes      *reportes.Service
 	BackofficeURL string
 }
 
@@ -149,6 +151,11 @@ func Routes(d Deps) []Route {
 		{"PUT", "/v1/cajas/{id}/punto-emision", sri, update(d.Facturacion.AsignarPunto)},
 		{"PUT", "/v1/facturacion/cambio-programado", sri, create(d.Facturacion.ProgramarCambio)},
 		{"DELETE", "/v1/facturacion/cambio-programado", sri, list(d.Facturacion.CancelarCambio)},
+		{"GET", "/v1/alertas/fiscales", reportes, list(d.Facturacion.AlertasFiscales)},
+		{"GET", "/v1/reportes/ventas", reportes, d.Reportes.HandleVentas},
+		{"GET", "/v1/reportes/ventas.xlsx", reportes, d.Reportes.HandleExcel},
+		{"GET", "/v1/reportes/cierres", reportes, d.Reportes.HandleCierres},
+		{"GET", "/v1/reportes/cierres/{id}/pdf", reportes, d.Reportes.HandleCierrePDF},
 		{"GET", "/v1/comprobantes", reportes, d.Boveda.HandleListar},
 		{"GET", "/v1/comprobantes/{id}", reportes, get(d.Boveda.Obtener)},
 		{"GET", "/v1/comprobantes/{id}/xml", reportes, d.Boveda.HandleDescargar("xml")},

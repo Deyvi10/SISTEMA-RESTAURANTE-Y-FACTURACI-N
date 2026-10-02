@@ -383,3 +383,43 @@ export interface DetalleComprobante extends FilaComprobante {
   correos: { destino: string; motivo: string; ok: boolean; fecha: string }[];
   mensajes: { Identificador: string; Mensaje: string; InformacionAdicional: string; Tipo: string }[];
 }
+
+/** Alerta fiscal (F5-16). */
+export interface AlertaFiscal {
+  clave: string;
+  nivel: "ADVERTENCIA" | "CRITICA";
+  titulo: string;
+  accion: string;
+  enlace: string;
+}
+
+export interface TotalesVentas {
+  documentos: number;
+  subtotal: string;
+  iva: string;
+  propina: string;
+  descuento: string;
+  total: string;
+}
+
+export interface ResumenVentas {
+  desde: string;
+  hasta: string;
+  dias: (TotalesVentas & { fecha: string })[];
+  total: TotalesVentas;
+  ticketPromedio: string;
+  porMetodo: { metodo: string; monto: string; pagos: number }[];
+  notasCredito: { cantidad: number; valor: string };
+  neto: string;
+}
+
+export interface CierreZFila {
+  id: string;
+  numero: number;
+  caja: string;
+  cajero: string;
+  fechaNegocio: string;
+  cerradoAt: string;
+  resultado: "CUADRADO" | "SOBRANTE" | "FALTANTE";
+  hashValido: boolean;
+}

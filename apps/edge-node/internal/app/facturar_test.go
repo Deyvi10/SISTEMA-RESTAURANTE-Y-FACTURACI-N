@@ -151,6 +151,13 @@ func TestCobroEmiteLaFactura(t *testing.T) {
 		t.Fatalf("evento: %v", ev["claveAcceso"])
 	}
 
+	// F5-16: la venta lleva su fecha de negocio (jornada) para los reportes.
+	var venta string
+	_ = c.a.Store.Read().QueryRow(`SELECT payload FROM outbox WHERE tipo = ? ORDER BY rowid DESC LIMIT 1`, EventoVentaCobrada).Scan(&venta)
+	if !strings.Contains(venta, `"fechaNegocio":"2026-09-25"`) {
+		t.Fatalf("la venta no lleva su jornada: %.200s", venta)
+	}
+
 	// La siguiente venta toma el secuencial siguiente.
 	orden2, _ := c.ordenEnMesa(t, tel, "factura-0002", c.mesa2, plato(c.cerveza, "1"))
 	if st, out, raw := c.cobrar(orden2, c.efectivo.String(), "", "cobro-fact-2"); st != 200 || out.Documento.Codigo != "001-002-000000002" {

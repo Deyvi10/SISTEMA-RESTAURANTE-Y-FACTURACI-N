@@ -136,6 +136,14 @@ func (c *cliente) nodoOperativo() *nodoSim {
 	if err := arch.EntrenarSiHaceFalta(context.Background(), tid); err != nil {
 		c.e.t.Fatal(err)
 	}
+	// Una venta para los reportes y una alerta enviada (F5-16).
+	n.venta("2026-09-25", "12.50", "Efectivo")
+	if err := c.e.tdb.App.InTenant(context.Background(), tid, func(tx pgx.Tx) error {
+		_, err := tx.Exec(context.Background(), `INSERT INTO alertas_enviadas (tenant_id, clave, dia, detalle) VALUES (app_tenant(), 'prueba', current_date, 'x')`)
+		return err
+	}); err != nil {
+		c.e.t.Fatal(err)
+	}
 	n.cierreZ(cajas[0].ID, 1, "", "-0.50")
 	c.e.notificarCierres()
 	n.cliente(caja.Cliente{ID: ids.New(), TipoIdentificacion: "05", Identificacion: "1710034065", RazonSocial: "María Pérez", Email: "maria@example.com",
